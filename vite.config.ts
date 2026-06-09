@@ -3,6 +3,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // https://vitejs.dev/config/
 export default defineConfig({
   build: {
@@ -46,5 +48,5 @@ export default defineConfig({
       suppressWarnings: true,
       type: 'module',
     },
-  })],
+  }), cloudflare()],
 })
