@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Icon from '../components/Icon';
 import { supabase } from '../lib/supabase';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 type AuthMode = 'login' | 'signup';
 
@@ -30,6 +30,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [authError, setAuthError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -210,13 +211,23 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
                     className="link"
                     onClick={async () => {
                       if (!email.trim()) { setErrors(e => ({ ...e, email: true })); return; }
-                      await supabase.auth.resetPasswordForEmail(email.trim());
                       setAuthError('');
-                      alert('Un e-mail de réinitialisation a été envoyé.');
+                      setResetSent(false);
+                      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) { setAuthError(error.message); return; }
+                      setResetSent(true);
                     }}
                   >
                     Mot de passe oublié ?
                   </button>
+                </div>
+              )}
+
+              {resetSent && (
+                <div className="auth-success" role="status">
+                  <Icon name="check" ariaHidden /> E-mail envoyé — vérifiez votre boîte de réception.
                 </div>
               )}
 

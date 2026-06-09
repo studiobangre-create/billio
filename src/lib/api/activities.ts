@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import { INITIAL_ACTIVITY } from '../../data';
 import type { Activity } from '../schemas';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 function dbToActivity(row: Record<string, unknown>): Activity {
   const ts = new Date(String(row.created_at));

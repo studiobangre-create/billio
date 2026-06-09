@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import { INITIAL_INVOICES } from '../../data';
 import type { Invoice } from '../schemas';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 function dbToInvoice(row: Record<string, unknown>): Invoice {
   return {

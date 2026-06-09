@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from './context/AppContext';
 import AppShell from './components/AppShell';
 import AuthPage from './pages/AuthPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import InvitePage from './pages/InvitePage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import InvoicesPage from './pages/InvoicesPage';
@@ -16,18 +18,26 @@ import QuotesPage from './pages/QuotesPage';
 import TemplatesPage from './pages/TemplatesPage';
 import SettingsPage from './pages/SettingsPage';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 export default function App() {
+  const navigate = useNavigate();
   const [mockAuthed, setMockAuthed] = useState(false);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     if (MOCK) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+        navigate('/reset-password');
+      }
+    });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   if (!MOCK && session === undefined) return null; // resolving auth state
 
@@ -42,46 +52,53 @@ export default function App() {
         {/* Public */}
         <Route
           path="/login"
-          element={authed
+          element={authed && !isRecovery
             ? <Navigate to="/dashboard" replace />
             : <AuthPage onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
           }
         />
-
-        {/* Onboarding — full-screen, no AppShell */}
         <Route
-          path="/onboarding"
-          element={authed ? <OnboardingPage /> : <Navigate to="/login" replace />}
+          path="/reset-password"
+          element={isRecovery
+            ? <ResetPasswordPage onDone={() => setIsRecovery(false)} />
+            : <Navigate to="/login" replace />
+          }
         />
+        <Route path="/invite/:token" element={<InvitePage />} />
 
         {/* Protected — AppShell is the layout, Outlet renders child routes */}
         <Route
-          element={authed ? <OnboardingGuard><AppShell onLogout={onLogout} /></OnboardingGuard> : <Navigate to="/login" replace />}
+          element={authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/login" replace />}
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/invoices" element={<InvoicesPage />} />
-          <Route path="/invoices/:id" element={<InvoicePage />} />
-          {/* Stub routes — will get real pages later */}
-          <Route path="/clients"  element={<ClientsPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
-          <Route path="/payments" element={<PaymentsPage />} />
-          <Route path="/quotes"     element={<QuotesPage />} />
-          <Route path="/templates" element={<TemplatesPage />} />
-          <Route path="/settings"  element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Onboarding renders inside AppShell (gets the sidebar), not guarded */}
+          <Route path="/onboarding" element={<OnboardingPage />} />
+
+          {/* All other routes redirect to /onboarding when setup is missing */}
+          <Route element={<OnboardingGuard />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/invoices/:id" element={<InvoicePage />} />
+            <Route path="/clients"  element={<ClientsPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
+            <Route path="/payments" element={<PaymentsPage />} />
+            <Route path="/quotes"     element={<QuotesPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/settings"  element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
         </Route>
       </Routes>
     </AppProvider>
   );
 }
 
-function OnboardingGuard({ children }: { children: React.ReactNode }) {
+function OnboardingGuard() {
   const { needsOnboarding, loading } = useApp();
   if (loading) return null;
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
-  return <>{children}</>;
+  return <Outlet />;
 }
 
 function PlaceholderPage({ title }: { title: string }) {

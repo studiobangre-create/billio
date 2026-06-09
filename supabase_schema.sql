@@ -44,6 +44,7 @@ create or replace function public.my_org_ids()
 returns setof uuid
 language sql stable security definer
 set search_path = public
+set row_security = off          -- bypass RLS to avoid infinite recursion
 as $$
   select org_id from public.org_members where user_id = auth.uid();
 $$;
@@ -52,6 +53,7 @@ create or replace function public.my_admin_org_ids()
 returns setof uuid
 language sql stable security definer
 set search_path = public
+set row_security = off          -- bypass RLS to avoid infinite recursion
 as $$
   select org_id from public.org_members
   where user_id = auth.uid() and role in ('owner', 'admin');
@@ -77,13 +79,29 @@ create policy "orgs: owner can update" on public.organizations
 
 alter table public.org_members enable row level security;
 
--- any member can see who else is in their org
+-- SELECT only: non-recursive, no function call
 create policy "org_members: read own org" on public.org_members
-  for select using (org_id in (select public.my_org_ids()));
+  for select using (user_id = auth.uid());
 
--- only owners can add / remove / change members
-create policy "org_members: owner manages" on public.org_members
-  for all using (
+-- WRITE only: subquery triggers only the SELECT policy above (non-recursive)
+create policy "org_members: owner insert" on public.org_members
+  for insert with check (
+    org_id in (
+      select org_id from public.org_members
+      where user_id = auth.uid() and role = 'owner'
+    )
+  );
+
+create policy "org_members: owner update" on public.org_members
+  for update using (
+    org_id in (
+      select org_id from public.org_members
+      where user_id = auth.uid() and role = 'owner'
+    )
+  );
+
+create policy "org_members: owner delete" on public.org_members
+  for delete using (
     org_id in (
       select org_id from public.org_members
       where user_id = auth.uid() and role = 'owner'

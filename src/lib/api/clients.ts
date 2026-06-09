@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import { INITIAL_CLIENTS } from '../../data';
 import type { ClientRecord } from '../schemas';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 function dbToClient(row: Record<string, unknown>): ClientRecord {
   return {

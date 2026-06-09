@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import { INITIAL_PAYMENTS } from '../../data';
 import type { Payment } from '../schemas';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 function dbToPayment(row: Record<string, unknown>): Payment {
   return {

@@ -100,12 +100,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const resolvedOrgId = membership?.org_id ?? '';
       setOrgId(resolvedOrgId);
 
-      if (resolvedOrgId) {
-        const { data: org } = await supabase
+      if (!resolvedOrgId) {
+        // No org membership found — new user whose trigger hasn't run yet
+        setNeedsOnboarding(true);
+      } else {
+        const { data: org, error: orgErr } = await supabase
           .from('organizations')
           .select('onboarding_completed_at')
           .eq('id', resolvedOrgId)
           .single();
+        if (orgErr) console.warn('[boot] org fetch error:', orgErr.message);
         setNeedsOnboarding(!org?.onboarding_completed_at);
       }
 

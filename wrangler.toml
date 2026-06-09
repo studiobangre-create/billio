@@ -1,0 +1,34 @@
+name = "billio"
+account_id = "b387ad0edb069857cdf76793aa0855cc"
+compatibility_date = "2025-06-09"
+
+# Pure SPA — no custom Worker entry needed.
+# All routing is handled by the static-assets not_found_handling below.
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+# ── Environment overrides ─────────────────────────────────────
+# VITE_* vars are injected by Vite at BUILD time (they're baked
+# into the JS bundle). They are NOT runtime Worker vars — do NOT
+# put them in [vars] here.
+#
+# Set them before running `vite build`:
+#   VITE_SUPABASE_URL=...
+#   VITE_SUPABASE_ANON_KEY=...
+#   VITE_MOCK_AUTH=false
+#   VITE_SENTRY_DSN=...  (optional)
+#
+# For CI (GitHub Actions): add as repository secrets.
+# For local builds: set in .env.local (never commit that file).

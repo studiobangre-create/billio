@@ -9,7 +9,14 @@
       "Bash(git -C /Users/serge/workspace/billio diff --stat)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git -C /Users/serge/workspace/billio push)"
+      "Bash(git -C /Users/serge/workspace/billio push)",
+      "Read(//Users/serge/.claude/skills/cloudflare/references/static-assets/**)",
+      "Read(//Users/serge/.claude/skills/cloudflare/references/workers/**)",
+      "Bash(npx wrangler *)",
+      "Bash(bunx wrangler *)",
+      "Bash(npm run *)",
+      "Bash(curl -s https://kqywszzcivoxxxsljlzw.supabase.co/rest/v1/pending_invitations?limit=0 -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxeXdzenpjaXZveHh4c2xqbHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTkwOTcsImV4cCI6MjA5NjMzNTA5N30.8qCvAgKyXKO0LGA7uP6Cw2nBnm5NwCMUoWNF9z329d4' -I)",
+      "Bash(curl -s 'https://kqywszzcivoxxxsljlzw.supabase.co/rest/v1/pending_invitations?select=*&limit=1' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxeXdzenpjaXZveHh4c2xqbHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTkwOTcsImV4cCI6MjA5NjMzNTA5N30.8qCvAgKyXKO0LGA7uP6Cw2nBnm5NwCMUoWNF9z329d4' -H 'Accept: application/json')"
     ]
   }
 }
