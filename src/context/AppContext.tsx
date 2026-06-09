@@ -9,7 +9,7 @@ import { fetchQuotes }     from '../lib/api/quotes';
 import { fetchActivities } from '../lib/api/activities';
 import type { Invoice, Activity, ClientRecord, Payment, Product, Quote, Client } from '../lib/schemas';
 
-const MOCK = import.meta.env.VITE_MOCK_AUTH === 'false';
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 interface AppContextValue {
   // Entities
