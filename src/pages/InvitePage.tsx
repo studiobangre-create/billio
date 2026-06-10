@@ -41,6 +41,7 @@ export default function InvitePage() {
   const [showPw,    setShowPw]    = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [authError,  setAuthError]  = useState('');
+  const [confirmPending, setConfirmPending] = useState(false);
 
   useEffect(() => {
     if (!token) { setNotFound(true); setLoading(false); return; }
@@ -76,6 +77,15 @@ export default function InvitePage() {
           password,
         });
         if (signUpErr) throw signUpErr;
+
+        if (!signUpData.session) {
+          // Email confirmation required — user must confirm before the invite
+          // can be accepted. The invite link remains valid after confirmation.
+          setConfirmPending(true);
+          setSubmitting(false);
+          return;
+        }
+
         userId = signUpData.user?.id;
       } else {
         userId = signInData.user?.id;
@@ -116,6 +126,23 @@ export default function InvitePage() {
             <button className="submit-btn" style={{ marginTop: 24 }} onClick={() => navigate('/login')}>
               Aller à la connexion <Icon name="arrow-right" ariaHidden />
             </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  if (confirmPending) return (
+    <div className="auth-root">
+      <div className="auth-card" style={{ maxWidth: 420 }}>
+        <section className="form-panel" style={{ borderRadius: 'inherit' }}>
+          <div className="fp-inner">
+            <div className="fp-eyebrow">Vérification requise</div>
+            <div className="fp-title">Confirmez votre adresse e-mail</div>
+            <div className="fp-sub">
+              Un e-mail de confirmation a été envoyé à <strong>{invite!.email}</strong>.
+              Cliquez sur le lien dans cet e-mail, puis revenez sur ce lien d'invitation pour rejoindre l'équipe.
+            </div>
           </div>
         </section>
       </div>

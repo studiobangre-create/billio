@@ -47,8 +47,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [products,  setProducts]  = useState<Product[]>(MOCK ? INITIAL_PRODUCTS : []);
   const [quotes,    setQuotes]    = useState<Quote[]>(MOCK ? INITIAL_QUOTES : []);
 
-  const [userId,          setUserId]          = useState('mock-user');
-  const [orgId,           setOrgId]           = useState('mock-org');
+  const [userId,          setUserId]          = useState(MOCK ? 'mock-user' : '');
+  const [orgId,           setOrgId]           = useState(MOCK ? 'mock-org'  : '');
   const [userLabel,       setUserLabel]       = useState('');
   const [userInitials,    setUserInitials]    = useState('??');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
