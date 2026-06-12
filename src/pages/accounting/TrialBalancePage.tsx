@@ -193,7 +193,7 @@ export default function TrialBalancePage() {
                   <span />
                 </div>
 
-                {acctRows.map((a, i) => {
+                {acctRows.map((a) => {
                   const m = mvtOf(a.num);
                   const signed = signedOf(a.num);
                   return (

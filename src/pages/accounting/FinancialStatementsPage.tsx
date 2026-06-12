@@ -39,7 +39,7 @@ function SheetRowEl({ row }: { row: SheetRow }) {
 function BalanceSheet({ signedOf }: Pick<Fns, 'signedOf'>) {
   // Actif
   const software = signedOf('211') + signedOf('281');
-  const equipment = signedOf('2441') + signedOf('2441') > 0 ? signedOf('2441') : 0;
+  const _equipment = signedOf('2441') + signedOf('2441') > 0 ? signedOf('2441') : 0;
   const transport = signedOf('2451');
   const amortMat = Math.abs(signedOf('2818'));
   const netImmo = Math.max(0, signedOf('211')) + Math.max(0, signedOf('2441')) + Math.max(0, signedOf('2451')) - amortMat;

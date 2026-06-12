@@ -46,7 +46,7 @@ function fmtCompact(n: number) {
 const TVA = 0.18;
 
 export default function QuotesPage() {
-  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, userId, orgId, loading } = useApp();
+  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, orgId, loading } = useApp();
 
   if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');

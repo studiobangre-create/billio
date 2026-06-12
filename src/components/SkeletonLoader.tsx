@@ -44,7 +44,7 @@ function SkeletonTableRows({ rows = 5, cols = [180, 140, 120, 80, 60] }: { rows?
       </div>
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="skel-row">
-          {cols.map((w, j) => (
+          {cols.map((_w, j) => (
             <div key={j} style={{ flex: j === 0 ? 2 : 1 }}>
               <S w="80%" h={j === 0 ? 13 : 12} />
               {j === 0 && <S w="55%" h={10} r={4} />}

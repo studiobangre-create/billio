@@ -188,8 +188,9 @@ export default function SuppliersPage() {
       date:      form.date,
       dueDate:   form.dueDate,
       htAmount:  ht,
-      tvaAmount: Math.round(ht * TVA_RATE),
-      status:    'open',
+      tvaAmount:     Math.round(ht * TVA_RATE),
+      status:        'open',
+      paymentMethod: 'wire',
     });
   };
 
