@@ -113,8 +113,8 @@ function AccountSelect({
 }
 
 function AmtInput({
-  value, field, onChange, highlight,
-}: { value: number; field: 'd' | 'c'; onChange: (n: number) => void; highlight?: boolean }) {
+  value, onChange, highlight,
+}: { value: number; onChange: (n: number) => void; highlight?: boolean }) {
   const [raw, setRaw] = useState(value ? grp(value) : '');
 
   return (
@@ -449,7 +449,7 @@ export default function OpeningBalancesPage() {
     const side = ecart > 0 ? 'crédit' : 'débit';
     if (balanced) return {
       ok: true,
-      text: <>Balanced — débit = crédit = <b>{grp(totD)} XOF</b>. Ready to adopt as your opening position.</>,
+      text: <>Équilibrée — débit = crédit = <b>{grp(totD)} F CFA</b>. Prête à être adoptée comme position d'ouverture.</>,
     };
     return {
       ok: false,
@@ -598,8 +598,8 @@ export default function OpeningBalancesPage() {
                       <span style={{ width: 9, height: 9, borderRadius: 3, flexShrink: 0, background: dotColor, transition: 'background .15s', display: 'inline-block' }} />
                       <AccountSelect value={l.acct} onChange={v => updateAcct(l.id, v)} />
                     </div>
-                    <AmtInput value={l.d} field="d" highlight={!!l.d} onChange={n => updateAmt(l.id, 'd', n)} />
-                    <AmtInput value={l.c} field="c" onChange={n => updateAmt(l.id, 'c', n)} />
+                    <AmtInput value={l.d} highlight={!!l.d} onChange={n => updateAmt(l.id, 'd', n)} />
+                    <AmtInput value={l.c} onChange={n => updateAmt(l.id, 'c', n)} />
                     <button
                       onClick={() => delLine(l.id)}
                       title="Remove"
