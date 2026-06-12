@@ -145,7 +145,7 @@ function ProfileSection() {
 
 const COUNTRIES = ['Burkina Faso', "Côte d'Ivoire", 'Mali', 'Niger', 'Sénégal', 'Togo', 'Bénin', 'Guinée'];
 const CURRENCIES = [
-  { value: 'XOF', label: 'XOF — Franc CFA' },
+  { value: 'F CFA', label: 'F CFA — Franc CFA' },
   { value: 'EUR', label: 'EUR — Euro' },
   { value: 'USD', label: 'USD — Dollar' },
   { value: 'GHS', label: 'GHS — Cedi' },
@@ -154,15 +154,19 @@ const CURRENCIES = [
 
 /* ─── Business ─────────────────────────────────────────────────── */
 function BusinessSection() {
-  const { orgId, showToast } = useApp();
+  const { orgId, showToast, setOrgSettings } = useApp();
 
   const [name,     setName]    = useState('');
-  const [ifu,      setIfu]     = useState('');
-  const [rccm,     setRccm]    = useState('');
+  const [ifu,             setIfu]            = useState('');
+  const [rccm,            setRccm]           = useState('');
+  const [taxRegime,       setTaxRegime]      = useState('');
+  const [divisionFiscale, setDivisionFiscale]= useState('');
   const [address,  setAddress] = useState('');
   const [city,     setCity]    = useState('');
   const [country,  setCountry] = useState('Burkina Faso');
-  const [currency, setCurrency]= useState('XOF');
+  const [currency, setCurrency]= useState('F CFA');
+  const [email,    setEmail]   = useState('');
+  const [phone,    setPhone]   = useState('');
   const [loading,  setLoading] = useState(true);
   const [saving,   setSaving]  = useState(false);
 
@@ -170,19 +174,23 @@ function BusinessSection() {
     if (!orgId) return;
     supabase
       .from('organizations')
-      .select('name, ifu, rccm, address, city, country, currency')
+      .select('name, ifu, rccm, tax_regime, division_fiscale, address, city, country, currency, email, phone')
       .eq('id', orgId)
       .single()
       .then(({ data, error }) => {
         if (error) { console.warn('[settings] org fetch:', error.message); setLoading(false); return; }
         if (!data) return;
         setName(data.name     ?? '');
-        setIfu(data.ifu       ?? '');
-        setRccm(data.rccm     ?? '');
+        setIfu(data.ifu               ?? '');
+        setRccm(data.rccm             ?? '');
+        setTaxRegime(data.tax_regime       ?? '');
+        setDivisionFiscale(data.division_fiscale ?? '');
         setAddress(data.address ?? '');
         setCity(data.city     ?? '');
         setCountry(data.country  ?? 'Burkina Faso');
-        setCurrency(data.currency ?? 'XOF');
+        setCurrency(data.currency ?? 'F CFA');
+        setEmail(data.email   ?? '');
+        setPhone(data.phone   ?? '');
         setLoading(false);
       });
   }, [orgId]);
@@ -192,10 +200,11 @@ function BusinessSection() {
     setSaving(true);
     const { error } = await supabase
       .from('organizations')
-      .update({ name, ifu, rccm, address, city, country, currency })
+      .update({ name, ifu, rccm, tax_regime: taxRegime, division_fiscale: divisionFiscale, address, city, country, currency, email, phone })
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
+    setOrgSettings({ name, ifu, rccm, taxRegime, divisionFiscale, address, city, country, email, phone });
     showToast('Entreprise enregistrée');
   }
 
@@ -220,9 +229,34 @@ function BusinessSection() {
             <input className="form-input" value={rccm} onChange={e => setRccm(e.target.value)} disabled={loading} placeholder="BF-OUA-2021-B-1234" />
           </div>
         </div>
+        <div className="s-field-row">
+          <div className="s-field">
+            <label className="s-label">Régime fiscal</label>
+            <select className="form-input" value={taxRegime} onChange={e => setTaxRegime(e.target.value)} disabled={loading}>
+              <option value="">— Sélectionner —</option>
+              <option value="RNI">RNI — Régime normal d'imposition (CA ≥ 50M F CFA)</option>
+              <option value="RSI">RSI — Régime simplifié d'imposition (CA 15–50M F CFA)</option>
+              <option value="CME">CME — Contribution des micro-entreprises (CA &lt; 15M F CFA)</option>
+            </select>
+          </div>
+          <div className="s-field">
+            <label className="s-label">Division fiscale</label>
+            <input className="form-input" value={divisionFiscale} onChange={e => setDivisionFiscale(e.target.value)} disabled={loading} placeholder="ex. Ouagadougou I" />
+          </div>
+        </div>
         <div className="s-field">
           <label className="s-label">Adresse</label>
           <input className="form-input" value={address} onChange={e => setAddress(e.target.value)} disabled={loading} placeholder="Av. Kwame Nkrumah, Immeuble Baobab" />
+        </div>
+        <div className="s-field-row">
+          <div className="s-field">
+            <label className="s-label">Email de contact</label>
+            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} placeholder="contact@entreprise.bf" />
+          </div>
+          <div className="s-field">
+            <label className="s-label">Téléphone</label>
+            <input className="form-input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} disabled={loading} placeholder="+226 70 00 00 00" />
+          </div>
         </div>
         <div className="s-field-row-3">
           <div className="s-field">
@@ -488,12 +522,12 @@ function ProvidersSection({ onSave }: { onSave: () => void }) {
           <div className="pv-stats">
             <div className="pv-stat">
               <div className="pv-stat-label"><Icon name="credit-card" size={13} /> Collecté (juin)</div>
-              <div className="pv-stat-val tnum">2,41M <small>XOF</small></div>
+              <div className="pv-stat-val tnum">2,41M <small>F CFA</small></div>
               <div className="pv-stat-sub">38 paiements</div>
             </div>
             <div className="pv-stat">
               <div className="pv-stat-label"><Icon name="clock-pause" size={13} /> Prochain virement</div>
-              <div className="pv-stat-val tnum">486K <small>XOF</small></div>
+              <div className="pv-stat-val tnum">486K <small>F CFA</small></div>
               <div className="pv-stat-sub">Demain, J+1</div>
             </div>
             <div className="pv-stat">
@@ -573,7 +607,7 @@ function ProvidersSection({ onSave }: { onSave: () => void }) {
                   <div className="pv-recon-text"><b>{r.inv}</b> — {r.client}</div>
                   <div className="pv-recon-time">{r.time}</div>
                 </div>
-                <div className="pv-recon-amt">+{r.amt} XOF</div>
+                <div className="pv-recon-amt">+{r.amt} F CFA</div>
                 <span className="pv-recon-badge">Réconcilié</span>
               </div>
             ))}
@@ -928,7 +962,7 @@ function PlanSection() {
             <div className="s-plan-badge"><Icon name="sparkles" size={22} /></div>
             <div style={{ flex: 1 }}>
               <div className="s-plan-name">Plan Pro</div>
-              <div className="s-plan-price"><b>9 000 XOF</b> / mois · renouvellement le 6 juillet 2026</div>
+              <div className="s-plan-price"><b>25000 F CFA</b> / mois · renouvellement le 6 juillet 2026</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-sm">Changer</button>

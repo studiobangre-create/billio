@@ -122,15 +122,23 @@ export const STATUS_LABEL: Record<InvoiceStatus, string> = {
 export const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export function fmtCompact(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1) + 'M';
-  if (n >= 1_000) return Math.round(n / 1_000) + 'K';
-  return String(n);
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return (n / 1_000_000).toFixed(a % 1_000_000 === 0 ? 0 : 1) + 'M';
+  return Math.round(n).toLocaleString('fr-FR');
 }
 
 /** Format an ISO date string ("2026-06-01") to French short date ("1 juin"). */
 export function fmtDate(iso: string): string {
   try {
     return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  } catch {
+    return iso;
+  }
+}
+
+export function fmtDateLong(iso: string): string {
+  try {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
     return iso;
   }

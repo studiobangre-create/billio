@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Fixed Assets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+.assets { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.ah, .arow { display: grid; grid-template-columns: 1fr 88px 120px 120px 1.1fr 34px; align-items: center; gap: 14px; padding: 12px 18px; }
+.ah { background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.ah .r { text-align: right; }
+.arow { border-top: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background .1s; }
+.arow:first-child { border-top: none; }
+.arow:hover { background: var(--brand-tint); }
+.as-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.as-ico { width: 36px; height: 36px; border-radius: 9px; background: #F1ECFB; color: #5B45C7; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.as-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.as-sub { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 1px; }
+.as-acct { font-size: 12.5px; font-weight: 700; }
+.as-val { text-align: right; font-size: 13px; font-weight: 600; }
+.as-val .sub { font-size: 10.5px; color: var(--color-text-tertiary); font-weight: 500; margin-top: 1px; }
+.dep-wrap { display: flex; align-items: center; gap: 10px; }
+.dep-track { flex: 1; height: 7px; background: var(--color-background-secondary); border-radius: 4px; overflow: hidden; }
+.dep-fill { height: 100%; background: linear-gradient(90deg, #7A66D8, #5B45C7); border-radius: 4px; }
+.dep-pct { font-size: 11.5px; font-weight: 700; color: #5B45C7; width: 34px; text-align: right; }
+.a-go { color: var(--color-text-tertiary); font-size: 17px; text-align: right; }
+.arow:hover .a-go { color: var(--brand); }
+
+/* drawer */
+.dh-num { font-size: 12px; font-weight: 700; color: #5B45C7; letter-spacing: 0.4px; }
+.dh-label { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-top: 4px; line-height: 1.2; }
+.dh-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 7px; }
+.dstat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.dstat { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.dstat.full { grid-column: 1 / -1; background: #F1ECFB; border-color: transparent; }
+.dstat-l { font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.dstat.full .dstat-l { color: #41329C; }
+.dstat-v { font-size: 18px; font-weight: 800; letter-spacing: -0.3px; margin-top: 5px; }
+.dstat.full .dstat-v { color: #41329C; }
+.dsec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); margin: 4px 0 10px; display: flex; align-items: center; gap: 7px; }
+.sched { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+.sched-r { display: grid; grid-template-columns: 1fr 90px 96px 96px; gap: 0; }
+.sched-h { background: var(--color-background-secondary); font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.sched-r > div { padding: 9px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 12px; }
+.sched-r:last-child > div { border-bottom: none; }
+.sched-r .r { text-align: right; }
+.sched-r.cur { background: #F6F3FD; }
+.sched-r.cur .yr { font-weight: 800; color: #5B45C7; }
+.sched-r.done .yr { color: var(--color-text-tertiary); }
+.yr { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Fixed Assets</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-building-warehouse"></i> Accounting</div>
+        <div class="page-title">Fixed assets</div>
+        <div class="page-sub">Immobilisations · classe 2 · amortissements</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026</span>
+        <button class="btn" onclick="showToast('Depreciation run posted — dotation 180 000 to 681 / 28x')"><i class="ti ti-refresh"></i> Run depreciation</button>
+        <button class="btn btn-primary" onclick="showToast('Asset acquisition wizard would open here')"><i class="ti ti-plus"></i> New asset</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="kpi-strip" id="kpis"></div>
+      <div class="assets">
+        <div class="ah"><div>Immobilisation</div><div>Compte</div><div class="r">Valeur brute</div><div class="r">VNC</div><div>Amortissement</div><div></div></div>
+        <div id="assetRows"></div>
+      </div>
+    </div>
+  </div>
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("assets");
+
+  /* asset register — cumul = depreciation booked to date (incl. à-nouveau + juin run) */
+  var ASSETS = [
+    { id: "IMM-001", name: "Véhicule utilitaire Hilux", icon: "ti-truck-delivery", acct: "2451", amortAcct: "2818", acq: "2024-01-15", gross: 6500000, life: 5, method: "Linéaire", cumul: 2208333 },
+    { id: "IMM-002", name: "Mobilier & matériel de bureau", icon: "ti-briefcase", acct: "2441", amortAcct: "2818", acq: "2023-07-01", gross: 2400000, life: 10, method: "Linéaire", cumul: 691667 },
+    { id: "IMM-003", name: "Licence ERP & logiciels", icon: "ti-server", acct: "211", amortAcct: "281", acq: "2025-03-01", gross: 1800000, life: 3, method: "Linéaire", cumul: 630000 }
+  ];
+
+  function vnc(a) { return a.gross - a.cumul; }
+  function annual(a) { return Math.round(a.gross / a.life); }
+  function pct(a) { return Math.min(100, Math.round((a.cumul / a.gross) * 100)); }
+  function fy(iso) { return iso.split("-")[0]; }
+
+  function renderKpis() {
+    var gross = ASSETS.reduce(function (s, a) { return s + a.gross; }, 0);
+    var cumul = ASSETS.reduce(function (s, a) { return s + a.cumul; }, 0);
+    var net = gross - cumul;
+    var monthDot = ASSETS.reduce(function (s, a) { return s + Math.round(annual(a) / 12); }, 0);
+    var cards = [
+      { ico: "ti-building-warehouse", tint: "#F1ECFB", col: "#5B45C7", label: "Valeur brute", val: A.fmtCompact(gross), unit: "XOF", sub: ASSETS.length + " immobilisations" },
+      { ico: "ti-arrow-down-left", tint: "#FCEBEB", col: "#A32D2D", label: "Amort. cumulés (28x)", val: A.fmtCompact(cumul), unit: "XOF", sub: Math.round((cumul / gross) * 100) + "% amorti" },
+      { ico: "ti-scale", tint: "#E7F3E2", col: "#2E7D32", label: "Valeur nette (VNC)", val: A.fmtCompact(net), unit: "XOF", sub: "Au bilan · actif" },
+      { ico: "ti-refresh", tint: "var(--brand-tint)", col: "var(--brand)", label: "Dotation mensuelle", val: A.fmtCompact(monthDot), unit: "XOF", sub: "→ compte 681" }
+    ];
+    document.getElementById("kpis").innerHTML = cards.map(function (c) {
+      return '<div class="kpi"><div class="kpi-top"><div class="kpi-ico" style="background:' + c.tint + ';color:' + c.col + ';"><i class="ti ' + c.ico + '"></i></div><div class="kpi-label">' + c.label + '</div></div>' +
+        '<div class="kpi-value mono">' + c.val + (c.unit ? '<span class="unit">' + c.unit + '</span>' : '') + '</div><div class="kpi-sub">' + c.sub + '</div></div>';
+    }).join("");
+  }
+
+  function renderAssets() {
+    document.getElementById("assetRows").innerHTML = ASSETS.map(function (a) {
+      return '<div class="arow" data-id="' + a.id + '">' +
+        '<div class="as-cell"><div class="as-ico"><i class="ti ' + a.icon + '"></i></div><div style="min-width:0;"><div class="as-name">' + a.name + '</div><div class="as-sub mono">' + a.id + ' · acq. ' + fy(a.acq) + ' · ' + a.method + '</div></div></div>' +
+        '<div class="as-acct mono">' + a.acct + '</div>' +
+        '<div class="as-val mono">' + A.fmt(a.gross) + '</div>' +
+        '<div class="as-val mono">' + A.fmt(vnc(a)) + '<div class="sub">VNC</div></div>' +
+        '<div class="dep-wrap"><div class="dep-track"><div class="dep-fill" style="width:' + pct(a) + '%;"></div></div><div class="dep-pct mono">' + pct(a) + '%</div></div>' +
+        '<div class="a-go"><i class="ti ti-chevron-right"></i></div></div>';
+    }).join("");
+    document.querySelectorAll(".arow").forEach(function (r) { r.addEventListener("click", function () { openAsset(r.dataset.id); }); });
+    if (window.refreshIcons) refreshIcons(document.getElementById("assetRows"));
+  }
+
+  function openAsset(id) {
+    var a = ASSETS.find(function (x) { return x.id === id; });
+    var ann = annual(a);
+    var startY = parseInt(fy(a.acq), 10);
+    var rows = "";
+    var cumul = 0;
+    for (var i = 0; i < a.life; i++) {
+      var y = startY + i;
+      var dot = (i === a.life - 1) ? (a.gross - cumul) : ann;
+      cumul += dot;
+      var state = y < 2026 ? "done" : (y === 2026 ? "cur" : "");
+      rows += '<div class="sched-r ' + state + '"><div class="yr">' + y + (y === 2026 ? ' · en cours' : '') + '</div>' +
+        '<div class="r mono">' + A.fmt(dot) + '</div><div class="r mono">' + A.fmt(cumul) + '</div><div class="r mono">' + A.fmt(a.gross - cumul) + '</div></div>';
+    }
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><div class="as-ico" style="width:40px;height:40px;border-radius:10px;font-size:19px;"><i class="ti ' + a.icon + '"></i></div>' +
+      '<div style="flex:1;min-width:0;"><div class="dh-num mono">' + a.id + ' · compte ' + a.acct + '</div><div class="dh-label">' + a.name + '</div>' +
+      '<div class="dh-meta">Acquise le ' + a.acq.split("-").reverse().join("/") + ' · ' + a.method + ' sur ' + a.life + ' ans</div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="dstat-grid">' +
+          '<div class="dstat"><div class="dstat-l">Valeur brute</div><div class="dstat-v mono">' + A.fmt(a.gross) + '</div></div>' +
+          '<div class="dstat"><div class="dstat-l">Dotation annuelle</div><div class="dstat-v mono">' + A.fmt(ann) + '</div></div>' +
+          '<div class="dstat"><div class="dstat-l">Amort. cumulés</div><div class="dstat-v mono">' + A.fmt(a.cumul) + '</div></div>' +
+          '<div class="dstat"><div class="dstat-l">Compte amort.</div><div class="dstat-v mono">' + a.amortAcct + '</div></div>' +
+          '<div class="dstat full"><div class="dstat-l">Valeur nette comptable</div><div class="dstat-v mono">' + A.fmt(vnc(a)) + ' XOF · ' + pct(a) + '% amorti</div></div>' +
+        '</div>' +
+        '<div class="dsec-label"><i class="ti ti-calendar-stats"></i> Plan d\'amortissement</div>' +
+        '<div class="sched"><div class="sched-r sched-h"><div>Exercice</div><div class="r">Dotation</div><div class="r">Cumul</div><div class="r">VNC</div></div>' + rows + '</div>' +
+      '</div>';
+    document.getElementById("scrim").classList.add("open");
+    document.getElementById("drawer").classList.add("open");
+    if (window.refreshIcons) refreshIcons(document.getElementById("drawer"));
+  }
+  window.closeDrawer = function () { document.getElementById("scrim").classList.remove("open"); document.getElementById("drawer").classList.remove("open"); };
+
+  var toastTimer;
+  window.showToast = function (msg) { var t = document.getElementById("toast"); document.getElementById("toastMsg").textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600); };
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  renderKpis(); renderAssets();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

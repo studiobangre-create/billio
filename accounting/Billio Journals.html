@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Journals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+/* entries table */
+.entries { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.etbl-head, .erow { display: grid; grid-template-columns: 96px 78px 1fr 150px 116px 34px; align-items: center; gap: 14px; padding: 12px 18px; }
+.etbl-head { background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.etbl-head .r { text-align: right; }
+.erow { border-top: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background .1s; }
+.erow:first-child { border-top: none; }
+.erow:hover { background: var(--brand-tint); }
+.e-date { font-size: 12.5px; font-weight: 600; }
+.e-date .yr { color: var(--color-text-tertiary); font-weight: 500; }
+.jchip { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 6px; color: #fff; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px; }
+.jchip i { font-size: 12px; }
+.e-label { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.e-piece { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+.e-amt { text-align: right; font-size: 13.5px; font-weight: 700; }
+.e-amt .cur { font-size: 10px; color: var(--color-text-tertiary); font-weight: 600; margin-left: 3px; }
+.e-status { display: flex; justify-content: flex-start; }
+.e-go { color: var(--color-text-tertiary); font-size: 17px; text-align: right; }
+.erow:hover .e-go { color: var(--brand); }
+
+/* lines table (drawer + composer) */
+.lines { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+.lh, .lr { display: grid; grid-template-columns: 1fr 118px 118px; gap: 0; }
+.lh { background: var(--color-background-secondary); font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.lh > div, .lr > div { padding: 10px 13px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.lh .r, .lr .r { text-align: right; }
+.lr:last-child > div { border-bottom: none; }
+.lr .l-acct { display: flex; align-items: baseline; gap: 8px; }
+.l-num { font-size: 12.5px; font-weight: 700; }
+.l-lbl { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lr .amt { font-size: 13px; font-weight: 600; }
+.lr .amt.dim { color: var(--color-border-secondary); }
+.ltot { display: grid; grid-template-columns: 1fr 118px 118px; background: var(--color-background-secondary); border-top: 1px solid var(--color-border-secondary); }
+.ltot > div { padding: 11px 13px; font-weight: 800; font-size: 13px; }
+.ltot .r { text-align: right; }
+.ltot .lbl { color: var(--color-text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; }
+
+.balance-banner { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: var(--border-radius-md); font-size: 12.5px; font-weight: 700; margin-top: 14px; }
+.balance-banner.ok { background: #E7F3E2; color: #2E7D32; }
+.balance-banner.no { background: #FCEBEB; color: #A32D2D; }
+.balance-banner i { font-size: 16px; }
+
+/* drawer meta */
+.dh-piece { font-size: 12px; font-weight: 700; color: var(--brand); letter-spacing: 0.4px; }
+.dh-label { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-top: 4px; line-height: 1.2; }
+.dh-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 7px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dsec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); margin: 4px 0 10px; }
+
+/* composer */
+.comp-line { display: grid; grid-template-columns: 1fr 110px 110px 30px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.comp-line select, .comp-line input { width: 100%; padding: 9px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 12.5px; font-family: var(--font-sans); background: var(--color-background-primary); color: var(--color-text-primary); }
+.comp-line select { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235C687A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 26px; }
+.comp-line input { text-align: right; }
+.comp-line input:focus, .comp-line select:focus { outline: none; border-color: color-mix(in srgb, var(--brand) 70%, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
+.comp-del { width: 30px; height: 34px; border: none; background: transparent; color: var(--color-text-tertiary); cursor: pointer; border-radius: 7px; font-size: 15px; display: flex; align-items: center; justify-content: center; }
+.comp-del:hover { background: #FCEBEB; color: #A32D2D; }
+.comp-head { display: grid; grid-template-columns: 1fr 110px 110px 30px; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 7px; padding: 0 2px; }
+.comp-head .r { text-align: right; }
+.field { margin-bottom: 14px; }
+.field-label { font-size: 11.5px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 6px; }
+.field-row { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+.field input, .field select { width: 100%; padding: 9px 11px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 13px; font-family: var(--font-sans); background: var(--color-background-primary); }
+.field input:focus, .field select:focus { outline: none; border-color: color-mix(in srgb, var(--brand) 70%, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
+.field select { appearance: none; cursor: pointer; }
+.drawer-foot { padding: 14px 22px; border-top: 0.5px solid var(--color-border-tertiary); display: flex; gap: 10px; background: var(--color-background-primary); }
+.add-line-btn { font-size: 12.5px; font-weight: 600; color: var(--brand); background: none; border: none; cursor: pointer; padding: 6px 2px; display: inline-flex; align-items: center; gap: 6px; }
+.add-line-btn:hover { color: var(--brand-dark); }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Journals</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-notebook"></i> Accounting</div>
+        <div class="page-title">Journals</div>
+        <div class="page-sub">Saisie en partie double · juin 2026</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026 · ouvert</span>
+        <button class="btn btn-primary" onclick="openComposer()"><i class="ti ti-plus"></i> New entry</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="kpi-strip" id="kpis"></div>
+      <div class="toolbar">
+        <div class="search"><i class="ti ti-search"></i><input id="search" type="text" placeholder="Search label, pièce or account…" autocomplete="off"></div>
+        <div class="chips" id="journalChips"></div>
+      </div>
+      <div class="entries" id="entries">
+        <div class="etbl-head"><div>Date</div><div>Journal</div><div>Libellé / pièce</div><div class="r">Montant</div><div>Statut</div><div></div></div>
+        <div id="entryRows"></div>
+      </div>
+      <div class="tbl-empty" id="emptyState" style="display:none;">No entries match.</div>
+    </div>
+  </div>
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  var activeJournal = "all";
+  var query = "";
+  /* working copy so a posted draft persists during the session */
+  var entries = A.ENTRIES.map(function (e) { return e; });
+
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("journals");
+
+  function entryTotal(e) { return e.lines.reduce(function (s, l) { return s + l.d; }, 0); }
+  function entryBalanced(e) {
+    var d = e.lines.reduce(function (s, l) { return s + l.d; }, 0);
+    var c = e.lines.reduce(function (s, l) { return s + l.c; }, 0);
+    return Math.abs(d - c) < 0.5;
+  }
+  function fmtDate(iso) {
+    var months = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+    var p = iso.split("-"); return { d: parseInt(p[2], 10) + " " + months[parseInt(p[1], 10) - 1], y: p[0] };
+  }
+
+  /* ---- KPIs ---- */
+  function renderKpis() {
+    var posted = entries.filter(function (e) { return e.posted; });
+    var drafts = entries.filter(function (e) { return !e.posted; });
+    var totalD = posted.reduce(function (s, e) { return s + entryTotal(e); }, 0);
+    var unbal = entries.filter(function (e) { return !entryBalanced(e); }).length;
+    var cards = [
+      { ico: "ti-notebook", tint: "var(--brand-tint)", col: "var(--brand)", label: "Entries · juin", val: entries.length, unit: "", sub: posted.length + " posted · " + drafts.length + " draft" },
+      { ico: "ti-arrows-exchange", tint: "#E9F0FA", col: "var(--brand)", label: "Posted movement", val: A.fmtCompact(totalD), unit: "XOF", sub: "Débit = crédit" },
+      { ico: "ti-file-text", tint: "#FCEFE0", col: "#B26A09", label: "Drafts to review", val: drafts.length, unit: "", sub: drafts.length ? "Awaiting posting" : "All clear" },
+      { ico: unbal ? "ti-alert-triangle" : "ti-circle-check-filled", tint: unbal ? "#FCEBEB" : "#E7F3E2", col: unbal ? "#A32D2D" : "#2E7D32", label: "Balance check", val: unbal ? unbal : "OK", unit: "", sub: unbal ? "entries out of balance" : "Every entry balances" }
+    ];
+    document.getElementById("kpis").innerHTML = cards.map(function (c) {
+      return '<div class="kpi"><div class="kpi-top"><div class="kpi-ico" style="background:' + c.tint + ';color:' + c.col + ';"><i class="ti ' + c.ico + '"></i></div>' +
+        '<div class="kpi-label">' + c.label + '</div></div>' +
+        '<div class="kpi-value mono">' + c.val + (c.unit ? '<span class="unit">' + c.unit + '</span>' : '') + '</div>' +
+        '<div class="kpi-sub">' + c.sub + '</div></div>';
+    }).join("");
+  }
+
+  /* ---- journal chips ---- */
+  function renderChips() {
+    var counts = { all: entries.length };
+    entries.forEach(function (e) { counts[e.journal] = (counts[e.journal] || 0) + 1; });
+    var html = '<div class="chip-f' + (activeJournal === "all" ? " active" : "") + '" data-j="all">All <span class="cnt">' + counts.all + '</span></div>';
+    Object.keys(A.JOURNALS).forEach(function (k) {
+      var j = A.JOURNALS[k];
+      html += '<div class="chip-f' + (activeJournal === k ? " active" : "") + '" data-j="' + k + '">' + j.name + ' <span class="cnt">' + (counts[k] || 0) + '</span></div>';
+    });
+    var box = document.getElementById("journalChips");
+    box.innerHTML = html;
+    box.querySelectorAll(".chip-f").forEach(function (el) {
+      el.addEventListener("click", function () { activeJournal = el.dataset.j; renderChips(); renderEntries(); });
+    });
+  }
+
+  /* ---- entries list ---- */
+  function matches(e) {
+    if (activeJournal !== "all" && e.journal !== activeJournal) return false;
+    if (query) {
+      var q = query.toLowerCase();
+      if (e.label.toLowerCase().indexOf(q) >= 0) return true;
+      if (e.piece.toLowerCase().indexOf(q) >= 0) return true;
+      if (e.lines.some(function (l) { return l.acct.indexOf(q) === 0; })) return true;
+      return false;
+    }
+    return true;
+  }
+  function renderEntries() {
+    var list = entries.filter(matches).slice().sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    var wrap = document.getElementById("entryRows");
+    document.getElementById("emptyState").style.display = list.length ? "none" : "block";
+    document.getElementById("entries").style.display = list.length ? "block" : "none";
+    wrap.innerHTML = list.map(function (e) {
+      var j = A.JOURNALS[e.journal];
+      var dt = fmtDate(e.date);
+      var bal = entryBalanced(e);
+      var status = e.posted
+        ? '<span class="pill pill-posted"><i class="ti ti-circle-check-filled" style="font-size:12px;"></i> Posted</span>'
+        : '<span class="pill pill-draft">Draft</span>';
+      if (!bal) status = '<span class="pill pill-unbalanced"><i class="ti ti-alert-triangle" style="font-size:12px;"></i> Off</span>';
+      return '<div class="erow" data-id="' + e.id + '">' +
+        '<div class="e-date">' + dt.d + ' <span class="yr">' + dt.y + '</span></div>' +
+        '<div><span class="jchip" style="background:' + j.color + ';"><i class="ti ' + j.icon + '"></i>' + e.journal + '</span></div>' +
+        '<div style="min-width:0;"><div class="e-label">' + e.label + '</div><div class="e-piece mono">' + e.piece + '</div></div>' +
+        '<div class="e-amt mono">' + A.fmt(entryTotal(e)) + '<span class="cur">XOF</span></div>' +
+        '<div class="e-status">' + status + '</div>' +
+        '<div class="e-go"><i class="ti ti-chevron-right"></i></div></div>';
+    }).join("");
+    wrap.querySelectorAll(".erow").forEach(function (r) { r.addEventListener("click", function () { openEntry(r.dataset.id); }); });
+    if (window.refreshIcons) refreshIcons(wrap);
+  }
+
+  /* ---- entry detail drawer ---- */
+  function linesTable(e) {
+    var totD = 0, totC = 0;
+    var rows = e.lines.map(function (l) {
+      totD += l.d; totC += l.c;
+      var a = A.acct(l.acct) || { label: "" };
+      return '<div class="lr"><div class="l-acct"><span class="l-num mono">' + l.acct + '</span><span class="l-lbl">' + a.label + '</span></div>' +
+        '<div class="r"><span class="amt mono' + (l.d ? "" : " dim") + '">' + (l.d ? A.fmt(l.d) : "—") + '</span></div>' +
+        '<div class="r"><span class="amt mono' + (l.c ? "" : " dim") + '">' + (l.c ? A.fmt(l.c) : "—") + '</span></div></div>';
+    }).join("");
+    return '<div class="lines"><div class="lh"><div>Compte</div><div class="r">Débit</div><div class="r">Crédit</div></div>' + rows +
+      '<div class="ltot"><div class="lbl">Totaux</div><div class="r mono">' + A.fmt(totD) + '</div><div class="r mono">' + A.fmt(totC) + '</div></div></div>';
+  }
+  function openEntry(id) {
+    var e = entries.find(function (x) { return x.id === id; });
+    var j = A.JOURNALS[e.journal];
+    var dt = fmtDate(e.date);
+    var bal = entryBalanced(e);
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><span class="jchip" style="background:' + j.color + ';font-size:12px;padding:6px 11px;"><i class="ti ' + j.icon + '"></i>' + e.journal + '</span>' +
+      '<div style="flex:1;min-width:0;"><div class="dh-piece mono">' + e.piece + '</div><div class="dh-label">' + e.label + '</div>' +
+      '<div class="dh-meta"><span>' + j.name + '</span> · <span>' + dt.d + " " + dt.y + '</span> · ' +
+        (e.posted ? '<span class="pill pill-posted">Posted</span>' : '<span class="pill pill-draft">Draft</span>') + '</div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="dsec-label">Écriture · partie double</div>' + linesTable(e) +
+        '<div class="balance-banner ' + (bal ? "ok" : "no") + '"><i class="ti ' + (bal ? "ti-circle-check-filled" : "ti-alert-triangle") + '"></i>' +
+          (bal ? "Équilibrée — débit = crédit" : "Déséquilibrée — à corriger") + '</div>' +
+        (!e.posted ? '<div style="margin-top:18px;"><button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="postEntry(\'' + e.id + '\')"><i class="ti ti-circle-check-filled"></i> Post this entry</button></div>' : '') +
+      '</div>';
+    showDrawer();
+  }
+  window.postEntry = function (id) {
+    var e = entries.find(function (x) { return x.id === id; });
+    if (e) e.posted = true;
+    closeDrawer(); renderKpis(); renderEntries();
+    showToast("Entry " + id + " posted to the ledger");
+  };
+
+  /* ---- composer (new entry) ---- */
+  var compLines = [];
+  function openComposer() {
+    compLines = [ { acct: "", d: "", c: "" }, { acct: "", d: "", c: "" } ];
+    var opts = '<option value="">Compte…</option>' + A.ACCOUNTS.map(function (a) { return '<option value="' + a.num + '">' + a.num + " — " + a.label + '</option>'; }).join("");
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><span class="jchip" style="background:var(--brand);font-size:12px;padding:6px 11px;"><i class="ti ti-plus"></i>NEW</span>' +
+      '<div style="flex:1;"><div class="dh-piece">NOUVELLE ÉCRITURE</div><div class="dh-label">New journal entry</div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="field-row"><div class="field"><div class="field-label">Journal</div><select id="cJournal">' +
+          Object.keys(A.JOURNALS).map(function (k) { return '<option value="' + k + '">' + k + " — " + A.JOURNALS[k].name + '</option>'; }).join("") + '</select></div>' +
+          '<div class="field"><div class="field-label">Libellé</div><input id="cLabel" type="text" placeholder="e.g. Facture client — Orange"></div></div>' +
+        '<div class="dsec-label" style="margin-top:6px;">Lignes</div>' +
+        '<div class="comp-head"><div>Compte</div><div class="r">Débit</div><div class="r">Crédit</div><div></div></div>' +
+        '<div id="compLines" data-opts="1"></div>' +
+        '<button class="add-line-btn" onclick="addCompLine()"><i class="ti ti-plus"></i> Add line</button>' +
+        '<div class="balance-banner no" id="compBanner"><i class="ti ti-alert-triangle"></i> Add balanced lines</div>' +
+      '</div>' +
+      '<div class="drawer-foot"><button class="btn" style="flex:1;justify-content:center;" onclick="closeDrawer()">Cancel</button>' +
+        '<button class="btn btn-primary" id="cPost" style="flex:1;justify-content:center;" disabled onclick="saveEntry()"><i class="ti ti-circle-check-filled"></i> Post entry</button></div>';
+    window.__compOpts = opts;
+    renderCompLines();
+    showDrawer();
+  }
+  window.openComposer = openComposer;
+  function renderCompLines() {
+    var box = document.getElementById("compLines");
+    box.innerHTML = compLines.map(function (l, i) {
+      return '<div class="comp-line">' +
+        '<select onchange="updComp(' + i + ',\'acct\',this.value)">' + window.__compOpts.replace('value="' + l.acct + '"', 'value="' + l.acct + '" selected') + '</select>' +
+        '<input type="number" min="0" placeholder="0" value="' + l.d + '" oninput="updComp(' + i + ',\'d\',this.value)">' +
+        '<input type="number" min="0" placeholder="0" value="' + l.c + '" oninput="updComp(' + i + ',\'c\',this.value)">' +
+        '<button class="comp-del" onclick="delComp(' + i + ')"><i class="ti ti-trash"></i></button></div>';
+    }).join("");
+    recompBalance();
+    if (window.refreshIcons) refreshIcons(box.parentElement);
+  }
+  window.addCompLine = function () { compLines.push({ acct: "", d: "", c: "" }); renderCompLines(); };
+  window.delComp = function (i) { compLines.splice(i, 1); if (!compLines.length) compLines.push({ acct: "", d: "", c: "" }); renderCompLines(); };
+  window.updComp = function (i, f, v) {
+    if (f === "acct") compLines[i].acct = v;
+    else { compLines[i][f] = v; if (v && f === "d") compLines[i].c = ""; if (v && f === "c") compLines[i].d = ""; }
+    if (f !== "acct") recompBalance(); else recompBalance();
+  };
+  function recompBalance() {
+    var d = compLines.reduce(function (s, l) { return s + (parseFloat(l.d) || 0); }, 0);
+    var c = compLines.reduce(function (s, l) { return s + (parseFloat(l.c) || 0); }, 0);
+    var bal = d > 0 && Math.abs(d - c) < 0.5;
+    var hasAccts = compLines.filter(function (l) { return l.acct && ((parseFloat(l.d) || 0) || (parseFloat(l.c) || 0)); }).length >= 2;
+    var banner = document.getElementById("compBanner");
+    var ok = bal && hasAccts;
+    banner.className = "balance-banner " + (ok ? "ok" : "no");
+    banner.innerHTML = ok
+      ? '<i class="ti ti-circle-check-filled"></i> Équilibrée · ' + A.fmt(d) + ' = ' + A.fmt(c)
+      : '<i class="ti ti-alert-triangle"></i> Débit ' + A.fmt(d) + ' · Crédit ' + A.fmt(c) + (d !== c ? ' — écart ' + A.fmt(Math.abs(d - c)) : '');
+    document.getElementById("cPost").disabled = !ok;
+    if (window.refreshIcons) refreshIcons(banner);
+  }
+  window.recompBalance = recompBalance;
+  window.saveEntry = function () {
+    var jc = document.getElementById("cJournal").value;
+    var label = document.getElementById("cLabel").value.trim() || "Écriture manuelle";
+    var n = entries.filter(function (e) { return e.journal === jc; }).length + 1;
+    var id = jc + "-" + String(9000 + n).padStart(4, "0");
+    var lines = compLines.filter(function (l) { return l.acct && ((parseFloat(l.d) || 0) || (parseFloat(l.c) || 0)); })
+      .map(function (l) { return { acct: l.acct, d: parseFloat(l.d) || 0, c: parseFloat(l.c) || 0 }; });
+    entries.unshift({ id: id, journal: jc, date: "2026-06-30", piece: "OD 2026-" + (900 + n), label: label, posted: true, lines: lines });
+    closeDrawer(); renderKpis(); renderChips(); renderEntries();
+    showToast("Entry " + id + " posted");
+  };
+
+  /* ---- drawer helpers ---- */
+  function showDrawer() {
+    document.getElementById("scrim").classList.add("open");
+    document.getElementById("drawer").classList.add("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "false");
+    if (window.refreshIcons) refreshIcons(document.getElementById("drawer"));
+  }
+  window.closeDrawer = function () {
+    document.getElementById("scrim").classList.remove("open");
+    document.getElementById("drawer").classList.remove("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "true");
+  };
+  window.openEntry = openEntry;
+
+  /* ---- toast ---- */
+  var toastTimer;
+  window.showToast = function (msg) {
+    var t = document.getElementById("toast");
+    document.getElementById("toastMsg").textContent = msg;
+    t.classList.add("show"); clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  };
+
+  document.getElementById("search").addEventListener("input", function (e) { query = e.target.value.trim(); renderEntries(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  renderKpis(); renderChips(); renderEntries();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

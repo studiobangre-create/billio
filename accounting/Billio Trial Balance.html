@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Trial Balance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+.balance-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.bt-head { display: grid; grid-template-columns: 78px 1fr repeat(4, 116px) 30px; gap: 0; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-secondary); position: sticky; top: 0; z-index: 2; }
+.bt-head > div { padding: 11px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.bt-head .r { text-align: right; }
+.bt-grouplabel { grid-column: 3 / 5; text-align: center !important; border-left: 0.5px solid var(--color-border-tertiary); border-right: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary) !important; }
+.bt-grouplabel2 { grid-column: 5 / 7; text-align: center !important; border-right: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary) !important; }
+
+.brow { display: grid; grid-template-columns: 78px 1fr repeat(4, 116px) 30px; gap: 0; align-items: center; border-bottom: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background .1s; }
+.brow:hover { background: var(--brand-tint); }
+.brow > div { padding: 9px 14px; }
+.brow .r { text-align: right; }
+.b-num { font-size: 12.5px; font-weight: 700; }
+.b-label { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-val { font-size: 12.5px; font-weight: 600; }
+.b-val.dim { color: var(--color-border-secondary); font-weight: 500; }
+.b-val.bold { font-weight: 700; }
+.b-go { color: var(--color-text-tertiary); font-size: 16px; text-align: right; }
+.brow:hover .b-go { color: var(--brand); }
+.col-sep { border-left: 0.5px solid var(--color-border-tertiary); }
+
+/* class subtotal row */
+.bsub { display: grid; grid-template-columns: 78px 1fr repeat(4, 116px) 30px; align-items: center; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-secondary); }
+.bsub > div { padding: 9px 14px; }
+.bsub .r { text-align: right; }
+.bsub-name { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+.bsub-val { font-size: 12px; font-weight: 700; color: var(--color-text-secondary); }
+
+/* grand total */
+.btotal { display: grid; grid-template-columns: 78px 1fr repeat(4, 116px) 30px; align-items: center; background: #18222F; color: #fff; }
+.btotal > div { padding: 14px; }
+.btotal .r { text-align: right; }
+.btotal-lbl { grid-column: 1 / 3; font-size: 13px; font-weight: 800; letter-spacing: -0.2px; }
+.btotal .t-val { font-size: 13.5px; font-weight: 800; }
+.btotal .col-sep { border-left: 0.5px solid rgba(255,255,255,0.15); }
+
+.tie-banner { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--border-radius-md); font-size: 13px; font-weight: 700; margin-top: 14px; }
+.tie-banner.ok { background: #E7F3E2; color: #2E7D32; }
+.tie-banner i { font-size: 18px; }
+
+/* ledger drawer */
+.dh-num { font-size: 12px; font-weight: 700; color: var(--brand); letter-spacing: 0.4px; }
+.dh-label { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-top: 4px; line-height: 1.2; }
+.dh-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 7px; }
+.led { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+.led-h, .led-r, .led-open { display: grid; grid-template-columns: 1fr 84px 84px 92px; gap: 0; }
+.led-h { background: var(--color-background-secondary); font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.led-h > div, .led-r > div, .led-open > div { padding: 9px 11px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.led-h .r, .led-r .r, .led-open .r { text-align: right; }
+.led-open { background: var(--color-background-secondary); font-style: italic; }
+.led-open .lo-lbl { font-size: 11.5px; color: var(--color-text-secondary); font-weight: 600; font-style: normal; }
+.led-r:last-child > div { border-bottom: none; }
+.led-lbl { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.led-sub { font-size: 10px; color: var(--color-text-tertiary); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.jchip { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; color: #fff; letter-spacing: 0.3px; }
+.led-amt { font-size: 11.5px; font-weight: 600; }
+.led-amt.dim { color: var(--color-border-secondary); }
+.led-run { font-size: 11.5px; font-weight: 700; }
+.dsec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); margin: 4px 0 10px; display: flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Trial Balance</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-book-2"></i> Accounting</div>
+        <div class="page-title">Trial balance</div>
+        <div class="page-sub">Balance générale des comptes · au 30 juin 2026</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026</span>
+        <button class="btn"><i class="ti ti-printer"></i> Export</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="kpi-strip" id="kpis"></div>
+      <div class="toolbar">
+        <div class="search"><i class="ti ti-search"></i><input id="search" type="text" placeholder="Filter account…" autocomplete="off"></div>
+        <div class="chips">
+          <div class="chip-f active" id="incZero" data-on="0"><i class="ti ti-eye-off" style="font-size:14px;"></i> Hide nil accounts</div>
+        </div>
+      </div>
+      <div class="balance-card">
+        <div class="bt-head">
+          <div>Compte</div><div>Intitulé</div>
+          <div class="r bt-grouplabel">Mouvements</div>
+          <div class="r bt-grouplabel2">Soldes</div>
+          <div></div>
+        </div>
+        <div class="bt-head" style="position:static;border-bottom:0.5px solid var(--color-border-secondary);">
+          <div></div><div></div>
+          <div class="r col-sep">Débit</div><div class="r">Crédit</div>
+          <div class="r col-sep">Débiteur</div><div class="r">Créditeur</div><div></div>
+        </div>
+        <div id="balRows"></div>
+        <div class="btotal" id="grandTotal"></div>
+      </div>
+      <div class="tie-banner ok" id="tieBanner"></div>
+    </div>
+  </div>
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  var hideZero = true;
+  var query = "";
+
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("ledger");
+
+  function rowData(a) {
+    var m = A.movementsOf(a.num);
+    var signed = A.closingSigned(a.num);
+    return { num: a.num, label: a.label, mD: m.debit, mC: m.credit,
+      sD: signed > 0.5 ? signed : 0, sC: signed < -0.5 ? -signed : 0,
+      active: !!(m.debit || m.credit || A.openingOf(a.num)) };
+  }
+  function valCell(v, extra) { return v ? '<div class="r ' + (extra || "") + '"><span class="b-val mono ' + (extra || "") + '">' + A.fmt(v) + '</span></div>'
+                                        : '<div class="r ' + (extra || "") + '"><span class="b-val mono dim">—</span></div>'; }
+
+  /* ---- KPIs ---- */
+  function renderKpis() {
+    var totMD = 0, totSD = 0, totSC = 0;
+    A.ACCOUNTS.forEach(function (a) { var r = rowData(a); totMD += r.mD; totSD += r.sD; totSC += r.sC; });
+    /* result = produits (7) - charges (6) */
+    var produits = 0, charges = 0;
+    A.ACCOUNTS.forEach(function (a) { var c = A.clsOf(a.num); var s = A.closingSigned(a.num);
+      if (c === 7) produits += -s; if (c === 6) charges += s; });
+    var result = produits - charges;
+    var cards = [
+      { ico: "ti-scale", tint: "var(--brand-tint)", col: "var(--brand)", label: "Total movement", val: A.fmtCompact(totMD), unit: "XOF", sub: "Débit = crédit" },
+      { ico: "ti-book-2", tint: "#E9F0FA", col: "var(--brand)", label: "Accounts with activity", val: A.ACCOUNTS.filter(function (a) { return rowData(a).active; }).length, unit: "", sub: "of " + A.ACCOUNTS.length + " in plan" },
+      { ico: result >= 0 ? "ti-trending-up" : "ti-trending-down", tint: result >= 0 ? "#E7F3E2" : "#FCEBEB", col: result >= 0 ? "#2E7D32" : "#A32D2D", label: "Result (cl. 7 − 6)", val: A.fmtCompact(result), unit: "XOF", sub: result >= 0 ? "Bénéfice provisoire" : "Perte provisoire" },
+      { ico: "ti-circle-check-filled", tint: "#E7F3E2", col: "#2E7D32", label: "Balance status", val: "Tied", unit: "", sub: "Débit = crédit ✓" }
+    ];
+    document.getElementById("kpis").innerHTML = cards.map(function (c) {
+      return '<div class="kpi"><div class="kpi-top"><div class="kpi-ico" style="background:' + c.tint + ';color:' + c.col + ';"><i class="ti ' + c.ico + '"></i></div>' +
+        '<div class="kpi-label">' + c.label + '</div></div>' +
+        '<div class="kpi-value mono">' + c.val + (c.unit ? '<span class="unit">' + c.unit + '</span>' : '') + '</div>' +
+        '<div class="kpi-sub">' + c.sub + '</div></div>';
+    }).join("");
+  }
+
+  /* ---- table ---- */
+  function renderTable() {
+    var byClass = {};
+    A.ACCOUNTS.forEach(function (a) {
+      var r = rowData(a);
+      if (hideZero && !r.active) return;
+      if (query) { var q = query.toLowerCase(); if (a.num.indexOf(q) !== 0 && a.label.toLowerCase().indexOf(q) < 0) return; }
+      (byClass[A.clsOf(a.num)] = byClass[A.clsOf(a.num)] || []).push(r);
+    });
+    var keys = Object.keys(byClass).sort();
+    var wrap = document.getElementById("balRows");
+    wrap.innerHTML = keys.map(function (k) {
+      var c = A.CLASSES[k];
+      var rows = byClass[k];
+      var sMD = 0, sMC = 0, sSD = 0, sSC = 0;
+      var rowsHtml = rows.map(function (r) {
+        sMD += r.mD; sMC += r.mC; sSD += r.sD; sSC += r.sC;
+        return '<div class="brow" data-num="' + r.num + '">' +
+          '<div class="b-num mono">' + r.num + '</div>' +
+          '<div style="min-width:0;"><div class="b-label">' + r.label + '</div></div>' +
+          valCell(r.mD, "col-sep") + valCell(r.mC) +
+          valCell(r.sD, "col-sep bold") + valCell(r.sC, "bold") +
+          '<div class="b-go"><i class="ti ti-chevron-right"></i></div></div>';
+      }).join("");
+      var sub = '<div class="bsub"><div></div><div class="bsub-name"><span class="cls-tag" style="background:' + c.color + ';width:18px;height:18px;font-size:10px;border-radius:5px;">' + k + '</span> Classe ' + k + ' · ' + c.short + '</div>' +
+        '<div class="r col-sep"><span class="bsub-val mono">' + A.fmt(sMD) + '</span></div><div class="r"><span class="bsub-val mono">' + A.fmt(sMC) + '</span></div>' +
+        '<div class="r col-sep"><span class="bsub-val mono">' + (sSD ? A.fmt(sSD) : "—") + '</span></div><div class="r"><span class="bsub-val mono">' + (sSC ? A.fmt(sSC) : "—") + '</span></div><div></div></div>';
+      return sub + rowsHtml;
+    }).join("");
+
+    wrap.querySelectorAll(".brow").forEach(function (r) { r.addEventListener("click", function () { openLedger(r.dataset.num); }); });
+    if (window.refreshIcons) refreshIcons(wrap);
+    renderTotals();
+  }
+
+  function renderTotals() {
+    var tMD = 0, tMC = 0, tSD = 0, tSC = 0;
+    A.ACCOUNTS.forEach(function (a) { var r = rowData(a); tMD += r.mD; tMC += r.mC; tSD += r.sD; tSC += r.sC; });
+    document.getElementById("grandTotal").innerHTML =
+      '<div class="btotal-lbl">Totaux généraux</div>' +
+      '<div class="r col-sep"><span class="t-val mono">' + A.fmt(tMD) + '</span></div><div class="r"><span class="t-val mono">' + A.fmt(tMC) + '</span></div>' +
+      '<div class="r col-sep"><span class="t-val mono">' + A.fmt(tSD) + '</span></div><div class="r"><span class="t-val mono">' + A.fmt(tSC) + '</span></div><div></div>';
+    var tied = Math.abs(tMD - tMC) < 0.5 && Math.abs(tSD - tSC) < 0.5;
+    document.getElementById("tieBanner").innerHTML =
+      '<i class="ti ti-circle-check-filled"></i> Balance équilibrée — mouvements ' + A.fmt(tMD) + ' = ' + A.fmt(tMC) + ' · soldes ' + A.fmt(tSD) + ' = ' + A.fmt(tSC) + ' XOF';
+    if (window.refreshIcons) refreshIcons(document.getElementById("tieBanner"));
+  }
+
+  /* ---- ledger drawer ---- */
+  function fmtDate(iso) {
+    var months = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+    var p = iso.split("-"); return parseInt(p[2], 10) + " " + months[parseInt(p[1], 10) - 1];
+  }
+  function openLedger(num) {
+    var a = A.acct(num);
+    var c = A.CLASSES[A.clsOf(num)];
+    var open = A.openingOf(num);
+    var led = A.ledgerOf(num);
+    var signed = A.closingSigned(num);
+
+    var openRow = '<div class="led-open"><div class="lo-lbl">À-nouveau au 01/06</div>' +
+      '<div class="r"><span class="led-amt mono ' + (open > 0 ? "" : "dim") + '">' + (open > 0 ? A.fmt(open) : "—") + '</span></div>' +
+      '<div class="r"><span class="led-amt mono ' + (open < 0 ? "" : "dim") + '">' + (open < 0 ? A.fmt(-open) : "—") + '</span></div>' +
+      '<div class="r"><span class="led-run mono">' + (Math.abs(open) < 0.5 ? "0" : A.fmt(Math.abs(open)) + (open > 0 ? " D" : " C")) + '</span></div></div>';
+
+    var rows = led.map(function (row) {
+      var e = row.entry; var j = A.JOURNALS[e.journal];
+      return '<div class="led-r"><div style="min-width:0;"><div class="led-lbl">' + e.label + '</div>' +
+        '<div class="led-sub"><span class="jchip" style="background:' + j.color + ';">' + e.journal + '</span> ' + e.piece + ' · ' + fmtDate(e.date) + '</div></div>' +
+        '<div class="r"><span class="led-amt mono ' + (row.d ? "" : "dim") + '">' + (row.d ? A.fmt(row.d) : "—") + '</span></div>' +
+        '<div class="r"><span class="led-amt mono ' + (row.c ? "" : "dim") + '">' + (row.c ? A.fmt(row.c) : "—") + '</span></div>' +
+        '<div class="r"><span class="led-run mono">' + A.fmt(Math.abs(row.running)) + (row.running >= 0 ? " D" : " C") + '</span></div></div>';
+    }).join("");
+    if (!led.length) rows = '<div class="led-r"><div style="grid-column:1/-1;color:var(--color-text-tertiary);font-size:12px;">No movements this period.</div></div>';
+
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><span class="cls-tag" style="background:' + c.color + ';width:38px;height:38px;border-radius:10px;font-size:14px;">' + A.clsOf(num) + '</span>' +
+      '<div style="flex:1;min-width:0;"><div class="dh-num mono">GRAND LIVRE · ' + num + '</div><div class="dh-label">' + a.label + '</div>' +
+      '<div class="dh-meta">Solde de clôture : <b>' + (Math.abs(signed) < 0.5 ? "0" : A.fmt(Math.abs(signed)) + " " + (signed > 0 ? "Débiteur" : "Créditeur")) + '</b></div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="dsec-label"><i class="ti ti-history"></i> Mouvements de la période</div>' +
+        '<div class="led"><div class="led-h"><div>Écriture</div><div class="r">Débit</div><div class="r">Crédit</div><div class="r">Solde</div></div>' +
+        openRow + rows + '</div>' +
+        '<div style="margin-top:18px;"><a class="btn" style="width:100%;justify-content:center;" href="Billio Journals.html"><i class="ti ti-notebook"></i> Open journals</a></div>' +
+      '</div>';
+    document.getElementById("scrim").classList.add("open");
+    document.getElementById("drawer").classList.add("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "false");
+    if (window.refreshIcons) refreshIcons(document.getElementById("drawer"));
+  }
+  window.closeDrawer = function () {
+    document.getElementById("scrim").classList.remove("open");
+    document.getElementById("drawer").classList.remove("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "true");
+  };
+
+  /* toast */
+  var toastTimer;
+  window.showToast = function (msg) {
+    var t = document.getElementById("toast");
+    document.getElementById("toastMsg").textContent = msg;
+    t.classList.add("show"); clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  };
+
+  document.getElementById("incZero").addEventListener("click", function () {
+    hideZero = !hideZero;
+    this.classList.toggle("active", hideZero);
+    this.innerHTML = (hideZero ? '<i class="ti ti-eye-off" style="font-size:14px;"></i> Hide nil accounts' : '<i class="ti ti-eye" style="font-size:14px;"></i> Showing all accounts');
+    if (window.refreshIcons) refreshIcons(this);
+    renderTable();
+  });
+  document.getElementById("search").addEventListener("input", function (e) { query = e.target.value.trim(); renderTable(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  renderKpis(); renderTable();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

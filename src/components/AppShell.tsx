@@ -1,10 +1,10 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Icon from './Icon';
-import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
-  const { toastMsg, toastVisible, toastError } = useApp();
+  const { toastMsg, toastVisible, toastError } = useToast();
 
   return (
     <div className="app">

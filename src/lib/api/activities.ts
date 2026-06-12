@@ -4,7 +4,7 @@ import type { Activity } from '../schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-function dbToActivity(row: Record<string, unknown>): Activity {
+export function dbToActivity(row: Record<string, unknown>): Activity {
   const ts = new Date(String(row.created_at));
   const time = ts.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
   return {
@@ -14,11 +14,12 @@ function dbToActivity(row: Record<string, unknown>): Activity {
   };
 }
 
-export async function fetchActivities(_orgId: string): Promise<Activity[]> {
+export async function fetchActivities(orgId: string): Promise<Activity[]> {
   if (MOCK) return [...INITIAL_ACTIVITY];
   const { data, error } = await supabase
     .from('activities')
     .select('*')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;

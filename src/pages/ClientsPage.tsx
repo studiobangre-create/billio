@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
 import Icon from '../components/Icon';
 import { EmptyState, EmptyInline } from '../components/EmptyState';
+import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { createClient } from '../lib/api/clients';
+import { createClient, updateClient, removeClient } from '../lib/api/clients';
 import { fmt } from '../data';
-import type { ClientStatus, InvoiceStatus, NewClientForm } from '../lib/schemas';
+import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '../lib/schemas';
 
 type FilterKey = 'all' | 'active' | 'lead' | 'balance';
 
@@ -36,21 +38,25 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 const EMPTY_FORM: NewClientForm = {
-  name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '',
+  name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '',
 };
 
 function fmtCompact(n: number) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
-  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
-  return String(n);
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
+  return Math.round(n).toLocaleString('fr-FR');
 }
 
 export default function ClientsPage() {
-  const { clients, setClients, invoices, userId } = useApp();
+  const { clients, setClients, invoices, orgId, showToast, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Clients" subtitle="Gérez vos clients" variant="table-only" rows={6} />;
   const [filter, setFilter]   = useState<FilterKey>('all');
   const [search, setSearch]   = useState('');
   const [panel, setPanel]     = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(null);
   const [form, setForm]       = useState<NewClientForm>(EMPTY_FORM);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
 
   const totalBilled  = clients.reduce((s, c) => s + c.billed, 0);
   const outstanding  = clients.reduce((s, c) => s + c.balance, 0);
@@ -85,7 +91,31 @@ export default function ClientsPage() {
     ? clients.find(c => c.code === panel.code) ?? null
     : null;
 
-  function closePanel() { setPanel(null); }
+  function closePanel() { setPanel(null); setEditMode(false); }
+
+  function openDetailEdit(cl: ClientRecord | null) {
+    if (!cl) return;
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '' });
+    setEditMode(true);
+  }
+
+  async function handleSaveEdit(cl: ClientRecord | null) {
+    if (!cl) return;
+    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime };
+    setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
+    await updateClient(cl.code, patch);
+    setEditMode(false);
+    showToast('Client mis à jour');
+  }
+
+  async function handleDeleteClient(cl: ClientRecord | null) {
+    if (!cl) return;
+    if (!window.confirm(`Supprimer "${cl.name}" ? Cette action est irréversible.`)) return;
+    setClients(prev => prev.filter(c => c.code !== cl.code));
+    await removeClient(cl.code);
+    closePanel();
+    showToast(`"${cl.name}" supprimé`);
+  }
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
@@ -97,11 +127,11 @@ export default function ClientsPage() {
       code, av: avs[clients.length % avs.length],
       name: form.name, contact: form.contact || '—',
       email: form.email || '—', phone: form.phone || '—',
-      city: form.city || '—', ifu: form.ifu,
+      city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime,
       status: form.status,
     };
     setClients(prev => [{ ...payload, invoices: 0, billed: 0, balance: 0 }, ...prev]);
-    await createClient(userId, payload);
+    await createClient(orgId, payload);
     setForm(EMPTY_FORM);
     closePanel();
   }
@@ -148,7 +178,7 @@ export default function ClientsPage() {
                 <div className="metric-label">Total facturé</div>
               </div>
               <div className="metric-value">
-                {fmtCompact(totalBilled)}<span className="metric-unit">XOF</span>
+                {fmtCompact(totalBilled)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">revenu cumulé</div>
             </div>
@@ -158,7 +188,7 @@ export default function ClientsPage() {
                 <div className="metric-label">Solde impayé</div>
               </div>
               <div className="metric-value">
-                {fmtCompact(outstanding)}<span className="metric-unit">XOF</span>
+                {fmtCompact(outstanding)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">{withBalance} client{withBalance !== 1 ? 's' : ''} avec solde</div>
             </div>
@@ -204,8 +234,7 @@ export default function ClientsPage() {
 
             {filtered.length === 0 ? (
               <EmptyState
-                variant="compact"
-                icon={<Icon name="users" size={24} ariaHidden />}
+                illustration={<ClientsEmptyIllustration />}
                 title="Aucun client trouvé"
                 description="Aucun client ne correspond à votre recherche. Essayez d'autres termes."
               />
@@ -239,10 +268,10 @@ export default function ClientsPage() {
                   {/* Billed */}
                   <div style={{ textAlign: 'right' }}>
                     <div className="billed tnum">
-                      {fmt(cl.billed)}<span className="cur">XOF</span>
+                      {fmt(cl.billed)}<span className="cur">F CFA</span>
                     </div>
                     {cl.balance > 0
-                      ? <div className="billed-sub bal">{fmt(cl.balance)} XOF dû</div>
+                      ? <div className="billed-sub bal">{fmt(cl.balance)} F CFA dû</div>
                       : cl.billed > 0
                         ? <div className="billed-sub clear">Tout réglé</div>
                         : <div className="billed-sub" style={{ color: 'var(--color-text-tertiary)' }}>Aucune facture</div>
@@ -299,13 +328,13 @@ export default function ClientsPage() {
                 <div className="stat-box">
                   <div className="stat-label">Total facturé</div>
                   <div className="stat-val tnum">
-                    {fmtCompact(detailClient.billed)}<span className="cur">XOF</span>
+                    {fmtCompact(detailClient.billed)}<span className="cur">F CFA</span>
                   </div>
                 </div>
                 <div className="stat-box">
                   <div className="stat-label">Solde impayé</div>
                   <div className={'stat-val tnum' + (detailClient.balance > 0 ? ' bal' : '')}>
-                    {fmtCompact(detailClient.balance)}<span className="cur">XOF</span>
+                    {fmtCompact(detailClient.balance)}<span className="cur">F CFA</span>
                   </div>
                 </div>
               </div>
@@ -313,19 +342,79 @@ export default function ClientsPage() {
               {/* Contact */}
               <div className="detail-block">
                 <div className="detail-block-title">Contact</div>
-                <div className="contact-line">
-                  <Icon name="mail" size={16} />
-                  <span>{detailClient.email}</span>
-                </div>
-                <div className="contact-line">
-                  <Icon name="phone" size={16} />
-                  <span>{detailClient.phone}</span>
-                </div>
-                <div className="contact-line">
-                  <Icon name="map-pin" size={16} />
-                  <span>{detailClient.city}</span>
-                </div>
+                {editMode ? (
+                  <>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">Raison sociale</label>
+                      <input className="form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">Contact principal</label>
+                      <input className="form-input" value={editForm.contact} onChange={e => setEditForm(f => ({ ...f, contact: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">Email</label>
+                      <input className="form-input" type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">Téléphone</label>
+                      <input className="form-input" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">Ville</label>
+                      <input className="form-input" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Statut</label>
+                      <select className="form-input" value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value as ClientStatus }))}>
+                        <option value="active">Actif</option>
+                        <option value="lead">Prospect</option>
+                        <option value="inactive">Inactif</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="contact-line">
+                      <Icon name="mail" size={16} />
+                      <span>{detailClient.email}</span>
+                    </div>
+                    <div className="contact-line">
+                      <Icon name="phone" size={16} />
+                      <span>{detailClient.phone}</span>
+                    </div>
+                    <div className="contact-line">
+                      <Icon name="map-pin" size={16} />
+                      <span>{detailClient.city}</span>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Identifiants fiscaux */}
+              {(detailClient.ifu || detailClient.rccm || detailClient.taxRegime) && (
+                <div className="detail-block">
+                  <div className="detail-block-title">Identifiants fiscaux</div>
+                  {detailClient.ifu && (
+                    <div className="contact-line">
+                      <Icon name="file-text" size={16} />
+                      <span>IFU&nbsp;<strong>{detailClient.ifu}</strong></span>
+                    </div>
+                  )}
+                  {detailClient.rccm && (
+                    <div className="contact-line">
+                      <Icon name="building" size={16} />
+                      <span>RCCM&nbsp;<strong>{detailClient.rccm}</strong></span>
+                    </div>
+                  )}
+                  {detailClient.taxRegime && (
+                    <div className="contact-line">
+                      <Icon name="tag" size={16} />
+                      <span>Régime&nbsp;<strong>{detailClient.taxRegime}</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Recent invoices */}
               <div className="detail-block">
@@ -344,7 +433,7 @@ export default function ClientsPage() {
                           <div className="mini-id">#{inv.id}</div>
                           <div className="mini-sub">{inv.sub}</div>
                         </div>
-                        <div className="mini-amt">{fmt(inv.amt)} XOF</div>
+                        <div className="mini-amt">{fmt(inv.amt)} F CFA</div>
                         <span className={`mini-status st-${inv.status}`}>
                           {INV_STATUS_LABEL[inv.status]}
                         </span>
@@ -355,13 +444,28 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className="panel-footer">
-              <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={closePanel}>
-                Fermer
-              </button>
-              <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-                <Icon name="plus" size={15} />
-                Nouvelle facture
+            <div className="panel-footer" style={{ flexDirection: 'column', gap: 8 }}>
+              {editMode ? (
+                <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                  <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditMode(false)}>
+                    Annuler
+                  </button>
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => handleSaveEdit(detailClient)}>
+                    <Icon name="check" size={15} /> Enregistrer
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                  <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openDetailEdit(detailClient)}>
+                    <Icon name="edit" size={15} /> Modifier
+                  </button>
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                    <Icon name="plus" size={15} /> Nouvelle facture
+                  </button>
+                </div>
+              )}
+              <button className="btn btn-ghost btn-danger" style={{ width: '100%', justifyContent: 'center' }} onClick={() => handleDeleteClient(detailClient)}>
+                <Icon name="trash" size={15} /> Supprimer ce client
               </button>
             </div>
           </>
@@ -418,12 +522,33 @@ export default function ClientsPage() {
               </select>
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                IFU <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span>
+              </label>
+              <input className="form-input" placeholder="00012345 B" value={form.ifu}
+                onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                RCCM <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span>
+              </label>
+              <input className="form-input" placeholder="BF-OUA-2021-B-1234" value={form.rccm}
+                onChange={e => setForm(f => ({ ...f, rccm: e.target.value }))} />
+            </div>
+          </div>
           <div className="form-group">
             <label className="form-label">
-              IFU <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span>
+              Régime fiscal <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span>
             </label>
-            <input className="form-input" placeholder="00012345 B" value={form.ifu}
-              onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
+            <select className="form-input" value={form.taxRegime}
+              onChange={e => setForm(f => ({ ...f, taxRegime: e.target.value }))}>
+              <option value="">— Sélectionner —</option>
+              <option value="RNI">RNI — Régime normal d'imposition (CA ≥ 50M F CFA)</option>
+              <option value="RSI">RSI — Régime simplifié d'imposition (CA 15–50M F CFA)</option>
+              <option value="CME">CME — Contribution des micro-entreprises (CA &lt; 15M F CFA)</option>
+            </select>
           </div>
         </form>
 

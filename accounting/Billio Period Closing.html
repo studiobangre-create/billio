@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Period Closing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.cols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; align-items: start; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); }
+.card-head { padding: 16px 20px 13px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-title { font-size: 14px; font-weight: 700; }
+.card-sub { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 2px; }
+.card-body { padding: 8px 20px 18px; }
+
+/* period strip */
+.period-board { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.pcell { flex: 1; min-width: 78px; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 11px 10px; text-align: center; background: var(--color-background-primary); box-shadow: var(--shadow-sm); position: relative; }
+.pcell.closed { background: var(--color-background-secondary); }
+.pcell.current { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
+.pcell .pm { font-size: 12px; font-weight: 700; }
+.pcell .ps { font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; margin-top: 5px; display: inline-flex; align-items: center; gap: 3px; }
+.ps.cl { color: #2E7D32; } .ps.op { color: var(--brand); } .ps.fu { color: var(--color-text-tertiary); }
+.pcell .lockico { font-size: 11px; }
+
+/* checklist */
+.chk { display: flex; align-items: flex-start; gap: 13px; padding: 14px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.chk:last-child { border-bottom: none; }
+.chk-box { width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1.5px solid var(--color-border-secondary); cursor: pointer; transition: all .14s; background: var(--color-background-primary); color: transparent; }
+.chk-box.done { background: #2E7D32; border-color: #2E7D32; color: #fff; }
+.chk-box.pending { border-style: dashed; }
+.chk-main { flex: 1; min-width: 0; }
+.chk-title { font-size: 13.5px; font-weight: 600; }
+.chk-title.done { color: var(--color-text-secondary); text-decoration: line-through; text-decoration-color: var(--color-border-secondary); }
+.chk-sub { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 2px; line-height: 1.5; }
+.chk-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; margin-top: 2px; }
+.chk-tag.auto { background: var(--brand-tint); color: var(--brand); }
+.chk-tag.manual { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+
+/* progress ring + summary */
+.close-hero { text-align: center; padding: 8px 0 4px; }
+.ring-wrap { position: relative; width: 132px; height: 132px; margin: 8px auto 4px; }
+.ring-val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring-pct { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+.ring-lbl { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); margin-top: 1px; }
+.close-stat { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 12.5px; }
+.close-stat:last-of-type { border-bottom: none; }
+.close-stat .lbl { color: var(--color-text-secondary); }
+.close-stat .val { font-weight: 700; }
+.btn-block { width: 100%; justify-content: center; margin-top: 16px; }
+.btn-block:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* result allocation */
+.alloc { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; margin-top: 8px; }
+.alloc-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; font-size: 12.5px; }
+.alloc-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.alloc-row.head { font-weight: 700; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 9px; margin-bottom: 3px; }
+.alloc-flow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-secondary); margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--color-border-tertiary); }
+.acode { font-family: "SFMono-Regular", ui-monospace, monospace; font-weight: 700; color: var(--brand); }
+.neg { color: #A32D2D; }
+
+/* warning */
+.warn { display: flex; gap: 11px; padding: 13px 15px; background: #FCF3E6; border: 0.5px solid #F0D9A8; border-radius: var(--border-radius-md); margin-top: 14px; }
+.warn i { color: #B26A09; font-size: 17px; flex-shrink: 0; }
+.warn-t { font-size: 12px; font-weight: 700; color: #8C5207; }
+.warn-s { font-size: 11.5px; color: #A26A1A; margin-top: 2px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Period Closing</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-lock"></i> Accounting</div>
+        <div class="page-title">Period closing</div>
+        <div class="page-sub">Clôture · exercice 2026 · arrêté au 30 juin</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026 · ouvert</span>
+        <button class="btn"><i class="ti ti-lock"></i> Close June</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head"><div><div class="card-title">Periods · exercice 2026</div><div class="card-sub">Lock a period to freeze its postings</div></div></div>
+        <div class="card-body"><div class="period-board" id="periodBoard"></div></div>
+      </div>
+
+      <div class="cols">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">Closing checklist — juin 2026</div><div class="card-sub">Complete every step before locking the period</div></div></div>
+          <div class="card-body"><div id="checklist"></div></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Closing readiness</div></div></div>
+            <div class="card-body">
+              <div class="close-hero">
+                <div class="ring-wrap" id="ring"></div>
+              </div>
+              <div class="close-stat"><span class="lbl">Steps complete</span><span class="val" id="stDone">—</span></div>
+              <div class="close-stat"><span class="lbl">Entries to post</span><span class="val" id="stDraft">—</span></div>
+              <div class="close-stat"><span class="lbl">Trial balance</span><span class="val" style="color:#2E7D32;">Équilibrée ✓</span></div>
+              <button class="btn btn-primary btn-block" id="closeBtn" disabled onclick="doClose()"><i class="ti ti-lock"></i> Lock June &amp; carry forward</button>
+              <div class="warn" id="warn"><i class="ti ti-alert-triangle"></i><div><div class="warn-t">1 draft entry still open</div><div class="warn-s">Post or delete the draft TVA entry in Journals before you can close the period.</div></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Year-end result allocation</div><div class="card-sub">At 31 December · affectation du résultat</div></div></div>
+            <div class="card-body">
+              <div class="alloc">
+                <div class="alloc-row head"><span>Résultat de l'exercice (à ce jour)</span><span class="v neg" id="allocResult">—</span></div>
+                <div class="alloc-row"><span>Report à nouveau d'ouverture</span><span class="v">870 000</span></div>
+                <div class="alloc-flow"><i class="ti ti-arrow-right-circle"></i> Vire le résultat vers <span class="acode">110</span> Report à nouveau à la clôture annuelle.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("closing");
+
+  /* periods */
+  var PERIODS = [
+    { m: "Jan", s: "closed" }, { m: "Fév", s: "closed" }, { m: "Mar", s: "closed" },
+    { m: "Avr", s: "closed" }, { m: "Mai", s: "closed" }, { m: "Juin", s: "current" },
+    { m: "Juil", s: "future" }, { m: "Août", s: "future" }, { m: "Sep", s: "future" },
+    { m: "Oct", s: "future" }, { m: "Nov", s: "future" }, { m: "Déc", s: "future" }
+  ];
+  function renderPeriods() {
+    document.getElementById("periodBoard").innerHTML = PERIODS.map(function (p) {
+      var st = p.s === "closed" ? '<span class="ps cl"><i class="ti ti-lock lockico"></i> Clôturé</span>'
+        : p.s === "current" ? '<span class="ps op"><i class="ti ti-edit lockico"></i> Ouvert</span>'
+        : '<span class="ps fu">À venir</span>';
+      return '<div class="pcell ' + p.s + '"><div class="pm">' + p.m + '</div>' + st + '</div>';
+    }).join("");
+    if (window.refreshIcons) refreshIcons(document.getElementById("periodBoard"));
+  }
+
+  /* checklist */
+  var CHECKS = [
+    { t: "Rapprochement bancaire", s: "Solde 521 pointé avec le relevé de banque", tag: "manual", done: true },
+    { t: "Lettrage clients & fournisseurs", s: "Comptes 411 / 401 lettrés", tag: "manual", done: true },
+    { t: "Dotations aux amortissements", s: "Dotation de juin postée (681 → 28x)", tag: "auto", done: true },
+    { t: "Régularisation de la TVA", s: "Solder 443/445 vers 4441 — 1 brouillon à poster", tag: "auto", done: false },
+    { t: "Écritures de régularisation (OD)", s: "Charges & produits constatés d'avance", tag: "manual", done: true },
+    { t: "Validation de la balance", s: "Débit = crédit · contrôlé automatiquement", tag: "auto", done: true }
+  ];
+  function renderChecklist() {
+    document.getElementById("checklist").innerHTML = CHECKS.map(function (c, i) {
+      return '<div class="chk"><div class="chk-box ' + (c.done ? "done" : "pending") + '" data-i="' + i + '"><i class="ti ti-check"></i></div>' +
+        '<div class="chk-main"><div class="chk-title ' + (c.done ? "done" : "") + '">' + c.t + '</div><div class="chk-sub">' + c.s + '</div></div>' +
+        '<span class="chk-tag ' + c.tag + '">' + (c.tag === "auto" ? "Auto" : "Manuel") + '</span></div>';
+    }).join("");
+    document.querySelectorAll(".chk-box").forEach(function (b) {
+      b.addEventListener("click", function () { var i = +b.dataset.i; CHECKS[i].done = !CHECKS[i].done; renderChecklist(); renderReadiness(); });
+    });
+    if (window.refreshIcons) refreshIcons(document.getElementById("checklist"));
+  }
+
+  /* readiness ring */
+  function renderReadiness() {
+    var done = CHECKS.filter(function (c) { return c.done; }).length;
+    var pct = Math.round((done / CHECKS.length) * 100);
+    var drafts = A.ENTRIES.filter(function (e) { return !e.posted; }).length;
+    var R = 56, C = 2 * Math.PI * R;
+    var off = C * (1 - pct / 100);
+    var color = pct === 100 ? "#2E7D32" : "var(--brand)";
+    document.getElementById("ring").innerHTML =
+      '<svg width="132" height="132" viewBox="0 0 132 132">' +
+      '<circle cx="66" cy="66" r="56" fill="none" stroke="var(--color-background-secondary)" stroke-width="13"/>' +
+      '<circle cx="66" cy="66" r="56" fill="none" stroke="' + color + '" stroke-width="13" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '" transform="rotate(-90 66 66)" style="transition:stroke-dashoffset .4s ease;"/>' +
+      '</svg><div class="ring-val"><div class="ring-pct" style="color:' + color + ';">' + pct + '%</div><div class="ring-lbl">Ready</div></div>';
+    document.getElementById("stDone").textContent = done + " / " + CHECKS.length;
+    document.getElementById("stDraft").textContent = drafts ? drafts + " draft" : "None";
+    var ready = done === CHECKS.length;
+    document.getElementById("closeBtn").disabled = !ready;
+    document.getElementById("warn").style.display = ready ? "none" : "flex";
+  }
+
+  /* result allocation */
+  function net() { var s = 0; for (var i = 0; i < arguments.length; i++) s += A.closingSigned(arguments[i]); return s; }
+  var produits = -net("701", "706");
+  var charges = net("601", "605", "627", "661", "681", "671");
+  var result = produits - charges;
+  document.getElementById("allocResult").textContent = A.fmt(result) + " XOF";
+
+  window.doClose = function () {
+    PERIODS[5].s = "closed";
+    renderPeriods();
+    showToast("Juin 2026 clôturé · postings frozen · à-nouveaux carried forward");
+    document.querySelector('.topbar-actions .period-pill').innerHTML = '<span class="dot" style="background:#2E7D32;"></span> Exercice 2026 · juin clôturé';
+  };
+
+  var toastTimer;
+  window.showToast = function (msg) { var t = document.getElementById("toast"); document.getElementById("toastMsg").textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2800); };
+
+  renderPeriods(); renderChecklist(); renderReadiness();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

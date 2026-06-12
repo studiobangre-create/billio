@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
-import { EmptyInline } from '../components/EmptyState';
+import { EmptyState, EmptyInline } from '../components/EmptyState';
+import { ActivityEmptyIllustration, TopClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue } from '../data';
 import type { ActivityPart } from '../data';
@@ -15,8 +17,10 @@ function ActivityLine({ parts }: { parts: ActivityPart[] }) {
 }
 
 export default function DashboardPage() {
-  const { invoices, activity, clientsMap } = useApp();
+  const { invoices, activity, clientsMap, loading } = useApp();
   const navigate = useNavigate();
+
+  if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
 
   const metrics = useMemo(() => {
     const totalInvoiced  = invoices.filter(i => i.status !== 'draft').reduce((s, i) => s + i.amount, 0);
@@ -64,7 +68,7 @@ export default function DashboardPage() {
               <div className="metric-ico blue"><Icon name="file-invoice" size={15} ariaHidden /></div>
               <div className="metric-label">Total facturé</div>
             </div>
-            <div className="metric-value tnum">{fmt(metrics.totalInvoiced)}<span className="metric-unit">XOF</span></div>
+            <div className="metric-value tnum">{fmtCompact(metrics.totalInvoiced)}<span className="metric-unit">F CFA</span></div>
             <div className="metric-change"><span className="up"><Icon name="trending-up" size={14} ariaHidden />+12 % MoM</span></div>
           </div>
 
@@ -73,7 +77,7 @@ export default function DashboardPage() {
               <div className="metric-ico amber"><Icon name="clock-pause" size={15} ariaHidden /></div>
               <div className="metric-label">Impayé</div>
             </div>
-            <div className="metric-value tnum">{fmt(metrics.outstanding)}<span className="metric-unit">XOF</span></div>
+            <div className="metric-value tnum">{fmtCompact(metrics.outstanding)}<span className="metric-unit">F CFA</span></div>
             <div className="metric-change"><span className="dn"><Icon name="alert-triangle" size={14} ariaHidden />{metrics.overdueCount} en retard</span></div>
           </div>
 
@@ -82,7 +86,7 @@ export default function DashboardPage() {
               <div className="metric-ico green"><Icon name="cash" size={15} ariaHidden /></div>
               <div className="metric-label">Encaissé</div>
             </div>
-            <div className="metric-value tnum">{fmt(metrics.collected)}<span className="metric-unit">XOF</span></div>
+            <div className="metric-value tnum">{fmtCompact(metrics.collected)}<span className="metric-unit">F CFA</span></div>
             <div className="metric-change"><span className="up"><Icon name="trending-up" size={14} ariaHidden />{metrics.collectionRate} % collecté</span></div>
           </div>
 
@@ -134,7 +138,7 @@ export default function DashboardPage() {
                   <div className="cell-sub">{fmtDue(inv.due)}</div>
                 </div>
                 <div className="amount tnum" style={{ textAlign: 'right' }}>
-                  {fmt(inv.amount)}<span className="cur">XOF</span>
+                  {fmt(inv.amount)}<span className="cur">F CFA</span>
                 </div>
                 <div>
                   <span className={`status-pill s-${inv.status}`}>
@@ -158,7 +162,11 @@ export default function DashboardPage() {
               <button className="panel-link">Tout voir</button>
             </div>
             {activity.length === 0 ? (
-              <EmptyInline message="Aucune activité récente." />
+              <EmptyState
+                illustration={<ActivityEmptyIllustration />}
+                title="Aucune activité récente"
+                description="Les actions sur vos factures, clients et paiements apparaîtront ici."
+              />
             ) : activity.slice(0, 5).map((item, i) => (
               <div key={i} className="activity-item">
                 <div className={`act-dot ${item.kind}`} />
@@ -177,7 +185,11 @@ export default function DashboardPage() {
               <button className="panel-link" onClick={() => navigate('/clients')}>Gérer</button>
             </div>
             {topClients.length === 0 ? (
-              <EmptyInline message="Aucune donnée client disponible." />
+              <EmptyState
+                illustration={<TopClientsEmptyIllustration />}
+                title="Aucune donnée client"
+                description="Les clients avec le plus de revenus générés apparaîtront ici."
+              />
             ) : topClients.map(({ code, client, sum, n, barPct }) => (
               <div key={code} className="client-item">
                 <div className={`client-av lg ${client.av}`}>{code}</div>
@@ -188,7 +200,7 @@ export default function DashboardPage() {
                     <div className="bar-fill" style={{ width: `${barPct}%` }} />
                   </div>
                 </div>
-                <div className="client-total tnum">{fmtCompact(sum)} XOF</div>
+                <div className="client-total tnum">{fmtCompact(sum)} F CFA</div>
               </div>
             ))}
           </div>

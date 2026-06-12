@@ -29,7 +29,7 @@ create table if not exists public.org_members (
   org_id     uuid        not null references public.organizations on delete cascade,
   user_id    uuid        not null references auth.users           on delete cascade,
   role       text        not null default 'member'
-               check (role in ('owner', 'admin', 'member')),
+               check (role in ('owner', 'admin', 'member', 'accountant', 'observer')),
   created_at timestamptz not null default now(),
   unique (org_id, user_id)
 );
@@ -124,6 +124,7 @@ create table if not exists public.clients (
   phone          text        not null default '—',
   city           text        not null default '—',
   ifu            text        not null default '',
+  rccm           text        not null default '',
   status         text        not null default 'active'
                    check (status in ('active', 'lead', 'inactive')),
   invoices_count integer     not null default 0,

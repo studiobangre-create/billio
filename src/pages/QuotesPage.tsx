@@ -1,9 +1,14 @@
 import { useState, useMemo } from 'react';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
+import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { createQuote, updateQuote } from '../lib/api/quotes';
-import { fmt, fmtDate, newLineItem } from '../data';
+import { createQuote, updateQuote, removeQuote } from '../lib/api/quotes';
+import { createInvoice } from '../lib/api/invoices';
+import { fetchLineItems, saveLineItems } from '../lib/api/line-items';
+import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
+import { fmt, fmtDate, newLineItem, nextId } from '../data';
 import type { LineItem, QuoteStatus, Quote } from '../lib/schemas';
 
 type FilterKey = 'all' | QuoteStatus;
@@ -33,15 +38,17 @@ function nextQuoteId(quotes: Quote[]): string {
 }
 
 function fmtCompact(n: number) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
-  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
-  return String(n);
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
+  return Math.round(n).toLocaleString('fr-FR');
 }
 
 const TVA = 0.18;
 
 export default function QuotesPage() {
-  const { showToast, quotes, setQuotes, clientsMap, userId } = useApp();
+  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, userId, orgId, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -110,21 +117,63 @@ export default function QuotesPage() {
     const payload = { id, subject: fSubject.trim() || 'Devis sans titre', client: fClient, issued: fDate, valid: fValid, amount: total, status };
     const newQuote: Quote = { ...payload, expSoon: status === 'sent' };
     setQuotes(prev => [newQuote, ...prev]);
-    await createQuote(userId, payload);
+    await createQuote(orgId, payload);
+    await saveLineItems(orgId, lines, { quoteId: id });
     closePanel();
     showToast(status === 'sent' ? `Devis ${id} envoyé à ${cName}` : `Brouillon ${id} enregistré`);
   }
 
   async function convertToInvoice(id: string, e: React.MouseEvent) {
     e.stopPropagation();
+    const quote = quotes.find(q => q.id === id);
+    if (!quote) return;
+
+    const today   = new Date().toISOString().slice(0, 10);
+    const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+    const invId   = nextId(invoices);
+    const cName   = clientsMap[quote.client]?.name ?? quote.client;
+    const htAmount  = Math.round(quote.amount / 1.18);
+    const tvaAmount = quote.amount - htAmount;
+
+    const newInv = {
+      id:      invId,
+      subject: quote.subject,
+      client:  quote.client,
+      issued:  today,
+      due:     dueDate,
+      amount:  quote.amount,
+      status:  'pending' as const,
+    };
+
+    setInvoices(prev => [newInv, ...prev]);
     setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
+
+    const quoteLines = await fetchLineItems(undefined, id);
+    await createInvoice(orgId, newInv);
+    await saveLineItems(orgId, quoteLines.map(l => ({ ...l })), { invoiceId: invId });
     await updateQuote(id, { status: 'invoiced' });
-    showToast(`Devis ${id} → facture créée`);
+    await recordInvoiceIssuanceEntry(orgId, {
+      invoiceId:  invId,
+      htAmount,
+      tvaAmount,
+      date:       today,
+      clientName: cName,
+    });
+
+    showToast(`Devis ${id} → Facture #${invId} créée`);
   }
 
   function sendReminder(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     showToast(`Relance envoyée pour ${id}`);
+  }
+
+  async function handleDelete(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm(`Supprimer le devis ${id} ? Cette action est irréversible.`)) return;
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    await removeQuote(id);
+    showToast(`Devis ${id} supprimé`);
   }
 
   return (
@@ -153,7 +202,7 @@ export default function QuotesPage() {
                 <div className="metric-label">Devisé (90 jours)</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(totalQuoted)}<span className="metric-unit">XOF</span>
+                {fmtCompact(totalQuoted)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change">
                 <span className="up"><Icon name="trending-up" size={13} /> +8% vs trimestre dernier</span>
@@ -166,7 +215,7 @@ export default function QuotesPage() {
                 <div className="metric-label">En attente de réponse</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(openVal)}<span className="metric-unit">XOF</span>
+                {fmtCompact(openVal)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">
                 {openCount} devis en attente
@@ -192,7 +241,7 @@ export default function QuotesPage() {
                 <div className="metric-label">Acceptés</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(acceptedVal)}<span className="metric-unit">XOF</span>
+                {fmtCompact(acceptedVal)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">prêt à facturer</div>
             </div>
@@ -227,8 +276,7 @@ export default function QuotesPage() {
 
             {filtered.length === 0 ? (
               <EmptyState
-                variant="compact"
-                icon={<Icon name="file-text" size={24} ariaHidden />}
+                illustration={<QuotesEmptyIllustration />}
                 title="Aucun devis"
                 description="Aucun devis dans cette catégorie. Créez un devis pour commencer."
               />
@@ -265,7 +313,7 @@ export default function QuotesPage() {
 
                     {/* Amount */}
                     <div className="amount tnum" style={{ textAlign: 'right' }}>
-                      {fmt(q.amount)}<span className="cur">XOF</span>
+                      {fmt(q.amount)}<span className="cur">F CFA</span>
                     </div>
 
                     {/* Status */}
@@ -303,8 +351,8 @@ export default function QuotesPage() {
                           <Icon name="copy" size={14} />
                         </button>
                       )}
-                      <button className="icon-btn" title="Plus" onClick={e => e.stopPropagation()}>
-                        <Icon name="dots" size={14} />
+                      <button className="icon-btn" title="Supprimer" onClick={e => handleDelete(q.id, e)}>
+                        <Icon name="trash" size={14} />
                       </button>
                     </div>
                   </div>
@@ -415,15 +463,15 @@ export default function QuotesPage() {
           <div className="total-block">
             <div className="total-row">
               <span>Sous-total</span>
-              <span>{fmt(subtotal)} XOF</span>
+              <span>{fmt(subtotal)} F CFA</span>
             </div>
             <div className="total-row">
               <span>TVA (18%)</span>
-              <span>{fmt(tax)} XOF</span>
+              <span>{fmt(tax)} F CFA</span>
             </div>
             <div className="total-row final">
               <span>Total estimé</span>
-              <span>{fmt(total)} XOF</span>
+              <span>{fmt(total)} F CFA</span>
             </div>
           </div>
         </div>

@@ -4,7 +4,7 @@ import type { Payment } from '../schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-function dbToPayment(row: Record<string, unknown>): Payment {
+export function dbToPayment(row: Record<string, unknown>): Payment {
   return {
     id:     String(row.id),
     date:   String(row.date),
@@ -18,11 +18,12 @@ function dbToPayment(row: Record<string, unknown>): Payment {
   };
 }
 
-export async function fetchPayments(_orgId: string): Promise<Payment[]> {
+export async function fetchPayments(orgId: string): Promise<Payment[]> {
   if (MOCK) return [...INITIAL_PAYMENTS];
   const { data, error } = await supabase
     .from('payments')
     .select('*')
+    .eq('org_id', orgId)
     .order('date', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(dbToPayment);
@@ -52,4 +53,10 @@ export async function createPayment(
     .single();
   if (error) throw error;
   return dbToPayment(data as Record<string, unknown>);
+}
+
+export async function removePayment(id: string): Promise<void> {
+  if (MOCK) return;
+  const { error } = await supabase.from('payments').delete().eq('id', id);
+  if (error) throw error;
 }

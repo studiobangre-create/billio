@@ -35,23 +35,29 @@ export const invoiceSchema = z.object({
 });
 
 export const clientSchema = z.object({
-  name: z.string(),
-  city: z.string(),
-  av:   z.string(),
+  name:      z.string(),
+  city:      z.string(),
+  av:        z.string(),
+  ifu:       z.string().optional(),
+  rccm:      z.string().optional(),
+  taxRegime: z.string().optional(),
 });
 
 export const clientRecordSchema = z.object({
-  code:     z.string(),
-  av:       z.string(),
-  name:     z.string(),
-  contact:  z.string(),
-  email:    z.string(),
-  phone:    z.string(),
-  city:     z.string(),
-  invoices: z.number().int().min(0),
-  billed:   z.number().min(0),
-  balance:  z.number().min(0),
-  status:   clientStatusSchema,
+  code:      z.string(),
+  av:        z.string(),
+  name:      z.string(),
+  contact:   z.string(),
+  email:     z.string(),
+  phone:     z.string(),
+  city:      z.string(),
+  ifu:       z.string().optional(),
+  rccm:      z.string().optional(),
+  taxRegime: z.string().optional(),
+  invoices:  z.number().int().min(0),
+  billed:    z.number().min(0),
+  balance:   z.number().min(0),
+  status:    clientStatusSchema,
 });
 
 export const paymentSchema = z.object({
@@ -106,13 +112,15 @@ export const activitySchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const newClientFormSchema = z.object({
-  name:    z.string().min(1, 'La raison sociale est requise'),
-  contact: z.string(),
-  email:   z.union([z.string().email('Email invalide'), z.literal('')]),
-  phone:   z.string(),
-  city:    z.string(),
-  status:  clientStatusSchema,
-  ifu:     z.string(),
+  name:      z.string().min(1, 'La raison sociale est requise'),
+  contact:   z.string(),
+  email:     z.union([z.string().email('Email invalide'), z.literal('')]),
+  phone:     z.string(),
+  city:      z.string(),
+  status:    clientStatusSchema,
+  ifu:       z.string(),
+  rccm:      z.string(),
+  taxRegime: z.string(),
 });
 
 export const lineItemFormSchema = lineItemSchema.omit({ id: true }).extend({

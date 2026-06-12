@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
+import { ProductsEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { createProduct } from '../lib/api/products';
+import { createProduct, updateProduct, removeProduct } from '../lib/api/products';
 import { fmt, fmtCompact } from '../data';
 import type { ProductType, Product } from '../lib/schemas';
 
@@ -19,11 +21,15 @@ function TypePill({ type }: { type: ProductType }) {
 }
 
 export default function ProductsPage() {
-  const { showToast, products, setProducts, userId } = useApp();
+  const { showToast, products, setProducts, orgId, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Produits & Services" subtitle="Gérez votre catalogue" variant="table-only" rows={6} />;
   const [filter, setFilter]         = useState<FilterKey>('all');
   const [view, setView]             = useState<ViewMode>('list');
   const [search, setSearch]         = useState('');
   const [panelOpen, setPanelOpen]   = useState(false);
+  const [editId,    setEditId]      = useState<string | null>(null);
+  const [dotsOpen,  setDotsOpen]    = useState<string | null>(null);
 
   // New item form state
   const [fType,  setFType]  = useState<ProductType>('service');
@@ -59,29 +65,54 @@ export default function ProductsPage() {
   const maxUsed = useMemo(() => Math.max(...products.map(p => p.used), 1), [products]);
 
   const openPanel = () => {
+    setEditId(null);
     setFType('service'); setFName(''); setFSku('');
     setFDesc(''); setFPrice(50_000); setFUnit('heure'); setFTax(18);
     setPanelOpen(true);
   };
 
+  const openEdit = (p: Product) => {
+    setEditId(p.id);
+    setFType(p.type); setFName(p.name); setFSku(p.sku === '—' ? '' : p.sku);
+    setFDesc(''); setFPrice(p.price); setFUnit(p.unit); setFTax(p.tax);
+    setPanelOpen(true);
+  };
+
+  const handleDelete = async (p: Product) => {
+    setDotsOpen(null);
+    if (!window.confirm(`Supprimer "${p.name}" ? Cette action est irréversible.`)) return;
+    setProducts(prev => prev.filter(x => x.id !== p.id));
+    await removeProduct(p.id);
+    showToast(`"${p.name}" supprimé`);
+  };
+
   const submitItem = async () => {
     if (!fName.trim()) { showToast('Donnez un nom à cet article.', true); return; }
-    const item: Product = {
-      id:    crypto.randomUUID(),
-      name:  fName.trim(),
-      sku:   fSku.trim() || '—',
-      type:  fType,
-      unit:  fUnit,
-      price: fPrice,
-      tax:   fTax,
-      used:  0,
-      ico:   fType === 'service' ? 'briefcase' : 'tag',
-      color: fType === 'service' ? 'ico-blue' : 'ico-green',
-    };
-    setProducts(prev => [item, ...prev]);
-    await createProduct(userId, item);
-    setPanelOpen(false);
-    showToast(`"${item.name}" ajouté au catalogue`);
+    if (editId) {
+      const patch = { name: fName.trim(), sku: fSku.trim() || '—', type: fType, unit: fUnit, price: fPrice, tax: fTax, ico: fType === 'service' ? 'briefcase' : 'tag', color: fType === 'service' ? 'ico-blue' : 'ico-green' };
+      setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...patch } : p));
+      await updateProduct(editId, patch);
+      setPanelOpen(false);
+      setEditId(null);
+      showToast(`"${patch.name}" mis à jour`);
+    } else {
+      const item: Product = {
+        id:    crypto.randomUUID(),
+        name:  fName.trim(),
+        sku:   fSku.trim() || '—',
+        type:  fType,
+        unit:  fUnit,
+        price: fPrice,
+        tax:   fTax,
+        used:  0,
+        ico:   fType === 'service' ? 'briefcase' : 'tag',
+        color: fType === 'service' ? 'ico-blue' : 'ico-green',
+      };
+      setProducts(prev => [item, ...prev]);
+      await createProduct(orgId, item);
+      setPanelOpen(false);
+      showToast(`"${item.name}" ajouté au catalogue`);
+    }
   };
 
   return (
@@ -135,7 +166,7 @@ export default function ProductsPage() {
                 <div className="metric-ico amber"><Icon name="cash" size={15} ariaHidden /></div>
                 <div className="metric-label">Revenu catalogue</div>
               </div>
-              <div className="metric-value tnum">{fmtCompact(metrics.revenue)}<span className="metric-unit">XOF</span></div>
+              <div className="metric-value tnum">{fmtCompact(metrics.revenue)}<span className="metric-unit">F CFA</span></div>
               <div className="metric-change" style={{ color: 'var(--color-text-secondary)' }}>cumulé, toutes factures</div>
             </div>
           </div>
@@ -196,8 +227,7 @@ export default function ProductsPage() {
               </div>
               {visible.length === 0 ? (
                 <EmptyState
-                  variant="compact"
-                  icon={<Icon name="package" size={24} ariaHidden />}
+                  illustration={<ProductsEmptyIllustration />}
                   title="Aucun article trouvé"
                   description="Aucun article ne correspond à la recherche. Modifiez vos filtres."
                 />
@@ -215,7 +245,7 @@ export default function ProductsPage() {
                   <div><TypePill type={p.type} /></div>
                   <div className="cell-unit">par {p.unit}</div>
                   <div className="price tnum" style={{ textAlign: 'right' }}>
-                    {fmt(p.price)}<span className="cur">XOF</span>
+                    {fmt(p.price)}<span className="cur">F CFA</span>
                   </div>
                   <div className="used-cell">
                     <div className="used-top tnum">{p.used}× <span>utilisé</span></div>
@@ -223,13 +253,20 @@ export default function ProductsPage() {
                       <div className="bar-fill" style={{ width: `${Math.round((p.used / maxUsed) * 100)}%` }} />
                     </div>
                   </div>
-                  <div className="row-actions">
-                    <button className="icon-btn" aria-label="Modifier" onClick={e => e.stopPropagation()}>
+                  <div className="row-actions" style={{ position: 'relative' }}>
+                    <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
                       <Icon name="edit" size={15} ariaHidden />
                     </button>
-                    <button className="icon-btn" aria-label="Plus" onClick={e => e.stopPropagation()}>
+                    <button className="icon-btn" aria-label="Plus" onClick={e => { e.stopPropagation(); setDotsOpen(dotsOpen === p.id ? null : p.id); }}>
                       <Icon name="dots" size={15} ariaHidden />
                     </button>
+                    {dotsOpen === p.id && (
+                      <div className="dropdown-menu" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10 }}>
+                        <button className="dropdown-item danger" onClick={() => handleDelete(p)}>
+                          <Icon name="trash" size={14} ariaHidden /> Supprimer
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -242,8 +279,7 @@ export default function ProductsPage() {
               {visible.length === 0 ? (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <EmptyState
-                    variant="compact"
-                    icon={<Icon name="package" size={24} ariaHidden />}
+                    illustration={<ProductsEmptyIllustration />}
                     title="Aucun article trouvé"
                     description="Aucun article ne correspond à la recherche. Modifiez vos filtres."
                   />
@@ -257,12 +293,12 @@ export default function ProductsPage() {
                   <div className="pc-name">{p.name}</div>
                   <div className="pc-sku">{p.sku}</div>
                   <div className="pc-price tnum">
-                    {fmt(p.price)}<span className="cur">XOF</span>
+                    {fmt(p.price)}<span className="cur">F CFA</span>
                     <span className="per"> / {p.unit}</span>
                   </div>
                   <div className="pc-foot">
                     <div className="pc-used"><b className="tnum">{p.used}×</b> sur factures</div>
-                    <button className="icon-btn" aria-label="Modifier" onClick={e => e.stopPropagation()}>
+                    <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
                       <Icon name="edit" size={15} ariaHidden />
                     </button>
                   </div>
@@ -278,8 +314,8 @@ export default function ProductsPage() {
       <div className={`new-inv-panel${panelOpen ? ' open' : ''}`} role="dialog" aria-label="Nouvel article" aria-modal="true">
         <div className="panel-slide-head">
           <div>
-            <div className="panel-slide-title">Nouvel article</div>
-            <div className="panel-slide-sub">Enregistrez-le une fois, réutilisez sur toute facture</div>
+            <div className="panel-slide-title">{editId ? 'Modifier l\'article' : 'Nouvel article'}</div>
+            <div className="panel-slide-sub">{editId ? 'Mettre à jour les informations' : 'Enregistrez-le une fois, réutilisez sur toute facture'}</div>
           </div>
           <button className="icon-btn" onClick={() => setPanelOpen(false)} aria-label="Fermer">
             <Icon name="x" size={15} ariaHidden />
@@ -330,7 +366,7 @@ export default function ProductsPage() {
               <div className="input-affix">
                 <input type="number" min={0} value={fPrice}
                   onChange={e => setFPrice(parseFloat(e.target.value) || 0)} />
-                <span className="suffix">XOF</span>
+                <span className="suffix">F CFA</span>
               </div>
             </div>
             <div className="form-group">

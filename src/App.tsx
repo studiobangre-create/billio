@@ -1,22 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from './context/AppContext';
+import { ToastProvider } from './context/ToastContext';
 import AppShell from './components/AppShell';
-import AuthPage from './pages/AuthPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import InvitePage from './pages/InvitePage';
-import OnboardingPage from './pages/OnboardingPage';
-import DashboardPage from './pages/DashboardPage';
-import InvoicesPage from './pages/InvoicesPage';
-import InvoicePage from './pages/InvoicePage';
-import ProductsPage from './pages/ProductsPage';
-import ClientsPage from './pages/ClientsPage';
-import PaymentsPage from './pages/PaymentsPage';
-import QuotesPage from './pages/QuotesPage';
-import TemplatesPage from './pages/TemplatesPage';
-import SettingsPage from './pages/SettingsPage';
+
+// ── Lazy page chunks ────────────────────────────────────────────────────────
+// Each import() becomes its own JS chunk; the browser only downloads a page
+// when the user navigates to it. The PWA service worker caches chunks after
+// first visit, so subsequent navigations are instant.
+const AuthPage               = lazy(() => import('./pages/AuthPage'));
+const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
+const InvitePage             = lazy(() => import('./pages/InvitePage'));
+const OnboardingPage         = lazy(() => import('./pages/OnboardingPage'));
+const DashboardPage          = lazy(() => import('./pages/DashboardPage'));
+const InvoicesPage           = lazy(() => import('./pages/InvoicesPage'));
+const InvoicePage            = lazy(() => import('./pages/InvoicePage'));
+const ContactsPage           = lazy(() => import('./pages/ContactsPage'));
+const ProductsPage           = lazy(() => import('./pages/ProductsPage'));
+const PaymentsPage           = lazy(() => import('./pages/PaymentsPage'));
+const QuotesPage             = lazy(() => import('./pages/QuotesPage'));
+const TemplatesPage          = lazy(() => import('./pages/TemplatesPage'));
+const SettingsPage           = lazy(() => import('./pages/SettingsPage'));
+const ChartOfAccountsPage    = lazy(() => import('./pages/accounting/ChartOfAccountsPage'));
+const JournalsPage           = lazy(() => import('./pages/accounting/JournalsPage'));
+const TrialBalancePage       = lazy(() => import('./pages/accounting/TrialBalancePage'));
+const FinancialStatementsPage= lazy(() => import('./pages/accounting/FinancialStatementsPage'));
+const FixedAssetsPage        = lazy(() => import('./pages/accounting/FixedAssetsPage'));
+const TaxPage                = lazy(() => import('./pages/accounting/TaxPage'));
+const PeriodClosingPage      = lazy(() => import('./pages/accounting/PeriodClosingPage'));
+const OpeningBalancesPage    = lazy(() => import('./pages/accounting/OpeningBalancesPage'));
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -47,7 +61,9 @@ export default function App() {
     : () => { supabase.auth.signOut(); };
 
   return (
+    <ToastProvider>
     <AppProvider>
+      <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
         {/* Public */}
         <Route
@@ -79,8 +95,18 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/invoices/:id" element={<InvoicePage />} />
-            <Route path="/clients"  element={<ClientsPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/clients"  element={<Navigate to="/contacts" replace />} />
             <Route path="/products" element={<ProductsPage />} />
+            <Route path="/accounting/chart-of-accounts"    element={<ChartOfAccountsPage />} />
+            <Route path="/accounting/journals"             element={<JournalsPage />} />
+            <Route path="/accounting/trial-balance"        element={<TrialBalancePage />} />
+            <Route path="/accounting/financial-statements" element={<FinancialStatementsPage />} />
+            <Route path="/accounting/fixed-assets"         element={<FixedAssetsPage />} />
+            <Route path="/accounting/suppliers"            element={<Navigate to="/contacts?tab=suppliers" replace />} />
+            <Route path="/accounting/tax"                  element={<TaxPage />} />
+            <Route path="/accounting/period-closing"       element={<PeriodClosingPage />} />
+            <Route path="/accounting/opening-balances"     element={<OpeningBalancesPage />} />
             <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
             <Route path="/payments" element={<PaymentsPage />} />
             <Route path="/quotes"     element={<QuotesPage />} />
@@ -90,7 +116,9 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      </Suspense>
     </AppProvider>
+    </ToastProvider>
   );
 }
 

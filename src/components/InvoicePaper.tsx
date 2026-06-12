@@ -20,12 +20,37 @@ export interface PaperConfig {
   footer:        string;
 }
 
+export interface BizInfo {
+  name:            string;
+  address:         string;
+  city:            string;
+  country:         string;
+  email:           string;
+  phone:           string;
+  ifu:             string;
+  rccm:            string;
+  taxRegime?:      string;
+  divisionFiscale?: string;
+}
+
 // ---------------------------------------------------------------------------
-// Mock invoice data
+// Mock fallback data (used when no biz prop supplied)
 // ---------------------------------------------------------------------------
-const BIZ  = { initials: 'SW', name: 'Studio Wend SARL', addr: 'Av. Kwame Nkrumah · Ouagadougou, BF', contact: 'contact@studiowend.bf' };
-const CLI  = { name: 'TechKonsult', city: 'Ouagadougou, Burkina Faso' };
-const INV  = { id: 'INV-0041', issued: '7 juin 2026', due: '21 juin 2026', subject: 'Refonte web — phase 2' };
+const MOCK_BIZ: BizInfo = {
+  name:            'Studio Wend SARL',
+  address:         'Av. Kwame Nkrumah · Ouagadougou, BF',
+  city:            'Ouagadougou',
+  country:         'Burkina Faso',
+  email:           'contact@studiowend.bf',
+  phone:           '+226 70 12 34 56',
+  ifu:             '00012345 B',
+  rccm:            'BF-OUA-2021-B-1234',
+  taxRegime:       'RNI',
+  divisionFiscale: 'Ouagadougou I',
+};
+
+const CLI   = { name: 'TechKonsult', city: 'Ouagadougou, Burkina Faso', ifu: '00067890 C', rccm: 'BF-OUA-2020-B-5678', taxRegime: 'RSI' };
+const INV   = { id: 'INV-0041', issued: '7 juin 2026', due: '21 juin 2026', subject: 'Refonte web — phase 2' };
 const LINES = [
   { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens', qty: 1, price: 300_000 },
   { desc: 'Développement front-end', note: 'Build responsive, composants', qty: 8, price: 35_000 },
@@ -34,6 +59,26 @@ const LINES = [
 const SUB   = LINES.reduce((s, l) => s + l.qty * l.price, 0);
 const TAX   = Math.round(SUB * 0.18);
 const TOTAL = SUB + TAX;
+
+function bizInitials(name: string) {
+  const words = name.trim().split(/\s+/);
+  return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || '??';
+}
+
+function BizMeta({ biz }: { biz: BizInfo }) {
+  const addr = [biz.address, biz.city, biz.country].filter(Boolean).join(', ');
+  const contact = [biz.email, biz.phone].filter(Boolean).join(' · ');
+  const compliance = [biz.ifu && `IFU ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`].filter(Boolean).join(' · ');
+  const fiscal = [biz.taxRegime && `${biz.taxRegime}`, biz.divisionFiscale && `${biz.divisionFiscale}`].filter(Boolean).join(' · ');
+  return (
+    <>
+      {addr && <>{addr}<br /></>}
+      {contact && <>{contact}<br /></>}
+      {compliance && <><span className="tp-compliance-ids-inline">{compliance}</span><br /></>}
+      {fiscal && <span className="tp-compliance-ids-inline">{fiscal}</span>}
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Shared sub-sections
@@ -45,6 +90,13 @@ function Parties() {
         <div className="tp-block-label">Facturé à</div>
         <div className="tp-client-name">{CLI.name}</div>
         <div className="tp-client-meta">{CLI.city}</div>
+        {(CLI.ifu || CLI.rccm || CLI.taxRegime) && (
+          <div className="tp-compliance-ids">
+            {CLI.ifu       && <span>IFU {CLI.ifu}</span>}
+            {CLI.rccm      && <span>RCCM {CLI.rccm}</span>}
+            {CLI.taxRegime && <span>{CLI.taxRegime}</span>}
+          </div>
+        )}
       </div>
       <div>
         <div className="tp-block-label">Détails</div>
@@ -90,11 +142,11 @@ function Totals({ cfg }: { cfg: PaperConfig }) {
   return (
     <div className="tp-totals">
       <div className="tp-tot-inner">
-        <div className="tp-tot-row"><span>Sous-total</span><span>{fmt(SUB)} XOF</span></div>
-        {cfg.showTax && <div className="tp-tot-row"><span>TVA (18 %)</span><span>{fmt(TAX)} XOF</span></div>}
-        {cfg.showDiscount && <div className="tp-tot-row"><span>Remise</span><span>0 XOF</span></div>}
+        <div className="tp-tot-row"><span>Sous-total</span><span>{fmt(SUB)} F CFA</span></div>
+        {cfg.showTax && <div className="tp-tot-row"><span>TVA (18 %)</span><span>{fmt(TAX)} F CFA</span></div>}
+        {cfg.showDiscount && <div className="tp-tot-row"><span>Remise</span><span>0 F CFA</span></div>}
         <div className={`tp-tot-grand ${cfg.totalStyle}`}>
-          <span>Total dû</span><span>{fmt(TOTAL)} XOF</span>
+          <span>Total dû</span><span>{fmt(TOTAL)} F CFA</span>
         </div>
       </div>
     </div>
@@ -130,24 +182,24 @@ function Signature({ cfg }: { cfg: PaperConfig }) {
   );
 }
 
-function Footer({ cfg }: { cfg: PaperConfig }) {
+function Footer({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
   return (
-    <div className="tp-foot">{cfg.footer || `${BIZ.name} · Facture générée via Billio`}</div>
+    <div className="tp-foot">{cfg.footer || `${biz.name || MOCK_BIZ.name} · Facture générée via Billio`}</div>
   );
 }
 
 // ---------------------------------------------------------------------------
 // Layout-specific bodies
 // ---------------------------------------------------------------------------
-function ClassicBody({ cfg }: { cfg: PaperConfig }) {
+function ClassicBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
   return (
     <>
       <div className="tp-top">
         <div className="tp-biz">
-          <div className="tp-logo">{BIZ.initials}</div>
+          <div className="tp-logo">{bizInitials(biz.name || MOCK_BIZ.name)}</div>
           <div>
-            <div className="tp-biz-name">{BIZ.name}</div>
-            <div className="tp-biz-meta">{BIZ.addr}<br />{BIZ.contact}</div>
+            <div className="tp-biz-name">{biz.name || MOCK_BIZ.name}</div>
+            <div className="tp-biz-meta"><BizMeta biz={biz.name ? biz : MOCK_BIZ} /></div>
           </div>
         </div>
         <div className="tp-doc">
@@ -166,20 +218,30 @@ function ClassicBody({ cfg }: { cfg: PaperConfig }) {
       <Totals cfg={cfg} />
       <PayNotes cfg={cfg} />
       <Signature cfg={cfg} />
-      <Footer cfg={cfg} />
+      <Footer cfg={cfg} biz={biz} />
     </>
   );
 }
 
-function BandBody({ cfg }: { cfg: PaperConfig }) {
+function BandBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
+  const resolved = biz.name ? biz : MOCK_BIZ;
+  const addr = [resolved.address, resolved.city].filter(Boolean).join(', ');
+  const compliance = [
+    resolved.ifu && `IFU ${resolved.ifu}`,
+    resolved.rccm && `RCCM ${resolved.rccm}`,
+    resolved.taxRegime && `${resolved.taxRegime}`,
+    resolved.divisionFiscale && `${resolved.divisionFiscale}`,
+  ].filter(Boolean).join(' · ');
   return (
     <>
       <div className="tp-band">
         <div className="tp-band-left">
-          <div className="tp-band-logo">{BIZ.initials}</div>
+          <div className="tp-band-logo">{bizInitials(resolved.name)}</div>
           <div>
-            <div className="tp-band-name">{BIZ.name}</div>
-            <div className="tp-band-tag">{BIZ.addr}</div>
+            <div className="tp-band-name">{resolved.name}</div>
+            <div className="tp-band-tag">
+              {addr}{compliance && ` · ${compliance}`}
+            </div>
           </div>
         </div>
         <div className="tp-band-right">
@@ -193,13 +255,14 @@ function BandBody({ cfg }: { cfg: PaperConfig }) {
         <Totals cfg={cfg} />
         <PayNotes cfg={cfg} />
         <Signature cfg={cfg} />
-        <Footer cfg={cfg} />
+        <Footer cfg={cfg} biz={biz} />
       </div>
     </>
   );
 }
 
-function MinimalBody({ cfg }: { cfg: PaperConfig }) {
+function MinimalBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
+  const resolved = biz.name ? biz : MOCK_BIZ;
   return (
     <>
       <div className="tp-min-top">
@@ -209,8 +272,8 @@ function MinimalBody({ cfg }: { cfg: PaperConfig }) {
       <div className="tp-min-rule" />
       <div className="tp-min-head">
         <div>
-          <div className="tp-block-label">{BIZ.name}</div>
-          <div className="tp-client-meta">{BIZ.addr}<br />{BIZ.contact}</div>
+          <div className="tp-block-label">{resolved.name}</div>
+          <div className="tp-client-meta"><BizMeta biz={resolved} /></div>
           <div className="tp-min-terms">Net 14 jours</div>
         </div>
         <div>
@@ -227,21 +290,22 @@ function MinimalBody({ cfg }: { cfg: PaperConfig }) {
       <Totals cfg={cfg} />
       <PayNotes cfg={cfg} />
       <Signature cfg={cfg} />
-      <Footer cfg={cfg} />
+      <Footer cfg={cfg} biz={biz} />
     </>
   );
 }
 
-function SidebarBody({ cfg }: { cfg: PaperConfig }) {
+function SidebarBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
+  const resolved = biz.name ? biz : MOCK_BIZ;
   return (
     <div className="tp-side-wrap">
       <div className="tp-aside">
-        <div className="tp-aside-logo">{BIZ.initials}</div>
-        <div className="tp-aside-name">{BIZ.name}</div>
-        <div className="tp-aside-meta">{BIZ.addr}<br />{BIZ.contact}</div>
+        <div className="tp-aside-logo">{bizInitials(resolved.name)}</div>
+        <div className="tp-aside-name">{resolved.name}</div>
+        <div className="tp-aside-meta"><BizMeta biz={resolved} /></div>
         <div className="tp-aside-sep" />
         <div className="tp-aside-label">Total dû</div>
-        <div className="tp-aside-total">{fmt(TOTAL)}<span>XOF</span></div>
+        <div className="tp-aside-total">{fmt(TOTAL)}<span>F CFA</span></div>
         <div className="tp-aside-due">Éch. {INV.due}</div>
         <div className="tp-aside-sep" />
         <div className="tp-aside-label">Paiement</div>
@@ -264,19 +328,30 @@ function SidebarBody({ cfg }: { cfg: PaperConfig }) {
         <InvoiceTable cfg={cfg} />
         <Totals cfg={cfg} />
         <Signature cfg={cfg} />
-        <Footer cfg={cfg} />
+        <Footer cfg={cfg} biz={biz} />
       </div>
     </div>
   );
 }
 
-function ReceiptBody({ cfg }: { cfg: PaperConfig }) {
+function ReceiptBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
+  const resolved = biz.name ? biz : MOCK_BIZ;
+  const addr = [resolved.address, resolved.city].filter(Boolean).join(', ');
+  const compliance = [
+    resolved.ifu && `IFU ${resolved.ifu}`,
+    resolved.rccm && `RCCM ${resolved.rccm}`,
+    resolved.taxRegime && `${resolved.taxRegime}`,
+    resolved.divisionFiscale && `${resolved.divisionFiscale}`,
+  ].filter(Boolean).join(' · ');
   return (
     <div className="tp-rcpt">
       <div className="tp-rcpt-head">
-        <div className="tp-rcpt-logo">{BIZ.initials}</div>
-        <div className="tp-rcpt-name">{BIZ.name}</div>
-        <div className="tp-rcpt-meta">{BIZ.addr}</div>
+        <div className="tp-rcpt-logo">{bizInitials(resolved.name)}</div>
+        <div className="tp-rcpt-name">{resolved.name}</div>
+        <div className="tp-rcpt-meta">
+          {addr}
+          {compliance && <><br /><span className="tp-compliance-ids-inline">{compliance}</span></>}
+        </div>
       </div>
       <div className="tp-rcpt-divider" />
       <div className="tp-rcpt-row">
@@ -290,22 +365,22 @@ function ReceiptBody({ cfg }: { cfg: PaperConfig }) {
       {LINES.map((l, i) => (
         <div key={i} className="tp-rcpt-item">
           <div className="tp-rcpt-item-name">{l.desc}</div>
-          <div className="tp-rcpt-item-amt">{fmt(l.qty * l.price)} XOF</div>
+          <div className="tp-rcpt-item-amt">{fmt(l.qty * l.price)} F CFA</div>
           <div className="tp-rcpt-item-sub">{l.note} {cfg.showQty ? `(×${l.qty})` : ''}</div>
         </div>
       ))}
       <div className="tp-rcpt-divider" />
       {cfg.showTax && (
         <div className="tp-rcpt-row">
-          <span>TVA (18 %)</span><span>{fmt(TAX)} XOF</span>
+          <span>TVA (18 %)</span><span>{fmt(TAX)} F CFA</span>
         </div>
       )}
       <div className="tp-rcpt-total">
-        <span>Total dû</span><span>{fmt(TOTAL)} XOF</span>
+        <span>Total dû</span><span>{fmt(TOTAL)} F CFA</span>
       </div>
       <div className="tp-rcpt-divider dashed" />
       <div className="tp-rcpt-pay">Mobile Money · Wave · Virement bancaire</div>
-      <div className="tp-rcpt-foot">{cfg.footer || `${BIZ.name} · via Billio`}</div>
+      <div className="tp-rcpt-foot">{cfg.footer || `${resolved.name} · via Billio`}</div>
     </div>
   );
 }
@@ -313,7 +388,8 @@ function ReceiptBody({ cfg }: { cfg: PaperConfig }) {
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
-export default function InvoicePaper({ config }: { config: PaperConfig }) {
+export default function InvoicePaper({ config, biz }: { config: PaperConfig; biz?: BizInfo }) {
+  const resolved = biz ?? MOCK_BIZ;
   const paperStyle: React.CSSProperties = {
     '--acc': config.color,
     fontFamily: config.fontFamily,
@@ -326,11 +402,11 @@ export default function InvoicePaper({ config }: { config: PaperConfig }) {
       data-density={config.density}
       style={paperStyle}
     >
-      {config.layout === 'classic'  && <ClassicBody  cfg={config} />}
-      {config.layout === 'band'     && <BandBody     cfg={config} />}
-      {config.layout === 'minimal'  && <MinimalBody  cfg={config} />}
-      {config.layout === 'sidebar'  && <SidebarBody  cfg={config} />}
-      {config.layout === 'receipt'  && <ReceiptBody  cfg={config} />}
+      {config.layout === 'classic'  && <ClassicBody  cfg={config} biz={resolved} />}
+      {config.layout === 'band'     && <BandBody     cfg={config} biz={resolved} />}
+      {config.layout === 'minimal'  && <MinimalBody  cfg={config} biz={resolved} />}
+      {config.layout === 'sidebar'  && <SidebarBody  cfg={config} biz={resolved} />}
+      {config.layout === 'receipt'  && <ReceiptBody  cfg={config} biz={resolved} />}
     </div>
   );
 }

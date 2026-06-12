@@ -128,7 +128,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
               <div className="mi-top">#FAC-0040 payée</div>
               <div className="mi-sub">Sahel Banque · à l'instant</div>
             </div>
-            <div className="mi-amt">1,2M XOF</div>
+            <div className="mi-amt">1,2M F CFA</div>
           </div>
         </aside>
 

@@ -15,7 +15,7 @@ type NavItem = { icon: string; label: string; to: string };
 const NAV_WORKSPACE: NavItem[] = [
   { icon: 'layout-dashboard', label: 'Tableau de bord', to: '/dashboard' },
   { icon: 'receipt',          label: 'Factures',        to: '/invoices'  },
-  { icon: 'users',            label: 'Clients',         to: '/clients'   },
+  { icon: 'users',            label: 'Contacts',        to: '/contacts'  },
   { icon: 'package',          label: 'Produits',        to: '/products'  },
   { icon: 'layout-grid',      label: 'Modèles',         to: '/templates' },
 ];
@@ -26,12 +26,23 @@ const NAV_FINANCE: NavItem[] = [
   { icon: 'file-text',   label: 'Devis',     to: '/quotes'   },
 ];
 
+const NAV_ACCOUNTING: NavItem[] = [
+  { icon: 'book',               label: 'Plan comptable',    to: '/accounting/chart-of-accounts'    },
+  { icon: 'arrows-exchange',    label: 'À-nouveaux',        to: '/accounting/opening-balances'     },
+  { icon: 'notebook',           label: 'Journaux',          to: '/accounting/journals'             },
+  { icon: 'book-2',             label: 'Balance générale',  to: '/accounting/trial-balance'        },
+  { icon: 'report-money',       label: 'États financiers',  to: '/accounting/financial-statements' },
+  { icon: 'building-warehouse', label: 'Immobilisations',   to: '/accounting/fixed-assets'         },
+  { icon: 'percentage',         label: 'Fiscalité',         to: '/accounting/tax'                  },
+  { icon: 'lock',               label: 'Clôture',           to: '/accounting/period-closing'       },
+];
+
 const NAV_ACCOUNT: NavItem[] = [
   { icon: 'settings', label: 'Paramètres', to: '/settings' },
 ];
 
 export default function Sidebar({ onLogout }: { onLogout: () => void }) {
-  const { invoices, userLabel, userInitials } = useApp();
+  const { invoices, userLabel, userInitials, openingBalancesAdopted } = useApp();
   const overdueCount = useMemo(
     () => invoices.filter(i => i.status === 'overdue').length,
     [invoices],
@@ -67,6 +78,20 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
 
         <div className="nav-section">Finance</div>
         {NAV_FINANCE.map(({ icon, label, to }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          >
+            <Icon name={icon} ariaHidden />
+            {label}
+          </NavLink>
+        ))}
+
+        <div className="nav-section">Comptabilité</div>
+        {NAV_ACCOUNTING.filter(({ to }) =>
+          to !== '/accounting/opening-balances' || !openingBalancesAdopted
+        ).map(({ icon, label, to }) => (
           <NavLink
             key={to}
             to={to}

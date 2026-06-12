@@ -4,7 +4,7 @@ import type { Quote } from '../schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-function dbToQuote(row: Record<string, unknown>): Quote {
+export function dbToQuote(row: Record<string, unknown>): Quote {
   const validUntil = String(row.valid_until);
   const daysLeft   = (new Date(validUntil).getTime() - Date.now()) / 86_400_000;
   return {
@@ -19,11 +19,12 @@ function dbToQuote(row: Record<string, unknown>): Quote {
   };
 }
 
-export async function fetchQuotes(_orgId: string): Promise<Quote[]> {
+export async function fetchQuotes(orgId: string): Promise<Quote[]> {
   if (MOCK) return [...INITIAL_QUOTES];
   const { data, error } = await supabase
     .from('quotes')
     .select('*')
+    .eq('org_id', orgId)
     .order('issued_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(dbToQuote);
@@ -57,5 +58,11 @@ export async function createQuote(
 export async function updateQuote(id: string, patch: Partial<Pick<Quote, 'status'>>): Promise<void> {
   if (MOCK) return;
   const { error } = await supabase.from('quotes').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+export async function removeQuote(id: string): Promise<void> {
+  if (MOCK) return;
+  const { error } = await supabase.from('quotes').delete().eq('id', id);
   if (error) throw error;
 }

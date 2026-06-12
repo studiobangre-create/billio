@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Tax</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+/* TVA computation hero */
+.vat-hero { display: grid; grid-template-columns: 1fr 44px 1fr 44px 1.15fr; align-items: stretch; gap: 0; margin-bottom: 18px; }
+.vat-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); padding: 20px 22px; }
+.vat-card.net { background: linear-gradient(155deg, #185FA5, #0C447C); color: #fff; border: none; box-shadow: 0 14px 30px -12px rgba(12,68,124,0.5); }
+.vat-op { display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 300; color: var(--color-text-tertiary); }
+.vat-acct { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: var(--brand); display: inline-flex; align-items: center; gap: 6px; }
+.vat-card.net .vat-acct { color: rgba(255,255,255,0.85); }
+.vat-label { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); margin-top: 10px; }
+.vat-card.net .vat-label { color: rgba(255,255,255,0.9); }
+.vat-value { font-size: 30px; font-weight: 800; letter-spacing: -1px; margin-top: 8px; line-height: 1; white-space: nowrap; }
+.vat-value .cur { font-size: 14px; font-weight: 600; color: var(--color-text-tertiary); margin-left: 5px; }
+.vat-card.net .vat-value .cur { color: rgba(255,255,255,0.7); }
+.vat-foot { font-size: 11.5px; color: var(--color-text-tertiary); margin-top: 9px; }
+.vat-card.net .vat-foot { color: rgba(255,255,255,0.8); }
+.vat-due-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.16); padding: 4px 10px; border-radius: 20px; margin-top: 12px; }
+
+.cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); }
+.card-head { padding: 16px 20px 13px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 700; }
+.card-sub { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 2px; }
+.card-body { padding: 8px 20px 16px; }
+
+.vat-line { display: grid; grid-template-columns: 64px 1fr 92px 80px; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.vat-line:last-child { border-bottom: none; }
+.vl-jchip { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; color: #fff; text-align: center; letter-spacing: 0.3px; }
+.vl-label { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 1px; }
+.vl-base { font-size: 12px; color: var(--color-text-secondary); text-align: right; }
+.vl-tva { font-size: 13px; font-weight: 700; text-align: right; }
+.subtot { display: flex; justify-content: space-between; padding: 12px 0 4px; font-size: 13px; font-weight: 800; }
+.subtot .v { font-variant-numeric: tabular-nums; }
+
+/* calendar */
+.cal-item { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.cal-item:last-child { border-bottom: none; }
+.cal-date { width: 50px; text-align: center; flex-shrink: 0; }
+.cal-day { font-size: 19px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
+.cal-mon { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); margin-top: 2px; }
+.cal-main { flex: 1; min-width: 0; }
+.cal-title { font-size: 13px; font-weight: 600; }
+.cal-sub { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 2px; }
+.cal-amt { font-size: 12.5px; font-weight: 700; text-align: right; white-space: nowrap; }
+.cal-flag { width: 4px; align-self: stretch; border-radius: 3px; }
+
+.hist-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.hist-row:last-child { border-bottom: none; }
+.hist-mon { font-size: 12.5px; font-weight: 600; flex: 1; }
+.hist-amt { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1080px) {
+  .vat-hero { grid-template-columns: 1fr; gap: 10px; }
+  .vat-op { height: 22px; transform: rotate(90deg); }
+  .cols { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Tax</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-building-bank"></i> Accounting</div>
+        <div class="page-title">Tax</div>
+        <div class="page-sub">TVA · déclaration mensuelle · juin 2026</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><i class="ti ti-calendar-stats"></i> Période · juin 2026</span>
+        <button class="btn btn-primary" onclick="showToast('Declaration draft prepared from posted entries')"><i class="ti ti-file-text"></i> Prepare declaration</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="vat-hero" id="vatHero"></div>
+      <div class="cols">
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">TVA breakdown · juin</div><div class="card-sub">Sourced from posted journal entries</div></div></div>
+          <div class="card-body" id="breakdown"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Tax calendar</div><div class="card-sub">Upcoming filing deadlines</div></div></div>
+            <div class="card-body" id="calendar"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><div class="card-title">Declaration history</div></div></div>
+            <div class="card-body" id="history"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("tax");
+
+  /* derive TVA from posted entries */
+  var collected = [], deductible = [];
+  A.ENTRIES.forEach(function (e) {
+    if (!e.posted) return;
+    e.lines.forEach(function (l) {
+      if (l.acct === "443" && l.c) collected.push({ e: e, tva: l.c });
+      if (l.acct === "445" && l.d) deductible.push({ e: e, tva: l.d });
+    });
+  });
+  var totColl = collected.reduce(function (s, x) { return s + x.tva; }, 0);
+  var totDed = deductible.reduce(function (s, x) { return s + x.tva; }, 0);
+  var net = totColl - totDed;
+
+  document.getElementById("vatHero").innerHTML =
+    '<div class="vat-card"><div class="vat-acct"><i class="ti ti-arrow-down-left"></i> COMPTE 443</div>' +
+      '<div class="vat-label">TVA collectée</div><div class="vat-value mono">' + A.fmt(totColl) + '<span class="cur">XOF</span></div>' +
+      '<div class="vat-foot">' + collected.length + ' ventes · sur 1 540 000 HT</div></div>' +
+    '<div class="vat-op">−</div>' +
+    '<div class="vat-card"><div class="vat-acct"><i class="ti ti-arrow-up-right"></i> COMPTE 445</div>' +
+      '<div class="vat-label">TVA déductible</div><div class="vat-value mono">' + A.fmt(totDed) + '<span class="cur">XOF</span></div>' +
+      '<div class="vat-foot">' + deductible.length + ' achats · récupérable</div></div>' +
+    '<div class="vat-op">=</div>' +
+    '<div class="vat-card net"><div class="vat-acct"><i class="ti ti-building-bank"></i> COMPTE 4441</div>' +
+      '<div class="vat-label">TVA nette à payer</div><div class="vat-value mono">' + A.fmt(net) + '<span class="cur">XOF</span></div>' +
+      '<div class="vat-due-tag"><i class="ti ti-clock"></i> À déclarer avant le 15 juillet</div></div>';
+
+  /* breakdown */
+  function jchip(code) { var j = A.JOURNALS[code]; return '<span class="vl-jchip" style="background:' + j.color + ';">' + code + '</span>'; }
+  function lineRow(x, base) {
+    return '<div class="vat-line">' + jchip(x.e.journal) + '<div style="min-width:0;"><div class="vl-label">' + x.e.label + '</div><div class="vl-sub mono">' + x.e.piece + '</div></div>' +
+      '<div class="vl-base mono">' + A.fmt(base) + '</div><div class="vl-tva mono">' + A.fmt(x.tva) + '</div></div>';
+  }
+  document.getElementById("breakdown").innerHTML =
+    '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--color-text-tertiary);display:grid;grid-template-columns:64px 1fr 92px 80px;gap:12px;padding:8px 0 4px;"><div></div><div>Pièce</div><div style="text-align:right;">Base HT</div><div style="text-align:right;">TVA</div></div>' +
+    '<div style="font-size:11px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:0.4px;padding:10px 0 2px;">TVA collectée (ventes)</div>' +
+    collected.map(function (x) { return lineRow(x, Math.round(x.tva / 0.18)); }).join("") +
+    '<div class="subtot" style="color:#2E7D32;"><span>Total collectée</span><span class="v mono">' + A.fmt(totColl) + '</span></div>' +
+    '<div style="font-size:11px;font-weight:700;color:#B26A09;text-transform:uppercase;letter-spacing:0.4px;padding:16px 0 2px;border-top:0.5px solid var(--color-border-tertiary);margin-top:6px;">TVA déductible (achats)</div>' +
+    deductible.map(function (x) { return lineRow(x, Math.round(x.tva / 0.18)); }).join("") +
+    '<div class="subtot" style="color:#B26A09;"><span>Total déductible</span><span class="v mono">' + A.fmt(totDed) + '</span></div>';
+
+  /* calendar */
+  var cal = [
+    { day: "15", mon: "juil", title: "Déclaration TVA — juin", sub: "TVA nette à reverser", amt: A.fmt(net) + " XOF", color: "#A32D2D" },
+    { day: "15", mon: "juil", title: "Retenues à la source", sub: "Salaires & prestations", amt: "—", color: "#B26A09" },
+    { day: "31", mon: "juil", title: "Acompte IS — 2e", sub: "Impôt sur les sociétés", amt: "240 000 XOF", color: "#185FA5" },
+    { day: "15", mon: "août", title: "Déclaration TVA — juillet", sub: "Période suivante", amt: "à estimer", color: "#93A0B0" }
+  ];
+  document.getElementById("calendar").innerHTML = cal.map(function (c) {
+    return '<div class="cal-item"><div class="cal-flag" style="background:' + c.color + ';"></div><div class="cal-date"><div class="cal-day">' + c.day + '</div><div class="cal-mon">' + c.mon + '</div></div>' +
+      '<div class="cal-main"><div class="cal-title">' + c.title + '</div><div class="cal-sub">' + c.sub + '</div></div>' +
+      '<div class="cal-amt mono">' + c.amt + '</div></div>';
+  }).join("");
+
+  /* history */
+  var hist = [
+    { mon: "Mai 2026", amt: "98 400", status: "Filed" },
+    { mon: "Avril 2026", amt: "142 600", status: "Filed" },
+    { mon: "Mars 2026", amt: "76 200", status: "Filed" }
+  ];
+  document.getElementById("history").innerHTML = hist.map(function (h) {
+    return '<div class="hist-row"><span class="pill pill-posted"><i class="ti ti-circle-check-filled" style="font-size:12px;"></i> ' + h.status + '</span>' +
+      '<span class="hist-mon">' + h.mon + '</span><span class="hist-amt mono">' + h.amt + ' XOF</span></div>';
+  }).join("");
+
+  var toastTimer;
+  window.showToast = function (msg) { var t = document.getElementById("toast"); document.getElementById("toastMsg").textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400); };
+
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

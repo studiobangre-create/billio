@@ -1,16 +1,16 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { pdf } from '@react-pdf/renderer';
 import Icon from '../components/Icon';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { removeInvoice } from '../lib/api/invoices';
-import { fmt, fmtDate, STATUS_LABEL } from '../data';
+import { removeInvoice, updateInvoice } from '../lib/api/invoices';
+import { recordInvoicePaymentEntry, deleteInvoiceEntries } from '../lib/api/accounting';
+import { fetchLineItems } from '../lib/api/line-items';
+import { fmt, fmtDate, fmtDateLong, STATUS_LABEL } from '../data';
+import { InvoicePDFDocument } from '../components/InvoicePDF';
 import type { Status } from '../data';
-
-// Mock line items — real data would come from backend per invoice
-const MOCK_LINES = [
-  { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens, mise à jour du design system', qty: 1, price: 300_000 },
-  { desc: 'Développement front-end', note: 'Build responsive, librairie de composants', qty: 8, price: 35_000 },
-  { desc: 'AQ & livraison', note: 'Tests cross-navigateurs, déploiement', qty: 1, price: 80_000 },
-];
+import type { LineItem } from '../lib/schemas';
 
 type DotKind = 'paid' | 'sent' | 'overdue' | 'viewed' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
@@ -79,7 +79,14 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, setInvoices, showToast, clientsMap, } = useApp();
+  const { invoices, setInvoices, showToast, clientsMap, orgSettings, orgId, loading } = useApp();
+  const [lines, setLines] = useState<LineItem[]>([]);
+
+  useEffect(() => {
+    if (id) fetchLineItems(id).then(setLines).catch(() => setLines([]));
+  }, [id]);
+
+  if (loading) return <PageSkeleton title="Facture" variant="table-only" metrics={0} rows={4} />;
 
   const invoice = invoices.find(i => i.id === id);
   if (!invoice) {
@@ -101,7 +108,7 @@ export default function InvoicePage() {
   }
 
   const client    = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
-  const subtotal  = MOCK_LINES.reduce((s, li) => s + li.qty * li.price, 0);
+  const subtotal  = lines.reduce((s, li) => s + li.qty * li.price, 0);
   const tax       = Math.round(subtotal * 0.18);
   const total     = subtotal + tax;
   const isOverdue = invoice.status === 'overdue';
@@ -109,20 +116,42 @@ export default function InvoicePage() {
 
   const handleSendReminder = () => showToast(`Relance envoyée à ${client.name}`);
   const handleDuplicate    = () => showToast('Facture dupliquée en brouillon');
+  const handleDownloadPDF = async () => {
+    const blob = await pdf(
+      <InvoicePDFDocument
+        invoice={invoice}
+        lines={lines}
+        client={client}
+        biz={orgSettings}
+      />
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `facture-${invoice.id.toLowerCase()}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const handleDelete = async () => {
     if (window.confirm(`Supprimer la facture #${invoice.id} ? Cette action est irréversible.`)) {
       setInvoices(prev => prev.filter(i => i.id !== invoice.id));
       await removeInvoice(invoice.id);
+      await deleteInvoiceEntries(orgId, invoice.id);
       showToast('Facture supprimée');
       navigate('/invoices');
     }
   };
-
-  // const handleMarkPaid = async () => {
-  //   setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' } : i));
-  //   await updateInvoice(invoice.id, { status: 'paid' });
-  //   showToast('Facture marquée comme payée');
-  // };
+  const handleMarkPaid = async () => {
+    setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' } : i));
+    await updateInvoice(invoice.id, { status: 'paid' });
+    await recordInvoicePaymentEntry(orgId, {
+      invoiceId: invoice.id,
+      total,
+      date: new Date().toISOString().slice(0, 10),
+      clientName: client.name,
+    });
+    showToast('Facture marquée comme payée');
+  };
 
   return (
     <div className="main">
@@ -138,7 +167,7 @@ export default function InvoicePage() {
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="btn" onClick={() => window.print()}>
+          <button className="btn" onClick={handleDownloadPDF}>
             <Icon name="printer" ariaHidden /> Télécharger PDF
           </button>
           <button className="btn">
@@ -161,12 +190,18 @@ export default function InvoicePage() {
               <div className="pp-biz">
                 <div className="pp-logo" aria-hidden="true"><BillioLogoSvg /></div>
                 <div>
-                  <div className="pp-biz-name">Studio Wend SARL</div>
+                  <div className="pp-biz-name">{orgSettings.name || 'Mon entreprise'}</div>
                   <div className="pp-biz-meta">
-                    Av. Kwame Nkrumah, Immeuble Baobab<br />
-                    Ouagadougou, Burkina Faso<br />
-                    IFU 00012345 B · RCCM BF-OUA-2021-B-1234<br />
-                    contact@studiowend.bf · +226 70 12 34 56
+                    {[orgSettings.address, orgSettings.city, orgSettings.country].filter(Boolean).join(', ')}
+                    {(orgSettings.ifu || orgSettings.rccm) && (
+                      <><br />{[orgSettings.ifu && `IFU ${orgSettings.ifu}`, orgSettings.rccm && `RCCM ${orgSettings.rccm}`].filter(Boolean).join(' · ')}</>
+                    )}
+                    {(orgSettings.taxRegime || orgSettings.divisionFiscale) && (
+                      <><br />{[orgSettings.taxRegime && `${orgSettings.taxRegime}`, orgSettings.divisionFiscale && `${orgSettings.divisionFiscale}`].filter(Boolean).join(' · ')}</>
+                    )}
+                    {(orgSettings.email || orgSettings.phone) && (
+                      <><br />{[orgSettings.email, orgSettings.phone].filter(Boolean).join(' · ')}</>
+                    )}
                   </div>
                 </div>
               </div>
@@ -182,14 +217,21 @@ export default function InvoicePage() {
                 <div className="pp-block-label">Facturé à</div>
                 <div className="pp-client-name">{client.name}</div>
                 <div className="pp-client-meta">{client.city}, Burkina Faso</div>
+                {(client.ifu || client.rccm || client.taxRegime) && (
+                  <div className="pp-compliance-ids">
+                    {client.ifu       && <span>IFU {client.ifu}</span>}
+                    {client.rccm      && <span>RCCM {client.rccm}</span>}
+                    {client.taxRegime && <span>{client.taxRegime}</span>}
+                  </div>
+                )}
               </div>
               <div>
                 <div className="pp-block-label">Détails</div>
                 <div className="pp-meta-grid">
                   <div className="k">Émis le</div>
-                  <div className="v">{fmtDate(invoice.issued)}</div>
+                  <div className="v">{fmtDateLong(invoice.issued)}</div>
                   <div className="k">Échéance</div>
-                  <div className={`v${isOverdue ? ' due' : ''}`}>{fmtDate(invoice.due)}</div>
+                  <div className={`v${isOverdue ? ' due' : ''}`}>{fmtDateLong(invoice.due)}</div>
                   <div className="k">Conditions</div>
                   <div className="v">Net 14 jours</div>
                   <div className="k">Référence</div>
@@ -208,12 +250,11 @@ export default function InvoicePage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_LINES.map((li, i) => (
-                  <tr key={i}>
-                    <td>
-                      <div className="li-desc">{li.desc}</div>
-                      {li.note && <div className="li-note">{li.note}</div>}
-                    </td>
+                {lines.length === 0 ? (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '16px 0' }}>Aucune ligne</td></tr>
+                ) : lines.map(li => (
+                  <tr key={li.id}>
+                    <td><div className="li-desc">{li.desc}</div></td>
                     <td className="r">{li.qty}</td>
                     <td className="r">{fmt(li.price)}</td>
                     <td className="r">{fmt(li.qty * li.price)}</td>
@@ -224,12 +265,12 @@ export default function InvoicePage() {
 
             <div className="pp-totals">
               <div className="pp-totals-inner">
-                <div className="tot-row"><span>Sous-total</span><span className="tv">{fmt(subtotal)} XOF</span></div>
-                <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} XOF</span></div>
+                <div className="tot-row"><span>Sous-total</span><span className="tv">{fmt(subtotal)} F CFA</span></div>
+                <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>
                 {invoice.status === 'paid' && (
-                  <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(total)} XOF</span></div>
+                  <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(total)} F CFA</span></div>
                 )}
-                <div className="tot-row grand"><span>Total dû</span><span className="tv">{invoice.status === 'paid' ? '0' : fmt(total)} XOF</span></div>
+                <div className="tot-row grand"><span>Total dû</span><span className="tv">{invoice.status === 'paid' ? '0' : fmt(total)} F CFA</span></div>
               </div>
             </div>
 
@@ -291,7 +332,7 @@ export default function InvoicePage() {
             <div className="rail-card">
               <div className="rail-due-label">Montant dû</div>
               <div className="rail-due-amt tnum">
-                {fmt(total)}<span className="cur">XOF</span>
+                {fmt(total)}<span className="cur">F CFA</span>
               </div>
               {isOverdue && (
                 <div className="rail-due-sub">
@@ -301,7 +342,7 @@ export default function InvoicePage() {
               )}
               <div className="rail-actions">
                 {(isOverdue || invoice.status === 'pending') && (<>
-                  <button className="btn btn-primary btn-block">
+                  <button className="btn btn-primary btn-block" onClick={handleMarkPaid}>
                     <Icon name="cash" ariaHidden /> Enregistrer un paiement
                   </button>
                   <button
@@ -323,7 +364,7 @@ export default function InvoicePage() {
                     <Icon name="send" ariaHidden /> Envoyer une relance
                   </button>
                 </>)}
-                <button className="btn btn-block" onClick={() => window.print()}>
+                <button className="btn btn-block" onClick={handleDownloadPDF}>
                   <Icon name="printer" ariaHidden /> Télécharger PDF
                 </button>
                 <div className="rail-divider" />

@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
+import { PaymentsEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { createPayment } from '../lib/api/payments';
+import { updateInvoice } from '../lib/api/invoices';
+import { recordInvoicePaymentEntry } from '../lib/api/accounting';
 import { fmt, fmtDate } from '../data';
 import type { PayMethod, PayStatus, Payment } from '../lib/schemas';
 
@@ -40,13 +44,15 @@ const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
 };
 
 function fmtCompact(n: number) {
-  if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + 'M';
-  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
-  return String(n);
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
+  return Math.round(n).toLocaleString('fr-FR');
 }
 
 export default function PaymentsPage() {
-  const { invoices, payments, setPayments, showToast, clientsMap, userId } = useApp();
+  const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Paiements" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
   const [filter, setFilter]     = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -123,9 +129,18 @@ export default function PaymentsPage() {
     };
 
     setPayments(prev => [newPayment, ...prev]);
-    await createPayment(userId, newPayment);
+    setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: 'paid' as const } : i));
+    await createPayment(orgId, newPayment);
+    await updateInvoice(invId, { status: 'paid' });
+    const clientName = clientsMap[inv?.client ?? '']?.name ?? (inv?.client ?? '?');
+    await recordInvoicePaymentEntry(orgId, {
+      invoiceId:  invId,
+      total:      amt,
+      date,
+      clientName,
+    });
     closePanel();
-    showToast(`Paiement ${m.label} de ${fmt(amt)} XOF enregistré`);
+    showToast(`Paiement ${m.label} de ${fmt(amt)} F CFA enregistré`);
   }
 
   return (
@@ -159,7 +174,7 @@ export default function PaymentsPage() {
                 <div className="metric-label pay-label-white">Reçu · 30 derniers jours</div>
               </div>
               <div className="metric-value pay-val-white tnum">
-                {fmt(total)}<span className="metric-unit pay-unit-white">XOF</span>
+                {fmt(total)}<span className="metric-unit pay-unit-white">F CFA</span>
               </div>
               <div className="metric-change pay-change-white">
                 <span className="pay-up"><Icon name="trending-up" size={13} /> +18% vs mois dernier</span>
@@ -173,7 +188,7 @@ export default function PaymentsPage() {
                 <div className="metric-label">Mobile Money</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(byMethod.momo)}<span className="metric-unit">XOF</span>
+                {fmtCompact(byMethod.momo)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="share-bar">
                 <div className="share-fill" style={{ width: `${share('momo')}%`, background: 'var(--pm-momo)' }} />
@@ -188,7 +203,7 @@ export default function PaymentsPage() {
                 <div className="metric-label">Wave</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(byMethod.wave)}<span className="metric-unit">XOF</span>
+                {fmtCompact(byMethod.wave)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="share-bar">
                 <div className="share-fill" style={{ width: `${share('wave')}%`, background: 'var(--pm-wave)' }} />
@@ -203,7 +218,7 @@ export default function PaymentsPage() {
                 <div className="metric-label">Carte</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(byMethod.card)}<span className="metric-unit">XOF</span>
+                {fmtCompact(byMethod.card)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="share-bar">
                 <div className="share-fill" style={{ width: `${share('card')}%`, background: 'var(--pm-card)' }} />
@@ -252,8 +267,7 @@ export default function PaymentsPage() {
 
             {filtered.length === 0 ? (
               <EmptyState
-                variant="compact"
-                icon={<Icon name="cash" size={24} ariaHidden />}
+                illustration={<PaymentsEmptyIllustration />}
                 title="Aucun paiement"
                 description="Aucun paiement ici pour le moment. Les paiements reçus apparaîtront ici."
               />
@@ -302,7 +316,7 @@ export default function PaymentsPage() {
                         color: p.status === 'pending' ? 'var(--color-text-tertiary)' : undefined,
                       }}
                     >
-                      +{fmt(p.amount)}<span className="cur">XOF</span>
+                      +{fmt(p.amount)}<span className="cur">F CFA</span>
                     </div>
 
                     {/* Status */}
@@ -372,7 +386,7 @@ export default function PaymentsPage() {
               <option value="">Sélectionner une facture ouverte…</option>
               {openInvoices.map(inv => (
                 <option key={inv.id} value={inv.id}>
-                  #{inv.id} — {clientsMap[inv.client]?.name ?? inv.client} ({fmt(inv.amount)} XOF)
+                  #{inv.id} — {clientsMap[inv.client]?.name ?? inv.client} ({fmt(inv.amount)} F CFA)
                 </option>
               ))}
             </select>
@@ -390,7 +404,7 @@ export default function PaymentsPage() {
                 placeholder="0"
                 required
               />
-              <span className="suffix">XOF</span>
+              <span className="suffix">F CFA</span>
             </div>
           </div>
 

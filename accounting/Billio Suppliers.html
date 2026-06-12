@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Suppliers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.av-a { background: #B5D4F4; color: #0C447C; } .av-b { background: #9FE1CB; color: #085041; } .av-c { background: #F5C4B3; color: #712B13; } .av-d { background: #C0DD97; color: #27500A; } .av-e { background: #F4C0D1; color: #72243E; }
+
+/* aging card */
+.aging-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); padding: 16px 18px; margin-bottom: 16px; }
+.aging-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.aging-title { font-size: 13.5px; font-weight: 700; }
+.aging-sub { font-size: 11.5px; color: var(--color-text-secondary); }
+.aging-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.aging-seg { }
+.aging-seg .bar { height: 8px; border-radius: 5px; background: var(--color-background-secondary); overflow: hidden; margin-bottom: 8px; }
+.aging-seg .fill { height: 100%; border-radius: 5px; }
+.aging-amt { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+.aging-lbl { font-size: 11px; color: var(--color-text-secondary); font-weight: 600; margin-top: 2px; }
+
+/* bills table */
+.bills { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.bh, .brow2 { display: grid; grid-template-columns: 1fr 150px 116px 120px 110px 34px; align-items: center; gap: 14px; padding: 12px 18px; }
+.bh { background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.bh .r { text-align: right; }
+.brow2 { border-top: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background .1s; }
+.brow2:first-child { border-top: none; }
+.brow2:hover { background: var(--brand-tint); }
+.sup-cell { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.sup-av { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.sup-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sup-piece { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 1px; }
+.b-due { font-size: 12.5px; font-weight: 500; }
+.b-due .sub { font-size: 11px; color: var(--color-text-tertiary); }
+.b-amt { text-align: right; font-size: 13.5px; font-weight: 700; }
+.b-amt .cur { font-size: 10px; color: var(--color-text-tertiary); font-weight: 600; margin-left: 3px; }
+.b-go { color: var(--color-text-tertiary); font-size: 17px; text-align: right; }
+.brow2:hover .b-go { color: var(--brand); }
+.pill-open { background: #FCEFE0; color: #B26A09; }
+.pill-overdue { background: #FCEBEB; color: #A32D2D; }
+.pill-paid { background: #E7F3E2; color: #2E7D32; }
+
+/* drawer */
+.dh-piece { font-size: 12px; font-weight: 700; color: var(--brand); letter-spacing: 0.4px; }
+.dh-label { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-top: 4px; line-height: 1.2; }
+.dh-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 7px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dsec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); margin: 4px 0 10px; }
+.amt-rows { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 4px 16px; margin-bottom: 18px; }
+.amt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 13px; }
+.amt-row:last-child { border-bottom: none; }
+.amt-row .lbl { color: var(--color-text-secondary); }
+.amt-row.total { font-weight: 800; font-size: 15px; }
+.amt-row.total .val { color: var(--brand); }
+.post-line { display: grid; grid-template-columns: 1fr 110px 110px; gap: 0; font-size: 12.5px; }
+.post-tbl { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+.post-tbl .ph { background: var(--color-background-secondary); font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.post-tbl > div > div { padding: 9px 13px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.post-tbl .r { text-align: right; }
+.post-tbl > div:last-child > div { border-bottom: none; }
+.pnum { font-weight: 700; }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Suppliers</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-truck-delivery"></i> Accounting</div>
+        <div class="page-title">Suppliers</div>
+        <div class="page-sub">Comptabilité fournisseurs · compte 401</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026</span>
+        <button class="btn"><i class="ti ti-user-plus"></i> New supplier</button>
+        <button class="btn btn-primary" onclick="showToast('Purchase-invoice entry would open here')"><i class="ti ti-plus"></i> New bill</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="kpi-strip" id="kpis"></div>
+      <div class="aging-card">
+        <div class="aging-head"><div><div class="aging-title">Balance âgée fournisseurs</div><div class="aging-sub">Outstanding payables by age</div></div></div>
+        <div class="aging-bars" id="agingBars"></div>
+      </div>
+      <div class="toolbar">
+        <div class="search"><i class="ti ti-search"></i><input id="search" type="text" placeholder="Search supplier or pièce…" autocomplete="off"></div>
+        <div class="chips" id="statusChips"></div>
+      </div>
+      <div class="bills" id="bills">
+        <div class="bh"><div>Fournisseur / pièce</div><div>Échéance</div><div class="r">Montant TTC</div><div>Statut</div><div>Âge</div><div></div></div>
+        <div id="billRows"></div>
+      </div>
+      <div class="tbl-empty" id="emptyState" style="display:none;">No bills match.</div>
+    </div>
+  </div>
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  var activeStatus = "all";
+  var query = "";
+
+  var BILLS = [
+    { id: "FRN-0461", sup: "Sahel Office Fournitures", code: "SO", city: "Ouagadougou", av: "av-a", date: "2026-06-03", due: "2026-06-18", ht: 250000, tva: 45000, status: "open", age: "current", expense: "605", journal: "AC-0118" },
+    { id: "FRN-0462", sup: "BurkinaFarm", code: "BF", city: "Koudougou", av: "av-d", date: "2026-06-08", due: "2026-07-08", ht: 600000, tva: 108000, status: "open", age: "current", expense: "601", journal: "AC-0119" },
+    { id: "FRN-0455", sup: "Faso Telecom", code: "FT", city: "Bobo-Dioulasso", av: "av-b", date: "2026-05-12", due: "2026-05-27", ht: 525424, tva: 94576, status: "overdue", age: "1-30", expense: "605", journal: null },
+    { id: "FRN-0448", sup: "Ouédraogo Transport", code: "OT", city: "Ouagadougou", av: "av-c", date: "2026-04-28", due: "2026-05-13", ht: 338983, tva: 61017, status: "overdue", age: "31-60", expense: "605", journal: null },
+    { id: "FRN-0450", sup: "Sahel Office Fournitures", code: "SO", city: "Ouagadougou", av: "av-a", date: "2026-05-02", due: "2026-05-17", ht: 762712, tva: 137288, status: "paid", age: "current", expense: "605", journal: "BQ-0234" }
+  ];
+  var SUPPLIERS = ["Sahel Office Fournitures", "BurkinaFarm", "Faso Telecom", "Ouédraogo Transport"];
+
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("suppliers");
+  function ttc(b) { return b.ht + b.tva; }
+  function fmtDate(iso) { var m = ["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."]; var p = iso.split("-"); return parseInt(p[2],10) + " " + m[parseInt(p[1],10)-1]; }
+
+  function renderKpis() {
+    var owing = BILLS.filter(function (b) { return b.status !== "paid"; });
+    var payable = owing.reduce(function (s, b) { return s + ttc(b); }, 0);
+    var overdue = BILLS.filter(function (b) { return b.status === "overdue"; }).reduce(function (s, b) { return s + ttc(b); }, 0);
+    var dueSoon = BILLS.filter(function (b) { return b.status === "open"; }).reduce(function (s, b) { return s + ttc(b); }, 0) - 708000;
+    var cards = [
+      { ico: "ti-truck-delivery", tint: "var(--brand-tint)", col: "var(--brand)", label: "Total payable (401)", val: A.fmtCompact(payable), unit: "XOF", sub: owing.length + " open bills" },
+      { ico: "ti-clock", tint: "#FCEFE0", col: "#B26A09", label: "Due within 7 days", val: A.fmtCompact(295000), unit: "XOF", sub: "1 bill — Sahel Office" },
+      { ico: "ti-alert-triangle", tint: "#FCEBEB", col: "#A32D2D", label: "Overdue", val: A.fmtCompact(overdue), unit: "XOF", sub: "2 bills past due" },
+      { ico: "ti-users", tint: "#E9F0FA", col: "var(--brand)", label: "Active suppliers", val: SUPPLIERS.length, unit: "", sub: "with open balances" }
+    ];
+    document.getElementById("kpis").innerHTML = cards.map(function (c) {
+      return '<div class="kpi"><div class="kpi-top"><div class="kpi-ico" style="background:' + c.tint + ';color:' + c.col + ';"><i class="ti ' + c.ico + '"></i></div><div class="kpi-label">' + c.label + '</div></div>' +
+        '<div class="kpi-value mono">' + c.val + (c.unit ? '<span class="unit">' + c.unit + '</span>' : '') + '</div><div class="kpi-sub">' + c.sub + '</div></div>';
+    }).join("");
+  }
+
+  function renderAging() {
+    var segs = [
+      { key: "current", label: "Non échu", color: "#2E7D32" },
+      { key: "1-30", label: "1–30 j", color: "#B26A09" },
+      { key: "31-60", label: "31–60 j", color: "#C2570B" },
+      { key: "60+", label: "60+ j", color: "#A32D2D" }
+    ];
+    var tot = {};
+    BILLS.filter(function (b) { return b.status !== "paid"; }).forEach(function (b) { tot[b.age] = (tot[b.age] || 0) + ttc(b); });
+    var max = Math.max(1, Math.max.apply(null, segs.map(function (s) { return tot[s.key] || 0; })));
+    document.getElementById("agingBars").innerHTML = segs.map(function (s) {
+      var v = tot[s.key] || 0;
+      return '<div class="aging-seg"><div class="bar"><div class="fill" style="width:' + Math.round((v / max) * 100) + '%;background:' + s.color + ';"></div></div>' +
+        '<div class="aging-amt mono" style="color:' + (v ? s.color : "var(--color-text-tertiary)") + ';">' + (v ? A.fmt(v) : "—") + '</div><div class="aging-lbl">' + s.label + '</div></div>';
+    }).join("");
+  }
+
+  function renderChips() {
+    var counts = { all: BILLS.length, open: 0, overdue: 0, paid: 0 };
+    BILLS.forEach(function (b) { counts[b.status]++; });
+    var defs = [["all","All"],["open","Open"],["overdue","Overdue"],["paid","Paid"]];
+    var box = document.getElementById("statusChips");
+    box.innerHTML = defs.map(function (d) { return '<div class="chip-f' + (activeStatus === d[0] ? " active" : "") + '" data-s="' + d[0] + '">' + d[1] + ' <span class="cnt">' + counts[d[0]] + '</span></div>'; }).join("");
+    box.querySelectorAll(".chip-f").forEach(function (el) { el.addEventListener("click", function () { activeStatus = el.dataset.s; renderChips(); renderBills(); }); });
+  }
+
+  function renderBills() {
+    var list = BILLS.filter(function (b) {
+      if (activeStatus !== "all" && b.status !== activeStatus) return false;
+      if (query) { var q = query.toLowerCase(); return b.sup.toLowerCase().indexOf(q) >= 0 || b.id.toLowerCase().indexOf(q) >= 0; }
+      return true;
+    });
+    document.getElementById("emptyState").style.display = list.length ? "none" : "block";
+    document.getElementById("bills").style.display = list.length ? "block" : "none";
+    var ageLbl = { "current": "Non échu", "1-30": "1–30 j", "31-60": "31–60 j", "60+": "60+ j" };
+    document.getElementById("billRows").innerHTML = list.map(function (b) {
+      var pill = b.status === "paid" ? '<span class="pill pill-paid"><i class="ti ti-circle-check-filled" style="font-size:12px;"></i> Payée</span>'
+        : b.status === "overdue" ? '<span class="pill pill-overdue"><i class="ti ti-alert-triangle" style="font-size:12px;"></i> En retard</span>'
+        : '<span class="pill pill-open">À payer</span>';
+      return '<div class="brow2" data-id="' + b.id + '">' +
+        '<div class="sup-cell"><div class="sup-av ' + b.av + '">' + b.code + '</div><div style="min-width:0;"><div class="sup-name">' + b.sup + '</div><div class="sup-piece mono">' + b.id + ' · ' + fmtDate(b.date) + '</div></div></div>' +
+        '<div class="b-due">' + fmtDate(b.due) + '<div class="sub">' + (b.status === "paid" ? "réglée" : "échéance") + '</div></div>' +
+        '<div class="b-amt mono">' + A.fmt(ttc(b)) + '<span class="cur">XOF</span></div>' +
+        '<div>' + pill + '</div>' +
+        '<div style="font-size:11.5px;color:var(--color-text-secondary);font-weight:600;">' + ageLbl[b.age] + '</div>' +
+        '<div class="b-go"><i class="ti ti-chevron-right"></i></div></div>';
+    }).join("");
+    document.querySelectorAll(".brow2").forEach(function (r) { r.addEventListener("click", function () { openBill(r.dataset.id); }); });
+    if (window.refreshIcons) refreshIcons(document.getElementById("billRows"));
+  }
+
+  function openBill(id) {
+    var b = BILLS.find(function (x) { return x.id === id; });
+    var exp = A.acct(b.expense) || { label: "Achats" };
+    var pill = b.status === "paid" ? '<span class="pill pill-paid">Payée</span>' : b.status === "overdue" ? '<span class="pill pill-overdue">En retard</span>' : '<span class="pill pill-open">À payer</span>';
+    var post = '<div class="post-tbl"><div class="post-line ph"><div>Compte</div><div class="r">Débit</div><div class="r">Crédit</div></div>' +
+      '<div class="post-line"><div><span class="pnum mono">' + b.expense + '</span> ' + exp.label + '</div><div class="r mono">' + A.fmt(b.ht) + '</div><div class="r mono" style="color:var(--color-border-secondary);">—</div></div>' +
+      '<div class="post-line"><div><span class="pnum mono">445</span> État, TVA récupérable</div><div class="r mono">' + A.fmt(b.tva) + '</div><div class="r mono" style="color:var(--color-border-secondary);">—</div></div>' +
+      '<div class="post-line"><div><span class="pnum mono">401</span> Fournisseurs</div><div class="r mono" style="color:var(--color-border-secondary);">—</div><div class="r mono">' + A.fmt(ttc(b)) + '</div></div></div>';
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><div class="sup-av ' + b.av + '" style="width:40px;height:40px;border-radius:10px;font-size:13px;">' + b.code + '</div>' +
+      '<div style="flex:1;min-width:0;"><div class="dh-piece mono">' + b.id + '</div><div class="dh-label">' + b.sup + '</div>' +
+      '<div class="dh-meta">' + b.city + ' · échéance ' + fmtDate(b.due) + ' · ' + pill + '</div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="dsec-label">Montant</div>' +
+        '<div class="amt-rows"><div class="amt-row"><span class="lbl">Montant HT</span><span class="mono">' + A.fmt(b.ht) + '</span></div>' +
+          '<div class="amt-row"><span class="lbl">TVA déductible (18%)</span><span class="mono">' + A.fmt(b.tva) + '</span></div>' +
+          '<div class="amt-row total"><span>Total TTC</span><span class="val mono">' + A.fmt(ttc(b)) + ' XOF</span></div></div>' +
+        '<div class="dsec-label">Écriture comptable' + (b.journal ? ' · ' + b.journal : '') + '</div>' + post +
+        (b.status !== "paid" ? '<div style="margin-top:18px;"><button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="payBill(\'' + b.id + '\')"><i class="ti ti-cash"></i> Mark as paid</button></div>' : '') +
+      '</div>';
+    document.getElementById("scrim").classList.add("open");
+    document.getElementById("drawer").classList.add("open");
+    if (window.refreshIcons) refreshIcons(document.getElementById("drawer"));
+  }
+  window.payBill = function (id) {
+    var b = BILLS.find(function (x) { return x.id === id; });
+    if (b) { b.status = "paid"; }
+    closeDrawer(); renderKpis(); renderAging(); renderChips(); renderBills();
+    showToast("Bill " + id + " marked paid · règlement posté");
+  };
+  window.closeDrawer = function () { document.getElementById("scrim").classList.remove("open"); document.getElementById("drawer").classList.remove("open"); };
+
+  var toastTimer;
+  window.showToast = function (msg) { var t = document.getElementById("toast"); document.getElementById("toastMsg").textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400); };
+  document.getElementById("search").addEventListener("input", function (e) { query = e.target.value.trim(); renderBills(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  renderKpis(); renderAging(); renderChips(); renderBills();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

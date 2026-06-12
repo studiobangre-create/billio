@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
+import { TemplatesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import InvoicePaper from '../components/InvoicePaper';
-import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle } from '../components/InvoicePaper';
+import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle, BizInfo } from '../components/InvoicePaper';
+import { PageSkeleton } from '../components/SkeletonLoader';
+import { useApp } from '../context/AppContext';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -158,9 +161,10 @@ function thumbScale(layout: PaperLayout) {
 // Template card
 // ---------------------------------------------------------------------------
 function TemplateCard({
-  tpl, onEdit, onUse, onToggleStar,
+  tpl, biz, onEdit, onUse, onToggleStar,
 }: {
   tpl: Template;
+  biz: BizInfo;
   onEdit: () => void;
   onUse: () => void;
   onToggleStar: () => void;
@@ -178,7 +182,7 @@ function TemplateCard({
           className="tp-paper-wrap"
           style={{ transform: `scale(${scale})`, left: offsetX }}
         >
-          <InvoicePaper config={tpl.config} />
+          <InvoicePaper config={tpl.config} biz={biz} />
         </div>
 
         {tpl.isDefault && <div className="tpl-badge default-badge">Défaut</div>}
@@ -421,6 +425,9 @@ function EditorControls({ cfg, onChange }: { cfg: PaperConfig; onChange: (c: Pap
 type View = 'gallery' | { kind: 'editor'; id: string };
 
 export default function TemplatesPage() {
+  const { orgSettings, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Modèles de factures" subtitle="Personnalisez vos modèles" variant="table-only" rows={4} />;
   const [templates, setTemplates] = useState<Template[]>(INITIAL_TEMPLATES);
   const [view, setView] = useState<View>('gallery');
   const [zoom, setZoom] = useState(100);
@@ -531,8 +538,7 @@ export default function TemplatesPage() {
                 {templates.length === 0 && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <EmptyState
-                      variant="compact"
-                      icon={<Icon name="sparkles" size={24} ariaHidden />}
+                      illustration={<TemplatesEmptyIllustration />}
                       title="Aucun modèle"
                       description="Vous n'avez pas encore de modèles. Créez-en un pour gagner du temps."
                     />
@@ -542,6 +548,7 @@ export default function TemplatesPage() {
                   <TemplateCard
                     key={tpl.id}
                     tpl={tpl}
+                    biz={orgSettings}
                     onEdit={() => openEditor(tpl.id)}
                     onUse={() => useTemplate(tpl.id)}
                     onToggleStar={() => toggleStar(tpl.id)}
@@ -619,7 +626,7 @@ export default function TemplatesPage() {
                     display: 'inline-block',
                   }}
                 >
-                  <InvoicePaper config={edConfig} />
+                  <InvoicePaper config={edConfig} biz={orgSettings} />
                 </div>
               </div>
             </div>

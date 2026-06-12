@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Chart of Accounts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+/* account table */
+.acct-table { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.cls-group + .cls-group { border-top: 0.5px solid var(--color-border-tertiary); }
+.cls-header { display: flex; align-items: center; gap: 11px; padding: 13px 18px; background: var(--color-background-secondary); cursor: pointer; user-select: none; }
+.cls-header:hover { background: var(--color-background-tertiary); }
+.cls-chev { color: var(--color-text-tertiary); font-size: 16px; transition: transform .18s; }
+.cls-group.collapsed .cls-chev { transform: rotate(-90deg); }
+.cls-name { font-size: 13.5px; font-weight: 700; letter-spacing: -0.2px; }
+.cls-meta { font-size: 11.5px; color: var(--color-text-secondary); font-weight: 500; }
+.cls-total { margin-left: auto; font-size: 13px; font-weight: 700; }
+.cls-total .side { font-size: 10px; font-weight: 800; margin-left: 3px; opacity: 0.6; }
+
+.cls-rows { display: block; }
+.cls-group.collapsed .cls-rows { display: none; }
+.acct-row { display: grid; grid-template-columns: 92px 1fr 120px 150px 36px; align-items: center; gap: 14px; padding: 11px 18px 11px 18px; border-top: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background .1s; }
+.cls-rows .acct-row:first-child { border-top: 0.5px solid var(--color-border-tertiary); }
+.acct-row:hover { background: var(--brand-tint); }
+.acct-num { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+.acct-label { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-nature { font-size: 10px; font-weight: 700; color: var(--color-text-tertiary); margin-top: 2px; letter-spacing: 0.4px; text-transform: uppercase; }
+.acct-mvt { font-size: 12px; color: var(--color-text-secondary); text-align: right; }
+.acct-mvt .mv-d { color: var(--color-text-primary); font-weight: 600; }
+.acct-mvt .sep { color: var(--color-text-tertiary); margin: 0 5px; }
+.acct-bal { text-align: right; font-size: 13.5px; font-weight: 700; }
+.acct-bal.zero { color: var(--color-text-tertiary); font-weight: 500; }
+.acct-bal .side { font-size: 10px; font-weight: 800; margin-left: 4px; padding: 1px 5px; border-radius: 5px; }
+.side-d { background: #E9F0FA; color: var(--brand); }
+.side-c { background: #F1ECFB; color: #5B45C7; }
+.acct-go { color: var(--color-text-tertiary); font-size: 17px; display: flex; justify-content: flex-end; }
+.acct-row:hover .acct-go { color: var(--brand); }
+
+/* drawer detail */
+.dh-num { font-size: 12px; font-weight: 700; color: var(--brand); letter-spacing: 0.4px; }
+.dh-label { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; margin-top: 4px; line-height: 1.2; }
+.dh-cls { font-size: 12px; color: var(--color-text-secondary); margin-top: 7px; display: flex; align-items: center; gap: 7px; }
+.dstat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+.dstat { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.dstat.full { grid-column: 1 / -1; background: var(--brand-tint); border-color: transparent; }
+.dstat-l { font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); }
+.dstat.full .dstat-l { color: var(--brand-dark); }
+.dstat-v { font-size: 19px; font-weight: 800; letter-spacing: -0.4px; margin-top: 5px; }
+.dstat.full .dstat-v { color: var(--brand-dark); font-size: 22px; }
+.dsec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+.mv-list { display: flex; flex-direction: column; }
+.mv-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.mv-row:last-child { border-bottom: none; }
+.mv-meta { min-width: 0; }
+.mv-label { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; display: flex; align-items: center; gap: 7px; }
+.jchip { font-size: 9.5px; font-weight: 800; padding: 1px 6px; border-radius: 5px; color: #fff; letter-spacing: 0.3px; }
+.mv-amt { text-align: right; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.mv-amt .mv-run { font-size: 10.5px; font-weight: 600; color: var(--color-text-tertiary); margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Chart of Accounts</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-book"></i> Accounting</div>
+        <div class="page-title">Chart of accounts</div>
+        <div class="page-sub">Plan comptable SYSCOHADA · Système Normal</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><span class="dot"></span> Exercice 2026 · ouvert</span>
+        <button class="btn"><i class="ti ti-download"></i> Import plan</button>
+        <button class="btn btn-primary" onclick="showToast('New-account form would open here')"><i class="ti ti-plus"></i> New account</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="kpi-strip" id="kpis"></div>
+      <div class="toolbar">
+        <div class="search"><i class="ti ti-search"></i><input id="search" type="text" placeholder="Search by number or label…" autocomplete="off"></div>
+        <div class="chips" id="classChips"></div>
+      </div>
+      <div class="acct-table" id="acctTable"></div>
+      <div class="tbl-empty" id="emptyState" style="display:none;">No accounts match your search.</div>
+    </div>
+  </div>
+
+  <!-- drawer -->
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+
+<div class="toast" id="toast"><i class="ti ti-circle-check-filled"></i><span id="toastMsg"></span></div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  var activeClass = "all";
+  var query = "";
+  var collapsed = {};
+
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("coa");
+
+  function sideTag(signed) {
+    if (Math.abs(signed) < 0.5) return "";
+    return signed > 0 ? '<span class="side side-d">D</span>' : '<span class="side side-c">C</span>';
+  }
+  function balCell(signed) {
+    if (Math.abs(signed) < 0.5) return '<div class="acct-bal zero mono">0</div>';
+    var cls = signed > 0 ? "side-d" : "side-c";
+    return '<div class="acct-bal mono">' + A.fmt(Math.abs(signed)) + '<span class="side ' + cls + '">' + (signed > 0 ? "D" : "C") + '</span></div>';
+  }
+
+  /* ---- KPIs ---- */
+  function renderKpis() {
+    var cash = A.closingSigned("521") + A.closingSigned("571");
+    var recv = A.closingSigned("411");
+    var pay = -A.closingSigned("401");
+    var usedClasses = {};
+    A.ACCOUNTS.forEach(function (a) {
+      var m = A.movementsOf(a.num); var o = A.openingOf(a.num);
+      if (m.debit || m.credit || o) usedClasses[A.clsOf(a.num)] = 1;
+    });
+    var cards = [
+      { ico: "ti-book", tint: "var(--brand-tint)", col: "var(--brand)", label: "Accounts", val: A.ACCOUNTS.length, unit: "", sub: Object.keys(usedClasses).length + " classes in use" },
+      { ico: "ti-building-bank", tint: "#E7F3E2", col: "#2E7D32", label: "Cash position (5x)", val: A.fmtCompact(cash), unit: "XOF", sub: "Banque + caisse" },
+      { ico: "ti-receipt", tint: "#E9F0FA", col: "var(--brand)", label: "Receivables (411)", val: A.fmtCompact(recv), unit: "XOF", sub: "Clients to collect" },
+      { ico: "ti-truck-delivery", tint: "#FCEFE0", col: "#B26A09", label: "Payables (401)", val: A.fmtCompact(pay), unit: "XOF", sub: "Suppliers to pay" }
+    ];
+    document.getElementById("kpis").innerHTML = cards.map(function (c) {
+      return '<div class="kpi"><div class="kpi-top"><div class="kpi-ico" style="background:' + c.tint + ';color:' + c.col + ';"><i class="ti ' + c.ico + '"></i></div>' +
+        '<div class="kpi-label">' + c.label + '</div></div>' +
+        '<div class="kpi-value mono">' + c.val + (c.unit ? '<span class="unit">' + c.unit + '</span>' : '') + '</div>' +
+        '<div class="kpi-sub">' + c.sub + '</div></div>';
+    }).join("");
+  }
+
+  /* ---- class chips ---- */
+  function renderChips() {
+    var counts = { all: A.ACCOUNTS.length };
+    A.ACCOUNTS.forEach(function (a) { var k = A.clsOf(a.num); counts[k] = (counts[k] || 0) + 1; });
+    var html = '<div class="chip-f' + (activeClass === "all" ? " active" : "") + '" data-c="all">All <span class="cnt">' + counts.all + '</span></div>';
+    Object.keys(A.CLASSES).forEach(function (k) {
+      if (!counts[k]) return;
+      var c = A.CLASSES[k];
+      html += '<div class="chip-f' + (activeClass == k ? " active" : "") + '" data-c="' + k + '">' +
+        '<span class="cls-tag" style="background:' + c.color + ';width:18px;height:18px;font-size:10px;">' + k + '</span> ' + c.short +
+        ' <span class="cnt">' + counts[k] + '</span></div>';
+    });
+    var box = document.getElementById("classChips");
+    box.innerHTML = html;
+    box.querySelectorAll(".chip-f").forEach(function (el) {
+      el.addEventListener("click", function () { activeClass = el.dataset.c; renderChips(); renderTable(); });
+    });
+    if (window.refreshIcons) refreshIcons(box);
+  }
+
+  /* ---- table ---- */
+  function matches(a) {
+    if (activeClass !== "all" && A.clsOf(a.num) != activeClass) return false;
+    if (query) { var q = query.toLowerCase(); return a.num.indexOf(q) === 0 || a.label.toLowerCase().indexOf(q) >= 0; }
+    return true;
+  }
+  function renderTable() {
+    var byClass = {};
+    A.ACCOUNTS.filter(matches).forEach(function (a) { (byClass[A.clsOf(a.num)] = byClass[A.clsOf(a.num)] || []).push(a); });
+    var keys = Object.keys(byClass).sort();
+    var wrap = document.getElementById("acctTable");
+    document.getElementById("emptyState").style.display = keys.length ? "none" : "block";
+    wrap.style.display = keys.length ? "block" : "none";
+
+    wrap.innerHTML = keys.map(function (k) {
+      var c = A.CLASSES[k];
+      var rows = byClass[k];
+      var clsSigned = rows.reduce(function (s, a) { return s + A.closingSigned(a.num); }, 0);
+      var rowsHtml = rows.map(function (a) {
+        var m = A.movementsOf(a.num);
+        var signed = A.closingSigned(a.num);
+        var mvt = (m.debit || m.credit)
+          ? '<span class="mv-d">' + A.fmt(m.debit) + '</span><span class="sep">/</span>' + A.fmt(m.credit)
+          : '<span style="color:var(--color-text-tertiary);">—</span>';
+        return '<div class="acct-row" data-num="' + a.num + '">' +
+          '<div class="acct-num mono">' + a.num + '</div>' +
+          '<div style="min-width:0;"><div class="acct-label">' + a.label + '</div>' +
+          '<div class="acct-nature">' + (a.nature === "D" ? "Débit" : "Crédit") + '</div></div>' +
+          '<div class="acct-mvt mono">' + mvt + '</div>' +
+          balCell(signed) +
+          '<div class="acct-go"><i class="ti ti-chevron-right"></i></div></div>';
+      }).join("");
+      var isCol = collapsed[k];
+      return '<div class="cls-group' + (isCol ? " collapsed" : "") + '" data-k="' + k + '">' +
+        '<div class="cls-header" data-toggle="' + k + '">' +
+          '<i class="ti ti-chevron-down cls-chev"></i>' +
+          '<span class="cls-tag" style="background:' + c.color + ';">' + k + '</span>' +
+          '<div><div class="cls-name">Classe ' + k + ' · ' + c.name + '</div>' +
+          '<div class="cls-meta">' + rows.length + ' account' + (rows.length > 1 ? "s" : "") + '</div></div>' +
+          '<div class="cls-total mono">' + (Math.abs(clsSigned) < 0.5 ? "0" : A.fmt(Math.abs(clsSigned)) + '<span class="side">' + (clsSigned > 0 ? "D" : "C") + '</span>') + '</div>' +
+        '</div><div class="cls-rows">' + rowsHtml + '</div></div>';
+    }).join("");
+
+    wrap.querySelectorAll(".cls-header").forEach(function (h) {
+      h.addEventListener("click", function () { var k = h.dataset.toggle; collapsed[k] = !collapsed[k]; renderTable(); });
+    });
+    wrap.querySelectorAll(".acct-row").forEach(function (r) {
+      r.addEventListener("click", function () { openDrawer(r.dataset.num); });
+    });
+    if (window.refreshIcons) refreshIcons(wrap);
+  }
+
+  /* ---- drawer ---- */
+  function openDrawer(num) {
+    var a = A.acct(num);
+    var c = A.CLASSES[A.clsOf(num)];
+    var m = A.movementsOf(num);
+    var open = A.openingOf(num);
+    var signed = A.closingSigned(num);
+    var led = A.ledgerOf(num);
+
+    var moves = led.length ? led.slice().reverse().map(function (row) {
+      var e = row.entry; var j = A.JOURNALS[e.journal];
+      var amt = row.d ? '<span style="color:var(--brand);">+' + A.fmt(row.d) + '</span>' : '<span style="color:#5B45C7;">−' + A.fmt(row.c) + '</span>';
+      return '<div class="mv-row"><div class="mv-meta"><div class="mv-label">' + e.label + '</div>' +
+        '<div class="mv-sub"><span class="jchip" style="background:' + j.color + ';">' + e.journal + '</span> ' + e.piece + ' · ' + fmtDate(e.date) + '</div></div>' +
+        '<div class="mv-amt mono">' + amt + '<div class="mv-run">solde ' + A.fmt(Math.abs(row.running)) + (row.running >= 0 ? " D" : " C") + '</div></div></div>';
+    }).join("") : '<div style="font-size:12.5px;color:var(--color-text-tertiary);padding:8px 0;">No movements this period.</div>';
+
+    document.getElementById("drawer").innerHTML =
+      '<div class="drawer-head"><span class="cls-tag" style="background:' + c.color + ';width:38px;height:38px;border-radius:10px;font-size:14px;">' + A.clsOf(num) + '</span>' +
+      '<div style="flex:1;min-width:0;"><div class="dh-num mono">COMPTE ' + num + '</div><div class="dh-label">' + a.label + '</div>' +
+      '<div class="dh-cls">Classe ' + A.clsOf(num) + ' · ' + c.name + ' · nature ' + (a.nature === "D" ? "débit" : "crédit") + '</div></div>' +
+      '<button class="drawer-close" onclick="closeDrawer()"><i class="ti ti-x"></i></button></div>' +
+      '<div class="drawer-body">' +
+        '<div class="dstat-grid">' +
+          '<div class="dstat"><div class="dstat-l">À-nouveau</div><div class="dstat-v mono">' + (open ? A.fmt(Math.abs(open)) + " " + (open > 0 ? "D" : "C") : "—") + '</div></div>' +
+          '<div class="dstat"><div class="dstat-l">Mouvements D / C</div><div class="dstat-v mono" style="font-size:14px;">' + A.fmt(m.debit) + ' / ' + A.fmt(m.credit) + '</div></div>' +
+          '<div class="dstat full"><div class="dstat-l">Solde de clôture</div><div class="dstat-v mono">' + (Math.abs(signed) < 0.5 ? "0" : A.fmt(Math.abs(signed)) + " XOF " + (signed > 0 ? "Débiteur" : "Créditeur")) + '</div></div>' +
+        '</div>' +
+        '<div class="dsec-label"><i class="ti ti-history"></i> Movements · grand livre</div>' +
+        '<div class="mv-list">' + moves + '</div>' +
+        '<div style="margin-top:20px;"><a class="btn" style="width:100%;justify-content:center;" href="Billio Trial Balance.html"><i class="ti ti-book-2"></i> Open trial balance</a></div>' +
+      '</div>';
+    document.getElementById("scrim").classList.add("open");
+    document.getElementById("drawer").classList.add("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "false");
+    if (window.refreshIcons) refreshIcons(document.getElementById("drawer"));
+  }
+  window.closeDrawer = function () {
+    document.getElementById("scrim").classList.remove("open");
+    document.getElementById("drawer").classList.remove("open");
+    document.getElementById("drawer").setAttribute("aria-hidden", "true");
+  };
+
+  function fmtDate(iso) {
+    var months = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+    var p = iso.split("-"); return parseInt(p[2], 10) + " " + months[parseInt(p[1], 10) - 1];
+  }
+
+  /* ---- toast ---- */
+  var toastTimer;
+  window.showToast = function (msg) {
+    var t = document.getElementById("toast");
+    document.getElementById("toastMsg").textContent = msg;
+    t.classList.add("show"); clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  };
+
+  document.getElementById("search").addEventListener("input", function (e) { query = e.target.value.trim(); renderTable(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  renderKpis(); renderChips(); renderTable();
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

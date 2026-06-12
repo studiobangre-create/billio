@@ -4,7 +4,7 @@ import type { Invoice } from '../schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-function dbToInvoice(row: Record<string, unknown>): Invoice {
+export function dbToInvoice(row: Record<string, unknown>): Invoice {
   return {
     id:      String(row.id),
     subject: String(row.subject ?? ''),
@@ -16,11 +16,12 @@ function dbToInvoice(row: Record<string, unknown>): Invoice {
   };
 }
 
-export async function fetchInvoices(_orgId: string): Promise<Invoice[]> {
+export async function fetchInvoices(orgId: string): Promise<Invoice[]> {
   if (MOCK) return [...INITIAL_INVOICES];
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
+    .eq('org_id', orgId)
     .order('issued_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(dbToInvoice);

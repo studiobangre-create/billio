@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Financial Statements</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="accounting-shell.css">
+<style>
+.mono { font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+.tabs { display: flex; gap: 4px; background: var(--color-background-secondary); padding: 4px; border-radius: 10px; border: 0.5px solid var(--color-border-tertiary); margin-bottom: 18px; width: fit-content; }
+.tab { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; border: none; background: transparent; font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 7px; transition: background .12s, color .12s; }
+.tab:hover { color: var(--color-text-primary); }
+.tab.active { background: var(--color-background-primary); color: var(--brand); box-shadow: var(--shadow-sm); }
+.tab i { font-size: 15px; }
+
+.pane { display: none; }
+.pane.active { display: block; opacity: 1; }
+
+/* statement sheet */
+.sheet { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.sheet-head { padding: 18px 24px; border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sheet-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+.sheet-sub { font-size: 12px; color: var(--color-text-secondary); margin-top: 3px; }
+.sheet-ent { text-align: right; font-size: 11.5px; color: var(--color-text-tertiary); font-weight: 600; }
+
+.bilan { display: grid; grid-template-columns: 1fr 1fr; }
+.bilan-col { padding: 6px 24px 18px; }
+.bilan-col + .bilan-col { border-left: 0.5px solid var(--color-border-tertiary); }
+.col-cap { font-size: 12px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--brand); padding: 14px 0 6px; }
+.col-cap.passif { color: #5B45C7; }
+
+.fl { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; font-size: 13px; gap: 14px; }
+.fl .lbl { color: var(--color-text-primary); }
+.fl .lbl .acct { font-size: 11px; color: var(--color-text-tertiary); font-weight: 600; margin-right: 7px; font-family: "SFMono-Regular", ui-monospace, monospace; }
+.fl .val { font-weight: 600; white-space: nowrap; }
+.fl.dim .lbl, .fl.dim .val { color: var(--color-text-tertiary); }
+.grp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-secondary); padding: 14px 0 4px; }
+.fl-sub { display: flex; justify-content: space-between; padding: 9px 0; font-size: 13px; font-weight: 700; border-top: 0.5px solid var(--color-border-tertiary); margin-top: 2px; }
+.fl-sub .val { color: var(--color-text-primary); }
+.fl-total { display: flex; justify-content: space-between; padding: 13px 16px; margin-top: 14px; border-radius: var(--border-radius-md); font-size: 14.5px; font-weight: 800; }
+.fl-total.actif { background: var(--brand-tint); color: var(--brand-dark); }
+.fl-total.passif { background: #F1ECFB; color: #41329C; }
+.fl.result .val { font-weight: 800; }
+.neg { color: #A32D2D !important; }
+
+.tie { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 14px; font-size: 13px; font-weight: 700; color: #2E7D32; background: #E7F3E2; border-top: 0.5px solid var(--color-border-tertiary); }
+.tie i { font-size: 17px; }
+
+/* income statement */
+.is-sheet { max-width: 660px; }
+.is-body { padding: 10px 28px 20px; }
+.is-line { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; font-size: 13.5px; gap: 14px; }
+.is-line .lbl .acct { font-size: 11px; color: var(--color-text-tertiary); font-weight: 600; margin-right: 8px; font-family: "SFMono-Regular", ui-monospace, monospace; }
+.is-line .val { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.is-grp { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--brand); padding: 18px 0 4px; }
+.is-grp.charge { color: #A32D2D; }
+.is-sub { display: flex; justify-content: space-between; padding: 10px 0; font-weight: 700; font-size: 13.5px; border-top: 0.5px solid var(--color-border-tertiary); }
+.is-inter { display: flex; justify-content: space-between; padding: 12px 16px; margin: 12px 0; background: var(--color-background-secondary); border-radius: var(--border-radius-md); font-weight: 700; font-size: 13.5px; }
+.is-inter .val.neg { color: #A32D2D; }
+.is-net { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; margin-top: 16px; border-radius: var(--border-radius-md); background: linear-gradient(155deg, #185FA5, #0C447C); color: #fff; }
+.is-net.loss { background: linear-gradient(155deg, #B5453F, #7E2420); }
+.is-net .lbl { font-size: 14px; font-weight: 700; }
+.is-net .val { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+
+/* placeholder panes */
+.placeholder { padding: 60px 40px; text-align: center; }
+
+/* cash flow */
+.cf-body { padding: 8px 28px 20px; max-width: 720px; }
+.cf-open { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); margin: 10px 0 6px; font-size: 13.5px; font-weight: 700; }
+.cf-open .za { font-size: 10px; font-weight: 800; color: var(--color-text-tertiary); background: var(--color-background-primary); padding: 2px 7px; border-radius: 5px; margin-right: 8px; }
+.cf-grp { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--brand); padding: 18px 0 4px; display: flex; align-items: center; gap: 8px; }
+.cf-grp .tag { font-size: 9px; font-weight: 800; color: #fff; background: var(--brand); width: 16px; height: 16px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
+.cf-line { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; font-size: 13px; gap: 14px; }
+.cf-line .lbl { color: var(--color-text-primary); }
+.cf-line .val { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cf-sub { display: flex; justify-content: space-between; padding: 10px 0; font-weight: 700; font-size: 13.5px; border-top: 0.5px solid var(--color-border-tertiary); }
+.cf-sub .val { font-variant-numeric: tabular-nums; }
+.cf-var { display: flex; justify-content: space-between; padding: 13px 16px; margin: 14px 0 6px; background: var(--brand-tint); border-radius: var(--border-radius-md); font-weight: 800; font-size: 14px; color: var(--brand-dark); }
+.cf-close { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #18222F; color: #fff; border-radius: var(--border-radius-md); font-size: 13.5px; font-weight: 700; }
+.cf-close .zh { font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.14); padding: 2px 7px; border-radius: 5px; margin-right: 8px; }
+.cf-close .val { font-size: 17px; font-variant-numeric: tabular-nums; }
+.pos { color: #2E7D32; } .neg2 { color: #A32D2D; }
+
+/* notes */
+.notes-body { padding: 16px 24px 24px; }
+.note { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); margin-bottom: 14px; overflow: hidden; }
+.note:last-child { margin-bottom: 0; }
+.note-h { display: flex; align-items: center; gap: 11px; padding: 13px 16px; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+.note-n { width: 24px; height: 24px; border-radius: 6px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.note-t { font-size: 13px; font-weight: 700; }
+.note-c { padding: 14px 16px; }
+.note-text { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.7; }
+.note-text b { color: var(--color-text-primary); font-weight: 600; }
+.ntbl { width: 100%; border-collapse: collapse; }
+.ntbl th { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--color-text-tertiary); text-align: right; padding: 7px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.ntbl th:first-child { text-align: left; }
+.ntbl td { font-size: 12.5px; padding: 9px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); text-align: right; font-variant-numeric: tabular-nums; }
+.ntbl td:first-child { text-align: left; font-weight: 500; }
+.ntbl tr:last-child td { border-bottom: none; }
+.ntbl tr.tot td { font-weight: 700; border-top: 1px solid var(--color-border-secondary); background: var(--color-background-secondary); }
+.ph-ico { width: 64px; height: 64px; border-radius: 18px; background: var(--color-background-secondary); display: inline-flex; align-items: center; justify-content: center; font-size: 30px; color: var(--color-text-tertiary); margin-bottom: 18px; }
+.ph-title { font-size: 17px; font-weight: 700; }
+.ph-sub { font-size: 13px; color: var(--color-text-secondary); margin-top: 8px; max-width: 44ch; margin-left: auto; margin-right: auto; line-height: 1.6; }
+.ph-pills { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.ph-pill { font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 20px; background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+
+@media (max-width: 900px) { .bilan { grid-template-columns: 1fr; } .bilan-col + .bilan-col { border-left: none; border-top: 0.5px solid var(--color-border-tertiary); } }
+</style>
+</head>
+<body>
+<h1 class="sr-only">Billio — Financial Statements</h1>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="crumb"><i class="ti ti-report-money"></i> Accounting</div>
+        <div class="page-title">Financial statements</div>
+        <div class="page-sub">États financiers · Système Normal · au 30 juin 2026</div>
+      </div>
+      <div class="topbar-actions">
+        <span class="period-pill"><i class="ti ti-calendar-stats"></i> Exercice 2026</span>
+        <button class="btn"><i class="ti ti-printer"></i> Export DSF</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="tabs" id="tabs"></div>
+      <div class="pane active" id="pane-bilan"></div>
+      <div class="pane" id="pane-resultat"></div>
+      <div class="pane" id="pane-flux"></div>
+      <div class="pane" id="pane-notes"></div>
+    </div>
+  </div>
+</div>
+
+<script src="icons.js"></script>
+<script src="accounting-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = window.ACC;
+  document.getElementById("sidebar").innerHTML = A.renderSidebar("statements");
+
+  function net() { var s = 0; for (var i = 0; i < arguments.length; i++) s += A.closingSigned(arguments[i]); return s; }
+  var fmt = A.fmt;
+
+  /* ---- result (produits − charges) ---- */
+  var produits = -net("701", "706");
+  var charges = net("601", "605", "627", "661", "681", "671");
+  var result = produits - charges;
+
+  /* ---------- BILAN ---------- */
+  var immoIncorp = net("211", "281");
+  var immoCorp = net("2441", "2451", "2818");
+  var totImmo = immoIncorp + immoCorp;
+  var stocks = net("311"), clients = net("411"), tvaRec = net("445");
+  var totCirc = stocks + clients + tvaRec;
+  var banque = net("521"), caisse = net("571");
+  var totTreso = banque + caisse;
+  var totalActif = totImmo + totCirc + totTreso;
+
+  var capital = -net("101"), reserves = -net("106"), ran = -net("110");
+  var capPropres = capital + reserves + ran + result;
+  var emprunts = -net("162");
+  var fourn = -net("401"), tvaFac = -net("443"), perso = -net("421"), secu = -net("431");
+  var totCircP = fourn + tvaFac + perso + secu;
+  var totalPassif = capPropres + emprunts + totCircP;
+
+  function fl(acct, label, val, dim) {
+    return '<div class="fl' + (dim ? " dim" : "") + '"><div class="lbl">' + (acct ? '<span class="acct">' + acct + '</span>' : '') + label + '</div><div class="val mono' + (val < 0 ? " neg" : "") + '">' + fmt(val) + '</div></div>';
+  }
+  function sub(label, val) { return '<div class="fl-sub"><div>' + label + '</div><div class="val mono">' + fmt(val) + '</div></div>'; }
+
+  document.getElementById("pane-bilan").innerHTML =
+    '<div class="sheet"><div class="sheet-head"><div><div class="sheet-title">Bilan</div><div class="sheet-sub">Balance sheet · au 30 juin 2026 · XOF</div></div>' +
+      '<div class="sheet-ent">Studio Wend SARL<br>Système Normal</div></div>' +
+    '<div class="bilan">' +
+      '<div class="bilan-col"><div class="col-cap">Actif</div>' +
+        '<div class="grp-label">Actif immobilisé</div>' +
+        fl("21/28", "Immobilisations incorporelles nettes", immoIncorp) +
+        fl("24/28", "Immobilisations corporelles nettes", immoCorp) +
+        sub("Total actif immobilisé", totImmo) +
+        '<div class="grp-label">Actif circulant</div>' +
+        fl("31", "Stocks de marchandises", stocks) +
+        fl("411", "Créances clients", clients) +
+        fl("445", "État, TVA récupérable", tvaRec) +
+        sub("Total actif circulant", totCirc) +
+        '<div class="grp-label">Trésorerie — actif</div>' +
+        fl("521", "Banques", banque) +
+        fl("571", "Caisse", caisse) +
+        sub("Total trésorerie", totTreso) +
+        '<div class="fl-total actif"><div>Total actif</div><div class="mono">' + fmt(totalActif) + '</div></div>' +
+      '</div>' +
+      '<div class="bilan-col"><div class="col-cap passif">Passif</div>' +
+        '<div class="grp-label">Capitaux propres</div>' +
+        fl("101", "Capital social", capital) +
+        fl("106", "Réserves", reserves) +
+        fl("110", "Report à nouveau", ran) +
+        '<div class="fl result"><div class="lbl">Résultat de l\'exercice</div><div class="val mono' + (result < 0 ? " neg" : "") + '">' + fmt(result) + '</div></div>' +
+        sub("Total capitaux propres", capPropres) +
+        '<div class="grp-label">Dettes financières</div>' +
+        fl("162", "Emprunts & dettes financières", emprunts) +
+        sub("Total dettes financières", emprunts) +
+        '<div class="grp-label">Passif circulant</div>' +
+        fl("401", "Fournisseurs", fourn) +
+        fl("443", "État, TVA facturée", tvaFac) +
+        fl("421", "Personnel", perso) +
+        fl("431", "Sécurité sociale", secu) +
+        sub("Total passif circulant", totCircP) +
+        '<div class="fl-total passif"><div>Total passif</div><div class="mono">' + fmt(totalPassif) + '</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="tie"><i class="ti ti-circle-check-filled"></i> Bilan équilibré — actif ' + fmt(totalActif) + ' = passif ' + fmt(totalPassif) + ' XOF</div></div>';
+
+  /* ---------- COMPTE DE RÉSULTAT ---------- */
+  function isl(acct, label, val) { return '<div class="is-line"><div class="lbl">' + (acct ? '<span class="acct">' + acct + '</span>' : '') + label + '</div><div class="val mono">' + fmt(val) + '</div></div>'; }
+  var ventes = -net("706"), march = -net("701");
+  var a601 = net("601"), a605 = net("605"), a627 = net("627"), a661 = net("661"), a681 = net("681"), a671 = net("671");
+  var prodExpl = ventes + march;
+  var chargesExpl = a601 + a605 + a627 + a661 + a681;
+  var resExpl = prodExpl - chargesExpl;
+  var resFin = -a671;
+  var resNet = resExpl + resFin;
+
+  document.getElementById("pane-resultat").innerHTML =
+    '<div class="sheet is-sheet"><div class="sheet-head"><div><div class="sheet-title">Compte de résultat</div><div class="sheet-sub">Income statement · 1er jan – 30 juin 2026 · XOF</div></div>' +
+      '<div class="sheet-ent">Studio Wend SARL<br>Système Normal</div></div>' +
+    '<div class="is-body">' +
+      '<div class="is-grp">Produits d\'exploitation</div>' +
+      isl("706", "Services vendus", ventes) +
+      (march ? isl("701", "Ventes de marchandises", march) : '') +
+      '<div class="is-sub"><div>Total produits d\'exploitation</div><div class="val mono">' + fmt(prodExpl) + '</div></div>' +
+      '<div class="is-grp charge">Charges d\'exploitation</div>' +
+      isl("601", "Achats de marchandises", a601) +
+      isl("605", "Autres achats", a605) +
+      isl("627", "Services bancaires", a627) +
+      isl("661", "Charges de personnel", a661) +
+      isl("681", "Dotations aux amortissements", a681) +
+      '<div class="is-sub"><div>Total charges d\'exploitation</div><div class="val mono">' + fmt(chargesExpl) + '</div></div>' +
+      '<div class="is-inter"><div>Résultat d\'exploitation</div><div class="val mono' + (resExpl < 0 ? " neg" : "") + '">' + fmt(resExpl) + '</div></div>' +
+      '<div class="is-grp charge">Charges financières</div>' +
+      isl("671", "Intérêts des emprunts", a671) +
+      '<div class="is-inter"><div>Résultat financier</div><div class="val mono neg">' + fmt(resFin) + '</div></div>' +
+      '<div class="is-net' + (resNet < 0 ? " loss" : "") + '"><div class="lbl">Résultat net de l\'exercice — ' + (resNet < 0 ? "Perte" : "Bénéfice") + '</div><div class="val mono">' + fmt(resNet) + '</div></div>' +
+    '</div></div>';
+
+  /* ---------- CASH FLOW (Tableau des flux de trésorerie) ---------- */
+  var openCash = A.openingOf("521") + A.openingOf("571");
+  var closeCash = net("521") + net("571");
+  var cf_enc = 1200000, cf_four = -900000, cf_fin = -59160, cf_caisse = -41300;
+  var ftao = cf_enc + cf_four + cf_fin + cf_caisse;
+  var ftai = 0;
+  var cf_loan = -250000;
+  var ftaf = cf_loan;
+  var variation = ftao + ftai + ftaf;
+  function cfl(label, val) { return '<div class="cf-line"><div class="lbl">' + label + '</div><div class="val ' + (val < 0 ? "neg2" : "pos") + '">' + fmt(val) + '</div></div>'; }
+
+  document.getElementById("pane-flux").innerHTML =
+    '<div class="sheet is-sheet"><div class="sheet-head"><div><div class="sheet-title">Tableau des flux de trésorerie</div><div class="sheet-sub">Cash-flow statement · juin 2026 · XOF</div></div>' +
+      '<div class="sheet-ent">Studio Wend SARL<br>Système Normal</div></div>' +
+    '<div class="cf-body">' +
+      '<div class="cf-open"><div><span class="za">ZA</span>Trésorerie nette au 1er juin</div><div class="mono">' + fmt(openCash) + '</div></div>' +
+      '<div class="cf-grp"><span class="tag">A</span> Flux des activités opérationnelles</div>' +
+      cfl("Encaissements reçus des clients", cf_enc) +
+      cfl("Sommes versées aux fournisseurs", cf_four) +
+      cfl("Frais financiers &amp; bancaires payés", cf_fin) +
+      cfl("Décaissements d\'exploitation (caisse)", cf_caisse) +
+      '<div class="cf-sub"><div>Flux de trésorerie opérationnels (A)</div><div class="val mono ' + (ftao < 0 ? "neg2" : "pos") + '">' + fmt(ftao) + '</div></div>' +
+      '<div class="cf-grp"><span class="tag">B</span> Flux des activités d\'investissement</div>' +
+      cfl("Acquisitions d\'immobilisations", 0) +
+      cfl("Cessions d\'immobilisations", 0) +
+      '<div class="cf-sub"><div>Flux de trésorerie d\'investissement (B)</div><div class="val mono">' + fmt(ftai) + '</div></div>' +
+      '<div class="cf-grp"><span class="tag">C</span> Flux des activités de financement</div>' +
+      cfl("Remboursement d\'emprunts (capital)", cf_loan) +
+      cfl("Augmentation de capital", 0) +
+      '<div class="cf-sub"><div>Flux de trésorerie de financement (C)</div><div class="val mono ' + (ftaf < 0 ? "neg2" : "pos") + '">' + fmt(ftaf) + '</div></div>' +
+      '<div class="cf-var"><div>Variation de trésorerie de la période (A + B + C)</div><div class="mono">' + fmt(variation) + '</div></div>' +
+      '<div class="cf-close"><div><span class="zh">ZH</span>Trésorerie nette au 30 juin</div><div class="val mono">' + fmt(closeCash) + '</div></div>' +
+      '<div class="tie" style="margin:14px -28px -20px;border-radius:0;">' +
+        '<i class="ti ti-circle-check-filled"></i> Contrôle : trésorerie d\'ouverture ' + fmt(openCash) + ' + variation ' + fmt(variation) + ' = ' + fmt(closeCash) + ' XOF</div>' +
+    '</div></div>';
+
+  /* ---------- NOTES ANNEXES ---------- */
+  document.getElementById("pane-notes").innerHTML =
+    '<div class="sheet"><div class="sheet-head"><div><div class="sheet-title">Notes annexes</div><div class="sheet-sub">Notes to the financial statements · exercice 2026</div></div>' +
+      '<div class="sheet-ent">Studio Wend SARL<br>Système Normal</div></div>' +
+    '<div class="notes-body">' +
+      '<div class="note"><div class="note-h"><div class="note-n">1</div><div class="note-t">Règles &amp; méthodes comptables</div></div>' +
+        '<div class="note-c"><div class="note-text">Les états financiers sont établis selon le <b>Système Normal du SYSCOHADA révisé</b>. ' +
+        'Les immobilisations sont comptabilisées au <b>coût historique</b> et amorties en mode <b>linéaire</b> sur leur durée d\'usage. ' +
+        'La <b>TVA</b> est appliquée au taux de <b>18 %</b>. Les créances et dettes sont retenues pour leur valeur nominale. Aucun changement de méthode sur l\'exercice.</div></div></div>' +
+      '<div class="note"><div class="note-h"><div class="note-n">2</div><div class="note-t">État des immobilisations &amp; amortissements</div></div>' +
+        '<div class="note-c"><table class="ntbl"><thead><tr><th>Poste</th><th>Valeur brute</th><th>Amort. cumulés</th><th>Valeur nette</th></tr></thead><tbody>' +
+          '<tr><td>Immob. incorporelles <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">211/281</span></td><td class="mono">1 800 000</td><td class="mono">630 000</td><td class="mono">1 170 000</td></tr>' +
+          '<tr><td>Immob. corporelles <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">24x/2818</span></td><td class="mono">8 900 000</td><td class="mono">2 250 000</td><td class="mono">6 650 000</td></tr>' +
+          '<tr class="tot"><td>Total immobilisations</td><td class="mono">10 700 000</td><td class="mono">2 880 000</td><td class="mono">7 820 000</td></tr>' +
+        '</tbody></table></div></div>' +
+      '<div class="note"><div class="note-h"><div class="note-n">3</div><div class="note-t">État des échéances des créances &amp; dettes</div></div>' +
+        '<div class="note-c"><table class="ntbl"><thead><tr><th>Poste</th><th>Montant total</th><th>≤ 1 an</th><th>&gt; 1 an</th></tr></thead><tbody>' +
+          '<tr><td>Créances clients <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">411</span></td><td class="mono">' + fmt(net("411")) + '</td><td class="mono">' + fmt(net("411")) + '</td><td class="mono">—</td></tr>' +
+          '<tr><td>État, TVA récupérable <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">445</span></td><td class="mono">' + fmt(net("445")) + '</td><td class="mono">' + fmt(net("445")) + '</td><td class="mono">—</td></tr>' +
+          '<tr><td>Fournisseurs <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">401</span></td><td class="mono">' + fmt(-net("401")) + '</td><td class="mono">' + fmt(-net("401")) + '</td><td class="mono">—</td></tr>' +
+          '<tr><td>Emprunts financiers <span style="color:var(--color-text-tertiary);font-family:monospace;font-size:11px;">162</span></td><td class="mono">' + fmt(-net("162")) + '</td><td class="mono">3 000 000</td><td class="mono">' + fmt(-net("162") - 3000000) + '</td></tr>' +
+        '</tbody></table></div></div>' +
+    '</div></div>';
+
+  /* ---------- tabs ---------- */
+  var TABS = [
+    { key: "bilan", label: "Bilan", icon: "ti-scale" },
+    { key: "resultat", label: "Compte de résultat", icon: "ti-report-money" },
+    { key: "flux", label: "Flux de trésorerie", icon: "ti-arrows-exchange" },
+    { key: "notes", label: "Notes annexes", icon: "ti-file-text" }
+  ];
+  var box = document.getElementById("tabs");
+  box.innerHTML = TABS.map(function (t, i) { return '<button class="tab' + (i === 0 ? " active" : "") + '" data-k="' + t.key + '"><i class="ti ' + t.icon + '"></i> ' + t.label + '</button>'; }).join("");
+  box.querySelectorAll(".tab").forEach(function (b) {
+    b.addEventListener("click", function () {
+      box.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      document.querySelectorAll(".pane").forEach(function (p) { p.classList.remove("active"); });
+      document.getElementById("pane-" + b.dataset.k).classList.add("active");
+    });
+  });
+
+  if (window.refreshIcons) refreshIcons();
+})();
+</script>
+</body>
+</html>

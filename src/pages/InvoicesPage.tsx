@@ -2,11 +2,15 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
+import { InvoicesEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { createInvoice } from '../lib/api/invoices';
+import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
+import { saveLineItems } from '../lib/api/line-items';
 import { createActivity } from '../lib/api/activities';
 import {
-  STATUS_LABEL, fmt, fmtDate, fmtDue, nextId, newLineItem,
+  STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem,
 } from '../data';
 import type { FilterKey, Status, LineItem } from '../data';
 import type { Activity } from '../lib/schemas';
@@ -20,7 +24,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 export default function InvoicesPage() {
-  const { invoices, setInvoices, setActivity, showToast, clientsMap, userId } = useApp();
+  const { invoices, setInvoices, setActivity, showToast, clientsMap, orgId, loading } = useApp();
+
+  if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
   const navigate = useNavigate();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
@@ -69,7 +75,7 @@ export default function InvoicesPage() {
     e.stopPropagation();
     const actEntry: Activity = { kind: 'sent', parts: [{ text: 'Relance envoyée pour ' }, { text: `#${id}`, bold: true }], time: "À l'instant" };
     setActivity((prev: Activity[]) => [actEntry, ...prev]);
-    await createActivity(userId, { kind: actEntry.kind, parts: actEntry.parts });
+    await createActivity(orgId, { kind: actEntry.kind, parts: actEntry.parts });
     showToast(`Relance envoyée pour #${id}`);
   };
 
@@ -81,14 +87,24 @@ export default function InvoicesPage() {
     const cName = clientsMap[fClient]?.name ?? fClient;
     const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status };
     setInvoices(prev => [newInv, ...prev]);
-    await createInvoice(userId, newInv);
+    await createInvoice(orgId, newInv);
+    await saveLineItems(orgId, lineItems, { invoiceId: id });
+    if (status === 'pending') {
+      await recordInvoiceIssuanceEntry(orgId, {
+        invoiceId:  id,
+        htAmount:   subtotal,
+        tvaAmount:  tax,
+        date:       fDate,
+        clientName: cName,
+      });
+    }
 
     const actPayload = status === 'pending'
       ? { kind: 'sent'   as const, parts: [{ text: 'Facture ' }, { text: `#${id}`, bold: true as const }, { text: ' envoyée à ' }, { text: cName, bold: true as const }] }
       : { kind: 'viewed' as const, parts: [{ text: 'Brouillon ' }, { text: `#${id}`, bold: true as const }, { text: ' enregistré pour ' }, { text: cName, bold: true as const }] };
     const actEntry: Activity = { ...actPayload, time: "À l'instant" };
     setActivity((prev: Activity[]) => [actEntry, ...prev]);
-    await createActivity(userId, actPayload);
+    await createActivity(orgId, actPayload);
 
     closePanel();
     showToast(status === 'pending' ? `Facture #${id} envoyée à ${cName}` : `Brouillon #${id} enregistré`);
@@ -119,8 +135,8 @@ export default function InvoicesPage() {
                 <div className="metric-label">Total facturé</div>
               </div>
               <div className="metric-value tnum">
-                {fmt(invoices.filter(i => i.status !== 'draft').reduce((s, i) => s + i.amount, 0))}
-                <span className="metric-unit">XOF</span>
+                {fmtCompact(invoices.filter(i => i.status !== 'draft').reduce((s, i) => s + i.amount, 0))}
+                <span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">{invoices.filter(i => i.status !== 'draft').length} factures émises</div>
             </div>
@@ -131,8 +147,8 @@ export default function InvoicesPage() {
                 <div className="metric-label">Encaissé</div>
               </div>
               <div className="metric-value tnum">
-                {fmt(invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0))}
-                <span className="metric-unit">XOF</span>
+                {fmtCompact(invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0))}
+                <span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">{invoices.filter(i => i.status === 'paid').length} factures payées</div>
             </div>
@@ -143,8 +159,8 @@ export default function InvoicesPage() {
                 <div className="metric-label">En attente</div>
               </div>
               <div className="metric-value tnum">
-                {fmt(invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0))}
-                <span className="metric-unit">XOF</span>
+                {fmtCompact(invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0))}
+                <span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">{invoices.filter(i => i.status === 'pending').length} en attente de paiement</div>
             </div>
@@ -155,8 +171,8 @@ export default function InvoicesPage() {
                 <div className="metric-label">En retard</div>
               </div>
               <div className="metric-value tnum" style={{ color: invoices.some(i => i.status === 'overdue') ? '#A32D2D' : undefined }}>
-                {fmt(invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0))}
-                <span className="metric-unit">XOF</span>
+                {fmtCompact(invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0))}
+                <span className="metric-unit">F CFA</span>
               </div>
               <div className="metric-change neutral">{invoices.filter(i => i.status === 'overdue').length} factures en retard</div>
             </div>
@@ -189,8 +205,7 @@ export default function InvoicesPage() {
 
             {filteredInvoices.length === 0 ? (
               <EmptyState
-                variant="compact"
-                icon={<Icon name="file-invoice" size={24} ariaHidden />}
+                illustration={<InvoicesEmptyIllustration />}
                 title={filter !== 'all' ? `Aucune facture « ${STATUS_LABEL[filter as Status]} »` : 'Aucune facture'}
                 description="Créez votre première facture pour commencer à facturer vos clients."
               />
@@ -214,7 +229,7 @@ export default function InvoicesPage() {
                     <div className="cell-sub">{fmtDue(inv.due)}</div>
                   </div>
                   <div className="amount tnum" style={{ textAlign: 'right' }}>
-                    {fmt(inv.amount)}<span className="cur">XOF</span>
+                    {fmt(inv.amount)}<span className="cur">F CFA</span>
                   </div>
                   <div>
                     <span className={`status-pill s-${inv.status}`}>{STATUS_LABEL[inv.status]}</span>
@@ -316,9 +331,9 @@ export default function InvoicesPage() {
           </button>
 
           <div className="total-block">
-            <div className="total-row"><span>Sous-total</span><span>{fmt(subtotal)} XOF</span></div>
-            <div className="total-row"><span>TVA (18 %)</span><span>{fmt(tax)} XOF</span></div>
-            <div className="total-row final"><span>Total à payer</span><span>{fmt(total)} XOF</span></div>
+            <div className="total-row"><span>Sous-total</span><span>{fmt(subtotal)} F CFA</span></div>
+            <div className="total-row"><span>TVA (18 %)</span><span>{fmt(tax)} F CFA</span></div>
+            <div className="total-row final"><span>Total à payer</span><span>{fmt(total)} F CFA</span></div>
           </div>
 
           <div className="form-group" style={{ marginTop: 16 }}>

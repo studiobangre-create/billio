@@ -4,7 +4,7 @@ import type { Product } from '../schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-function dbToProduct(row: Record<string, unknown>): Product {
+export function dbToProduct(row: Record<string, unknown>): Product {
   return {
     id:    String(row.id),
     name:  String(row.name),
@@ -19,11 +19,12 @@ function dbToProduct(row: Record<string, unknown>): Product {
   };
 }
 
-export async function fetchProducts(_orgId: string): Promise<Product[]> {
+export async function fetchProducts(orgId: string): Promise<Product[]> {
   if (MOCK) return [...INITIAL_PRODUCTS];
   const { data, error } = await supabase
     .from('products')
     .select('*')
+    .eq('org_id', orgId)
     .order('name', { ascending: true });
   if (error) throw error;
   return (data ?? []).map(dbToProduct);

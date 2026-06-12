@@ -118,7 +118,7 @@ export default function OnboardingPage() {
   const [address,  setAddress]  = useState('Av. Kwame Nkrumah, Immeuble Baobab');
   const [city,     setCity]     = useState('Ouagadougou');
   const [country,  setCountry]  = useState('Burkina Faso');
-  const [currency, setCurrency] = useState('XOF');
+  const [currency, setCurrency] = useState('F CFA');
   const [logoType, setLogoType] = useState<'none' | 'mono' | 'img'>('none');
   const [logoUrl,  setLogoUrl]  = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -444,7 +444,7 @@ export default function OnboardingPage() {
                     <div className="ob-field">
                       <label className="ob-field-label">Devise</label>
                       <select className="ob-input" value={currency} onChange={e => setCurrency(e.target.value)}>
-                        <option value="XOF">XOF — Franc CFA</option>
+                        <option value="F CFA">F CFA — Franc CFA</option>
                         <option value="EUR">EUR — Euro</option>
                         <option value="USD">USD — Dollar US</option>
                         <option value="GHS">GHS — Cedi</option>

@@ -9,7 +9,7 @@ alter table public.organizations
   add column if not exists address  text not null default '',
   add column if not exists city     text not null default '',
   add column if not exists country  text not null default 'Burkina Faso',
-  add column if not exists currency text not null default 'XOF';
+  add column if not exists currency text not null default 'F CFA';
 
 -- Invoice defaults on organizations
 alter table public.organizations
