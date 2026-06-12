@@ -27,8 +27,8 @@ const NAV_FINANCE: NavItem[] = [
 ];
 
 const NAV_ACCOUNTING: NavItem[] = [
+  { icon: 'arrows-exchange',    label: 'ouverture',        to: '/accounting/opening-balances'     },
   { icon: 'book',               label: 'Plan comptable',    to: '/accounting/chart-of-accounts'    },
-  { icon: 'arrows-exchange',    label: 'À-nouveaux',        to: '/accounting/opening-balances'     },
   { icon: 'notebook',           label: 'Journaux',          to: '/accounting/journals'             },
   { icon: 'book-2',             label: 'Balance générale',  to: '/accounting/trial-balance'        },
   { icon: 'report-money',       label: 'États financiers',  to: '/accounting/financial-statements' },

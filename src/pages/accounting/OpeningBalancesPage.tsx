@@ -453,7 +453,7 @@ export default function OpeningBalancesPage() {
     };
     return {
       ok: false,
-      text: <>Off by <b>{grp(ecart)} XOF</b> — needs {grp(ecart)} more on the <b>{side}</b> side to balance.</>,
+      text: <>Écart de <b>{grp(ecart)} F CFA</b> — il manque {grp(ecart)} au <b>{side}</b> pour équilibrer.</>,
     };
   }, [balanced, ecart, totD]);
 
@@ -513,9 +513,9 @@ export default function OpeningBalancesPage() {
             <Icon name="arrows-exchange" size={22} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px' }}>Coming from another platform?</div>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px' }}>Vous venez d'une autre plateforme ?</div>
             <div style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 3, lineHeight: 1.5, maxWidth: '62ch' }}>
-              Enter your closing balances as one balanced entry dated at the start of your exercice. Billio posts it to <b>journal OD</b> and adopts it as your opening position — your à-nouveaux flow straight into the trial balance and ledger.
+              Saisissez vos soldes de clôture en une écriture équilibrée datée au début de votre exercice. Billio l'enregistre dans le <b>journal OD</b> et l'adopte comme position d'ouverture — vos à-nouveaux alimentent directement la balance générale et le grand livre.
             </div>
           </div>
           <StepIndicator step={step} adopted={false} />
