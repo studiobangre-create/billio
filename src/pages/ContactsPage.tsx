@@ -531,30 +531,51 @@ export default function ContactsPage() {
   async function handleSaveEdit(cl: ClientRecord | null) {
     if (!cl) return;
     const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime };
+    const previous = clients.find(c => c.code === cl.code);
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
-    await updateClient(cl.code, patch);
-    setEditMode(false);
-    showToast('Client mis à jour');
+    try {
+      await updateClient(orgId, cl.code, patch);
+      setEditMode(false);
+      showToast('Client mis à jour');
+    } catch (err) {
+      if (previous) setClients(prev => prev.map(c => c.code === cl.code ? previous : c));
+      showToast('Erreur lors de la mise à jour. Veuillez réessayer.', true);
+      console.error('[updateClient]', err);
+    }
   }
   async function handleDeleteClient(cl: ClientRecord | null) {
     if (!cl) return;
     if (!window.confirm(`Supprimer "${cl.name}" ? Cette action est irréversible.`)) return;
     setClients(prev => prev.filter(c => c.code !== cl.code));
-    await removeClient(cl.code);
-    closeClientPanel();
-    showToast(`"${cl.name}" supprimé`);
+    try {
+      await removeClient(orgId, cl.code);
+      closeClientPanel();
+      showToast(`"${cl.name}" supprimé`);
+    } catch (err) {
+      setClients(prev => [cl, ...prev]);
+      showToast('Erreur lors de la suppression. Veuillez réessayer.', true);
+      console.error('[removeClient]', err);
+    }
   }
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
+    if (!orgId) { showToast('Impossible de sauvegarder : organisation introuvable.', true); return; }
     const avs = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
     const words = form.name.trim().split(/\s+/);
     const code = ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || 'NC';
     const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, status: form.status };
-    setClients(prev => [{ ...payload, invoices: 0, billed: 0, balance: 0 }, ...prev]);
-    await createClient(orgId, payload);
-    setForm(EMPTY_FORM);
-    closeClientPanel();
+    const optimistic = { ...payload, invoices: 0, billed: 0, balance: 0 };
+    setClients(prev => [optimistic, ...prev]);
+    try {
+      await createClient(orgId, payload);
+      setForm(EMPTY_FORM);
+      closeClientPanel();
+    } catch (err) {
+      setClients(prev => prev.filter(c => c.code !== payload.code || c.name !== payload.name));
+      showToast('Erreur lors de l\'enregistrement du client. Veuillez réessayer.', true);
+      console.error('[createClient]', err);
+    }
   }
 
   // ── Suppliers computed ────────────────────────────────────────────────────

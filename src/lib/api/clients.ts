@@ -64,7 +64,7 @@ export async function createClient(
   return dbToClient(data as Record<string, unknown>);
 }
 
-export async function updateClient(code: string, patch: Partial<ClientRecord>): Promise<void> {
+export async function updateClient(orgId: string, code: string, patch: Partial<ClientRecord>): Promise<void> {
   if (MOCK) return;
   const dbPatch: Record<string, unknown> = {};
   if (patch.name      !== undefined) dbPatch.name           = patch.name;
@@ -78,12 +78,12 @@ export async function updateClient(code: string, patch: Partial<ClientRecord>): 
   if (patch.taxRegime !== undefined) dbPatch.tax_regime     = patch.taxRegime;
   if (patch.status    !== undefined) dbPatch.status         = patch.status;
   if (Object.keys(dbPatch).length === 0) return;
-  const { error } = await supabase.from('clients').update(dbPatch).eq('code', code);
+  const { error } = await supabase.from('clients').update(dbPatch).eq('org_id', orgId).eq('code', code);
   if (error) throw error;
 }
 
-export async function removeClient(code: string): Promise<void> {
+export async function removeClient(orgId: string, code: string): Promise<void> {
   if (MOCK) return;
-  const { error } = await supabase.from('clients').delete().eq('code', code);
+  const { error } = await supabase.from('clients').delete().eq('org_id', orgId).eq('code', code);
   if (error) throw error;
 }

@@ -303,6 +303,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUserInitials('??');
         setOrgSettings(EMPTY_ORG);
         setNeedsOnboarding(false);
+        setInvoices([]);
+        setClients([]);
+        setPayments([]);
+        setProducts([]);
+        setQuotes([]);
+        setActivity([]);
         setLoading(false);
       }
     });
@@ -316,7 +322,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = useCallback((bizName: string, newOrgId?: string) => {
     setNeedsOnboarding(false);
     setUserLabel(prev => prev || bizName);
-    if (newOrgId) setOrgId(newOrgId);
+    if (newOrgId) {
+      setOrgId(newOrgId);
+      // Fetch data for the newly created org so the app doesn't start empty
+      fetchClients(newOrgId).then(setClients).catch(console.error);
+    }
   }, []);
 
   const hasFeature = useCallback((feature: Feature) => checkFeature(plan, feature), [plan]);
