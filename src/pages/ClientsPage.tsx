@@ -104,7 +104,7 @@ export default function ClientsPage() {
     if (!cl) return;
     const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime };
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
-    await updateClient(cl.code, patch);
+    await updateClient(orgId, cl.code, patch);
     setEditMode(false);
     showToast('Client mis à jour');
   }
@@ -113,7 +113,7 @@ export default function ClientsPage() {
     if (!cl) return;
     if (!window.confirm(`Supprimer "${cl.name}" ? Cette action est irréversible.`)) return;
     setClients(prev => prev.filter(c => c.code !== cl.code));
-    await removeClient(cl.code);
+    await removeClient(orgId, cl.code);
     closePanel();
     showToast(`"${cl.name}" supprimé`);
   }

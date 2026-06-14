@@ -143,10 +143,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setOrgId(resolvedOrgId);
       const validRoles = ['admin', 'accountant', 'member'] as const;
       const rawRole = membership?.role as string | undefined;
-      if (rawRole && !validRoles.includes(rawRole as typeof validRoles[number])) {
-        console.warn('[boot] unrecognized role value, defaulting to member:', rawRole);
-      }
-      setUserRole(validRoles.includes(rawRole as typeof validRoles[number]) ? rawRole as typeof validRoles[number] : 'member');
+      // 'owner' is the DB role assigned by create_initial_org; treat it as 'admin' in the UI
+      const normalizedRole = rawRole === 'owner' ? 'admin' : rawRole;
+      setUserRole(validRoles.includes(normalizedRole as typeof validRoles[number]) ? normalizedRole as typeof validRoles[number] : 'member');
 
       if (!resolvedOrgId) {
         setNeedsOnboarding(true);

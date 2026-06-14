@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import posthog from 'posthog-js';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
 import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -47,7 +48,8 @@ function fmtCompact(n: number) {
 const TVA = 0.18;
 
 export default function QuotesPage() {
-  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, orgId, loading } = useApp();
+  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, products, orgId, loading } = useApp();
+  const navigate = useNavigate();
 
   if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -64,6 +66,31 @@ export default function QuotesPage() {
   const [lines, setLines] = useState<LineItem[]>([
     newLineItem(), newLineItem(),
   ]);
+  const [showPicker, setShowPicker]   = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    function onClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showPicker]);
+
+  const filteredProducts = useMemo(() => {
+    const q = pickerQuery.toLowerCase();
+    return products.filter(p => !q || p.name.toLowerCase().includes(q));
+  }, [products, pickerQuery]);
+
+  function addFromProduct(productId: string) {
+    const p = products.find(pr => pr.id === productId);
+    if (!p) return;
+    setLines(prev => [...prev, newLineItem(p.name, 1, p.price)]);
+    setShowPicker(false);
+    setPickerQuery('');
+  }
 
   const subtotal = lines.reduce((s, li) => s + li.qty * li.price, 0);
   const tax      = Math.round(subtotal * TVA);
@@ -93,9 +120,10 @@ export default function QuotesPage() {
   function openPanel() {
     setFClient(''); setFSubject('');
     setLines([newLineItem(), newLineItem()]);
+    setShowPicker(false); setPickerQuery('');
     setPanelOpen(true);
   }
-  function closePanel() { setPanelOpen(false); }
+  function closePanel() { setPanelOpen(false); setShowPicker(false); }
 
   function addLine() {
     setLines(prev => [...prev, newLineItem()]);
@@ -287,7 +315,7 @@ export default function QuotesPage() {
               filtered.map(q => {
                 const cl = clientsMap[q.client];
                 return (
-                  <div key={q.id} className="q-row q-grid-cols">
+                  <div key={q.id} className="q-row q-grid-cols" onClick={() => navigate(`/quotes/${q.id}`)} style={{ cursor: 'pointer' }}>
                     {/* Quote ID + subject */}
                     <div>
                       <div className="q-id">#{q.id}</div>
@@ -326,7 +354,7 @@ export default function QuotesPage() {
 
                     {/* Actions */}
                     <div className="row-actions">
-                      {q.status === 'accepted' && (
+                      {!['invoiced', 'declined', 'expired'].includes(q.status) && (
                         <button
                           className="btn-convert"
                           onClick={e => convertToInvoice(q.id, e)}
@@ -457,10 +485,41 @@ export default function QuotesPage() {
             </div>
           ))}
 
-          <button className="add-line" onClick={addLine}>
-            <Icon name="plus" size={14} />
-            Ajouter une ligne
-          </button>
+          <div className="line-actions">
+            <button className="add-line" onClick={addLine}>
+              <Icon name="plus" size={14} />
+              Ajouter une ligne
+            </button>
+            {products.length > 0 && (
+              <div className="product-picker-wrap" ref={pickerRef}>
+                <button className="catalog-btn" onClick={() => setShowPicker(v => !v)}>
+                  <Icon name="package" size={14} />
+                  Depuis le catalogue
+                </button>
+                {showPicker && (
+                  <div className="product-picker-dropdown">
+                    <input
+                      autoFocus
+                      placeholder="Rechercher…"
+                      value={pickerQuery}
+                      onChange={e => setPickerQuery(e.target.value)}
+                    />
+                    {filteredProducts.length === 0 ? (
+                      <div className="picker-empty">Aucun produit trouvé</div>
+                    ) : filteredProducts.map(p => (
+                      <div key={p.id} className="picker-item" onClick={() => addFromProduct(p.id)}>
+                        <div>
+                          <div className="picker-item-name">{p.name}</div>
+                          <div className="picker-item-meta">{p.unit}</div>
+                        </div>
+                        <div className="picker-item-price">{fmt(p.price)} F</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Totals */}
           <div className="total-block">

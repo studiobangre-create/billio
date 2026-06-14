@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
@@ -25,7 +25,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 export default function InvoicesPage() {
-  const { invoices, setInvoices, setActivity, showToast, clientsMap, orgId, loading } = useApp();
+  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgId, loading } = useApp();
 
   if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
   const navigate = useNavigate();
@@ -41,6 +41,31 @@ export default function InvoicesPage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [fPay,     setFPay]     = useState('Mobile Money (MTN / Orange / Wave)');
   const [fNotes,   setFNotes]   = useState('');
+  const [showPicker, setShowPicker]   = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    function onClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showPicker]);
+
+  const filteredProducts = useMemo(() => {
+    const q = pickerQuery.toLowerCase();
+    return products.filter(p => !q || p.name.toLowerCase().includes(q));
+  }, [products, pickerQuery]);
+
+  function addFromProduct(productId: string) {
+    const p = products.find(pr => pr.id === productId);
+    if (!p) return;
+    setLineItems(prev => [...prev, newLineItem(p.name, 1, p.price)]);
+    setShowPicker(false);
+    setPickerQuery('');
+  }
 
   const filteredInvoices = useMemo(
     () => filter === 'all' ? invoices : invoices.filter(i => i.status === filter),
@@ -62,9 +87,10 @@ export default function InvoicesPage() {
     const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
     setFClient(''); setFDate(today); setFDue(due); setFSubject(''); setFNotes('');
     setLineItems([newLineItem('', 1, 250_000), newLineItem('', 3, 75_000)]);
+    setShowPicker(false); setPickerQuery('');
     setPanelOpen(true);
   };
-  const closePanel = () => setPanelOpen(false);
+  const closePanel = () => { setPanelOpen(false); setShowPicker(false); };
 
   const addLine    = () => setLineItems(prev => [...prev, newLineItem()]);
   const removeLine = (id: string) =>
@@ -350,9 +376,40 @@ export default function InvoicesPage() {
             </div>
           ))}
 
-          <button className="add-line" onClick={addLine}>
-            <Icon name="plus" size={14} ariaHidden /> Ajouter une ligne
-          </button>
+          <div className="line-actions">
+            <button className="add-line" onClick={addLine}>
+              <Icon name="plus" size={14} ariaHidden /> Ajouter une ligne
+            </button>
+            {products.length > 0 && (
+              <div className="product-picker-wrap" ref={pickerRef}>
+                <button className="catalog-btn" onClick={() => setShowPicker(v => !v)}>
+                  <Icon name="package" size={14} ariaHidden />
+                  Depuis le catalogue
+                </button>
+                {showPicker && (
+                  <div className="product-picker-dropdown">
+                    <input
+                      autoFocus
+                      placeholder="Rechercher…"
+                      value={pickerQuery}
+                      onChange={e => setPickerQuery(e.target.value)}
+                    />
+                    {filteredProducts.length === 0 ? (
+                      <div className="picker-empty">Aucun produit trouvé</div>
+                    ) : filteredProducts.map(p => (
+                      <div key={p.id} className="picker-item" onClick={() => addFromProduct(p.id)}>
+                        <div>
+                          <div className="picker-item-name">{p.name}</div>
+                          <div className="picker-item-meta">{p.unit}</div>
+                        </div>
+                        <div className="picker-item-price">{fmt(p.price)} F</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="total-block">
             <div className="total-row"><span>Sous-total</span><span>{fmt(subtotal)} F CFA</span></div>

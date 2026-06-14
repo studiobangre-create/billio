@@ -861,13 +861,25 @@ export default function ContactsPage() {
                         <input className="form-input" type={type} value={editForm[key] as string} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))} />
                       </div>
                     ))}
-                    <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
                       <label className="form-label">Statut</label>
                       <select className="form-input" value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value as ClientStatus }))}>
                         <option value="active">Actif</option>
                         <option value="lead">Prospect</option>
                         <option value="inactive">Inactif</option>
                       </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">IFU <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <input className="form-input" type="text" placeholder="00012345 B" value={editForm.ifu} onChange={e => setEditForm(f => ({ ...f, ifu: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">RCCM <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <input className="form-input" type="text" placeholder="BF-OUA-2021-B-1234" value={editForm.rccm} onChange={e => setEditForm(f => ({ ...f, rccm: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Régime fiscal <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <input className="form-input" type="text" placeholder="RNI, RSI…" value={editForm.taxRegime} onChange={e => setEditForm(f => ({ ...f, taxRegime: e.target.value }))} />
                     </div>
                   </>
                 ) : (
