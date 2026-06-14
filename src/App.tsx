@@ -10,6 +10,7 @@ import AppShell from './components/AppShell';
 // Each import() becomes its own JS chunk; the browser only downloads a page
 // when the user navigates to it. The PWA service worker caches chunks after
 // first visit, so subsequent navigations are instant.
+const LandingPage            = lazy(() => import('./pages/LandingPage'));
 const AuthPage               = lazy(() => import('./pages/AuthPage'));
 const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
 const InvitePage             = lazy(() => import('./pages/InvitePage'));
@@ -65,6 +66,12 @@ export default function App() {
     <AppProvider>
       <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
+        {/* Landing */}
+        <Route
+          path="/"
+          element={authed ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+        />
+
         {/* Public */}
         <Route
           path="/login"

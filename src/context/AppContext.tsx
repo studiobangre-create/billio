@@ -12,6 +12,7 @@ import { fetchActivities, dbToActivity } from '../lib/api/activities';
 import { fetchOpeningBalanceAdopted } from '../lib/api/accounting';
 import type { Invoice, Activity, ClientRecord, Payment, Product, Quote, Client } from '../lib/schemas';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { hasFeature as checkFeature, type PlanId, type PlanStatus, type Feature } from '../lib/plans';
 
 export interface OrgSettings {
   name:           string;
@@ -46,12 +47,19 @@ interface AppContextValue {
   orgId:       string;
   userLabel:   string;
   userInitials:string;
+  userRole:    'admin' | 'accountant' | 'member';
   // Onboarding
   needsOnboarding:    boolean;
   completeOnboarding: (bizName: string) => void;
   // Opening balances
   openingBalancesAdopted:    boolean;
   setOpeningBalancesAdopted: Dispatch<SetStateAction<boolean>>;
+  // Plan / feature flags
+  plan:          PlanId;
+  planStatus:    PlanStatus;
+  planRenewsAt:  string | null;
+  trialEndsAt:   string | null;
+  hasFeature:    (feature: Feature) => boolean;
   // UI
   loading:   boolean;
   showToast: (msg: string, isError?: boolean) => void;
@@ -74,8 +82,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [orgId,           setOrgId]           = useState(MOCK ? 'mock-org'  : '');
   const [userLabel,       setUserLabel]       = useState('');
   const [userInitials,    setUserInitials]    = useState('??');
+  const [userRole,        setUserRole]        = useState<'admin' | 'accountant' | 'member'>('member');
   const [needsOnboarding,         setNeedsOnboarding]         = useState(false);
   const [openingBalancesAdopted,  setOpeningBalancesAdopted]  = useState(false);
+  const [plan,          setPlan]          = useState<PlanId>(MOCK ? 'solo' : 'solo');
+  const [planStatus,    setPlanStatus]    = useState<PlanStatus>('free');
+  const [planRenewsAt,  setPlanRenewsAt]  = useState<string | null>(null);
+  const [trialEndsAt,   setTrialEndsAt]   = useState<string | null>(null);
   const [loading,                 setLoading]                 = useState(!MOCK);
 
   const { showToast } = useToast();
@@ -111,25 +124,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       // Resolve the user's org and check onboarding status
-      const { data: membership } = await supabase
+      const { data: membership, error: memberErr } = await supabase
         .from('org_members')
-        .select('org_id')
+        .select('org_id, role')
         .eq('user_id', user.id)
         .limit(1)
         .single();
+      // PGRST116 = no rows found — valid for new users who need onboarding
+      if (memberErr && memberErr.code !== 'PGRST116') {
+        console.error('[boot] org_members fetch error:', memberErr.message);
+        showToast('Erreur lors du chargement de votre profil. Veuillez réessayer.', true);
+        setLoading(false);
+        return;
+      }
       const resolvedOrgId = membership?.org_id ?? '';
       setOrgId(resolvedOrgId);
+      const validRoles = ['admin', 'accountant', 'member'] as const;
+      const rawRole = membership?.role as string | undefined;
+      if (rawRole && !validRoles.includes(rawRole as typeof validRoles[number])) {
+        console.warn('[boot] unrecognized role value, defaulting to member:', rawRole);
+      }
+      setUserRole(validRoles.includes(rawRole as typeof validRoles[number]) ? rawRole as typeof validRoles[number] : 'member');
 
       if (!resolvedOrgId) {
         setNeedsOnboarding(true);
       } else {
         const { data: org, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, onboarding_completed_at')
+          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
           .eq('id', resolvedOrgId)
           .single();
-        if (orgErr) console.warn('[boot] org fetch error:', orgErr.message);
-        setNeedsOnboarding(!org?.onboarding_completed_at);
+        if (orgErr) {
+          console.error('[boot] org fetch error:', orgErr.message);
+          showToast('Erreur lors du chargement de l\'organisation. Veuillez réessayer.', true);
+          setLoading(false);
+          return;
+        }
+        setNeedsOnboarding(!org.onboarding_completed_at);
         if (org) {
           setOrgSettings({
             name:           org.name            ?? '',
@@ -143,6 +174,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             taxRegime:      org.tax_regime      ?? '',
             divisionFiscale: org.division_fiscale ?? '',
           });
+          const rawPlan = org.plan as string | null;
+          const validPlans: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
+          const resolvedPlan: PlanId = validPlans.includes(rawPlan as PlanId) ? (rawPlan as PlanId) : 'solo';
+          setPlan(resolvedPlan);
+
+          const validStatuses: PlanStatus[] = ['free', 'trialing', 'active', 'canceled', 'past_due'];
+          const rawStatus = org.plan_status as string | null;
+          setPlanStatus(validStatuses.includes(rawStatus as PlanStatus) ? (rawStatus as PlanStatus) : (resolvedPlan === 'solo' ? 'free' : 'active'));
+          setPlanRenewsAt((org.plan_renews_at as string | null) ?? null);
+          setTrialEndsAt((org.trial_ends_at  as string | null) ?? null);
         }
       }
 
@@ -165,10 +206,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setQuotes(quo);
           setActivity(act);
           setOpeningBalancesAdopted(obAdopted);
+          setupRealtime(resolvedOrgId);
         } catch (err) {
           console.error('[boot] data fetch error:', err);
+          showToast('Erreur lors du chargement des données. Veuillez réessayer.', true);
+          setLoading(false);
+          return;
         }
-        setupRealtime(resolvedOrgId);
       }
       setLoading(false);
     }
@@ -263,6 +307,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserLabel(prev => prev || bizName);
   }, []);
 
+  const hasFeature = useCallback((feature: Feature) => checkFeature(plan, feature), [plan]);
+
   return (
     <AppContext.Provider value={{
       invoices,  setInvoices,
@@ -275,9 +321,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       orgSettings, setOrgSettings,
       userId,
       orgId,
-      userLabel, userInitials,
+      userLabel, userInitials, userRole,
       needsOnboarding, completeOnboarding,
       openingBalancesAdopted, setOpeningBalancesAdopted,
+      plan, planStatus, planRenewsAt, trialEndsAt, hasFeature,
       loading,
       showToast,
     }}>

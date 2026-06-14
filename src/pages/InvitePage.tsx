@@ -49,7 +49,13 @@ export default function InvitePage() {
       if (error || !data || (data as InviteDetails[]).length === 0) {
         setNotFound(true);
       } else {
-        setInvite((data as InviteDetails[])[0]);
+        const details = (data as InviteDetails[])[0];
+        const expired = new Date(details.expires_at) < new Date();
+        if (details.status !== 'pending' || expired) {
+          setNotFound(true);
+        } else {
+          setInvite(details);
+        }
       }
       setLoading(false);
     });

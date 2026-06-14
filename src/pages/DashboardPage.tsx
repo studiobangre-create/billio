@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
+import { QAIllustration } from '../components/QAIllustrations';
 import { EmptyState, EmptyInline } from '../components/EmptyState';
-import { ActivityEmptyIllustration, TopClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { ActivityEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue } from '../data';
@@ -16,9 +17,53 @@ function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   );
 }
 
+type Role = 'admin' | 'accountant' | 'member';
+
+const ROLE_LABELS: Record<Role, string> = {
+  admin: 'Admin',
+  accountant: 'Comptable',
+  member: 'Membre',
+};
+
+const ROLE_NOTES: Record<Role, string> = {
+  admin: 'Accès complet — gestion et supervision',
+  accountant: 'Saisie comptable et déclarations fiscales',
+  member: 'Facturation et suivi client',
+};
+
+interface QATile {
+  icon: string;
+  label: string;
+  sub: string;
+  primary?: boolean;
+  path?: string;
+}
+
+const ROLE_ACTIONS: Record<Role, QATile[]> = {
+  admin: [
+    { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
+    { icon: 'user-plus', label: 'Ajouter un client', sub: 'Carnet d\'adresses', path: '/clients' },
+    { icon: 'chart-bar', label: 'Rapports', sub: 'Analyse des performances', path: '/reports' },
+    { icon: 'credit-card', label: 'Paiements', sub: 'Suivi des encaissements', path: '/payments' },
+  ],
+  accountant: [
+    { icon: 'notebook', label: 'Saisir une écriture', sub: 'Journal comptable', primary: true, path: '/accounting/journals' },
+    { icon: 'book', label: 'Plan comptable', sub: 'Gérer les comptes', path: '/accounting/chart-of-accounts' },
+    { icon: 'building-bank', label: 'Déclaration TVA', sub: 'Saisie fiscale', path: '/accounting/tax' },
+    { icon: 'book-2', label: 'Balance', sub: 'Vue consolidée', path: '/accounting/trial-balance' },
+  ],
+  member: [
+    { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
+    { icon: 'file-text', label: 'Nouveau devis', sub: 'Transformer en facture', path: '/quotes' },
+    { icon: 'users', label: 'Mes clients', sub: 'Carnet d\'adresses', path: '/clients' },
+    { icon: 'bell', label: 'Rappels', sub: 'Suivi automatique', path: '/reminders' },
+  ],
+};
+
 export default function DashboardPage() {
-  const { invoices, activity, clientsMap, loading } = useApp();
+  const { invoices, activity, clientsMap, loading, userRole } = useApp();
   const navigate = useNavigate();
+  const role = userRole as Role;
 
   if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
 
@@ -31,18 +76,6 @@ export default function DashboardPage() {
     return { totalInvoiced, collected, outstanding, overdueCount, collectionRate };
   }, [invoices]);
 
-  const topClients = useMemo(() => {
-    const totals: Record<string, { sum: number; n: number }> = {};
-    invoices.forEach(inv => {
-      if (inv.status === 'draft') return;
-      if (!totals[inv.client]) totals[inv.client] = { sum: 0, n: 0 };
-      totals[inv.client].sum += inv.amount;
-      totals[inv.client].n  += 1;
-    });
-    const ranked = Object.entries(totals).sort(([, a], [, b]) => b.sum - a.sum).slice(0, 4);
-    const max    = ranked.length ? ranked[0][1].sum : 1;
-    return ranked.map(([code, d]) => ({ code, client: clientsMap[code] ?? { name: code, city: '—', av: 'av-a' }, ...d, barPct: Math.round((d.sum / max) * 100) }));
-  }, [invoices]);
 
   return (
     <div className="main">
@@ -178,31 +211,33 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Top clients */}
-          <div className="panel">
-            <div className="panel-head">
-              <div className="panel-title">Meilleurs clients par revenu</div>
-              <button className="panel-link" onClick={() => navigate('/clients')}>Gérer</button>
-            </div>
-            {topClients.length === 0 ? (
-              <EmptyState
-                illustration={<TopClientsEmptyIllustration />}
-                title="Aucune donnée client"
-                description="Les clients avec le plus de revenus générés apparaîtront ici."
-              />
-            ) : topClients.map(({ code, client, sum, n, barPct }) => (
-              <div key={code} className="client-item">
-                <div className={`client-av lg ${client.av}`}>{code}</div>
-                <div className="client-info">
-                  <div className="client-name">{client.name}</div>
-                  <div className="client-inv-count">{n} facture{n !== 1 ? 's' : ''}</div>
-                  <div className="bar-track">
-                    <div className="bar-fill" style={{ width: `${barPct}%` }} />
-                  </div>
-                </div>
-                <div className="client-total tnum">{fmtCompact(sum)} F CFA</div>
+          {/* Role-based quick actions */}
+          <div className="panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="panel-head" style={{ flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
+              <div className="qa-headline">
+                <div className="panel-title">Actions rapides</div>
               </div>
-            ))}
+              <div className="qa-role-note">
+                <Icon name={role === 'admin' ? 'shield-check' : role === 'accountant' ? 'book' : 'user'} size={13} ariaHidden />
+                {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[role]}
+              </div>
+            </div>
+            <div style={{ padding: '14px 17px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div className="qa-grid">
+                {ROLE_ACTIONS[role].map((tile, i) => (
+                  <button
+                    key={i}
+                    className={`qa-tile${tile.primary ? ' primary' : ''}`}
+                    onClick={() => tile.path && navigate(tile.path)}
+                  >
+                    <QAIllustration icon={tile.icon} primary={tile.primary} />
+                    <div className="qa-lbl">{tile.label}</div>
+                    <div className="qa-sub">{tile.sub}</div>
+                    <span className="qa-arrow"><Icon name="arrow-right" size={16} ariaHidden /></span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

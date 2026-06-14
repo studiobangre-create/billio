@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import Icon from '../components/Icon';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import {
+  PLANS, PLAN_LABELS, PLAN_ORDER, formatPrice,
+  SOLO_INVOICE_LIMIT,
+  type PlanStatus,
+} from '../lib/plans';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -949,39 +954,179 @@ function TeamSection() {
 }
 
 /* ─── Plan ──────────────────────────────────────────────────────── */
+const STATUS_LABEL: Record<PlanStatus, string> = {
+  free:      'Gratuit',
+  trialing:  'Essai gratuit',
+  active:    'Actif',
+  canceled:  'Annulé',
+  past_due:  'Paiement en retard',
+};
+
+const STATUS_CLASS: Record<PlanStatus, string> = {
+  free:     's-plan-status--gray',
+  trialing: 's-plan-status--blue',
+  active:   's-plan-status--green',
+  canceled: 's-plan-status--orange',
+  past_due: 's-plan-status--red',
+};
+
+function PlanStatusBadge({ status }: { status: PlanStatus }) {
+  return (
+    <span className={`s-plan-status ${STATUS_CLASS[status]}`}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 function PlanSection() {
+  const { plan, planStatus, planRenewsAt, trialEndsAt, invoices } = useApp();
+
+  const thisMonth    = new Date().toISOString().slice(0, 7);
+  const monthlyCount = invoices.filter(inv => inv.issued.startsWith(thisMonth)).length;
+  const isSolo       = plan === 'solo';
+  const usageLimit   = isSolo ? SOLO_INVOICE_LIMIT : null;
+  const usagePct     = usageLimit ? Math.min(100, (monthlyCount / usageLimit) * 100) : Math.min(100, (monthlyCount / 100) * 30);
+  const barWarning   = usageLimit && monthlyCount >= usageLimit * 0.8;
+
+  const currentDef  = PLANS.find(p => p.id === plan)!;
+  const currentIdx  = PLAN_ORDER.indexOf(plan);
+  const upgradePlans = PLANS.filter(p => PLAN_ORDER.indexOf(p.id) > currentIdx);
+
+  let renewalLine: string | null = null;
+  if (planRenewsAt) renewalLine = `Renouvellement le ${fmtDate(planRenewsAt)}`;
+  else if (trialEndsAt) renewalLine = `Essai gratuit jusqu'au ${fmtDate(trialEndsAt)}`;
+
   return (
     <>
+      {/* ── Current subscription ── */}
       <div className="s-card">
         <div className="s-card-head">
-          <div className="s-card-title">Plan &amp; facturation</div>
-          <div className="s-card-desc">Gérez votre abonnement et vos informations de paiement.</div>
+          <div>
+            <div className="s-card-title">Plan &amp; facturation</div>
+            <div className="s-card-desc">Gérez votre abonnement et vos informations de paiement.</div>
+          </div>
+          <PlanStatusBadge status={planStatus} />
         </div>
         <div className="s-card-body">
           <div className="s-plan-card">
             <div className="s-plan-badge"><Icon name="sparkles" size={22} /></div>
             <div style={{ flex: 1 }}>
-              <div className="s-plan-name">Plan Pro</div>
-              <div className="s-plan-price"><b>25000 F CFA</b> / mois · renouvellement le 6 juillet 2026</div>
+              <div className="s-plan-name">Plan {PLAN_LABELS[plan]}</div>
+              <div className="s-plan-price">
+                {currentDef.price === null
+                  ? <><b>Sur devis</b> · contrat annuel</>
+                  : currentDef.price === 0
+                  ? <b>Gratuit</b>
+                  : <><b>{formatPrice(currentDef.price)} XOF</b> / mois</>
+                }
+                {renewalLine && <> · {renewalLine}</>}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-sm">Changer</button>
-              <button className="btn btn-sm" style={{ color: '#A32D2D' }}>Annuler</button>
-            </div>
+            {plan !== 'enterprise' && (
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {upgradePlans.length > 0 && (
+                  <button className="btn btn-sm btn-primary">
+                    <Icon name="sparkles" size={13} /> Mettre à niveau
+                  </button>
+                )}
+                {plan !== 'solo' && (
+                  <button className="btn btn-sm" style={{ color: '#A32D2D' }}>Annuler</button>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Usage bar */}
           <div className="s-usage">
-            <div className="s-usage-top"><span>Factures ce mois</span><span className="tnum">41 <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>/ illimité</span></span></div>
-            <div className="s-bar-track"><div className="s-bar-fill" style={{ width: '41%' }} /></div>
+            <div className="s-usage-top">
+              <span>Factures ce mois</span>
+              <span className="tnum" style={barWarning ? { color: '#B45309' } : undefined}>
+                {monthlyCount}
+                {usageLimit
+                  ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}> / {usageLimit}</span>
+                  : <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}> / illimité</span>
+                }
+              </span>
+            </div>
+            <div className="s-bar-track">
+              <div
+                className="s-bar-fill"
+                style={{
+                  width: `${usagePct}%`,
+                  background: barWarning
+                    ? 'linear-gradient(90deg,#D97706,#B45309)'
+                    : undefined,
+                }}
+              />
+            </div>
+            {barWarning && usageLimit && (
+              <div className="s-usage-warn">
+                <Icon name="alert-triangle" size={12} />
+                {monthlyCount >= usageLimit
+                  ? 'Limite atteinte — passez au plan Business pour continuer à facturer.'
+                  : `Plus que ${usageLimit - monthlyCount} facture${usageLimit - monthlyCount > 1 ? 's' : ''} disponible${usageLimit - monthlyCount > 1 ? 's' : ''} ce mois.`
+                }
+              </div>
+            )}
           </div>
         </div>
         <div className="s-card-foot">
           <button className="btn"><Icon name="file-text" size={14} /> Historique de facturation</button>
         </div>
       </div>
+
+      {/* ── Upgrade options ── */}
+      {upgradePlans.length > 0 && (
+        <div className="s-card">
+          <div className="s-card-head">
+            <div className="s-card-title">Passer à un plan supérieur</div>
+            <div className="s-card-desc">Débloquez plus de fonctionnalités pour votre entreprise.</div>
+          </div>
+          <div className="s-card-body" style={{ gap: 10 }}>
+            {upgradePlans.map(p => (
+              <div key={p.id} className={`s-upgrade-row${p.popular ? ' s-upgrade-row--popular' : ''}`}>
+                <div style={{ flex: 1 }}>
+                  <div className="s-upgrade-name">
+                    {p.name}
+                    {p.popular && <span className="s-upgrade-popular-badge">Populaire</span>}
+                  </div>
+                  <div className="s-upgrade-tagline">{p.tagline}</div>
+                  <ul className="s-upgrade-perks">
+                    {p.perks.map(perk => (
+                      <li key={perk}><Icon name="check" size={12} className="s-upgrade-check" />{perk}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="s-upgrade-right">
+                  <div className="s-upgrade-price">
+                    {p.price === null
+                      ? <span className="s-upgrade-price-main">Sur devis</span>
+                      : <>
+                          <span className="s-upgrade-price-cur">{p.currency}</span>
+                          <span className="s-upgrade-price-main">{formatPrice(p.price)}</span>
+                          <span className="s-upgrade-price-period">/mois</span>
+                        </>
+                    }
+                  </div>
+                  <button className={`btn btn-sm${p.popular ? ' btn-primary' : ''}`}>
+                    {p.ctaLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Danger zone ── */}
       <div className="s-card s-danger-card">
         <div className="s-card-head">
           <div className="s-card-title" style={{ color: '#A32D2D' }}>Supprimer le workspace</div>
-          <div className="s-card-desc">Supprime définitivement ce workspace et toutes les factures.</div>
+          <div className="s-card-desc">Supprime définitivement ce workspace et toutes les factures, clients et données associées.</div>
         </div>
         <div className="s-card-foot" style={{ justifyContent: 'flex-start', background: 'var(--color-background-primary)', borderTop: 'none', paddingTop: 0 }}>
           <button className="btn" style={{ color: '#A32D2D', borderColor: 'var(--color-border-secondary)' }}>

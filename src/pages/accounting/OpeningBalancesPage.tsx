@@ -418,7 +418,7 @@ export default function OpeningBalancesPage() {
   }, [ecart, showToast]);
 
   const handleAdopt = useCallback(async () => {
-    if (!balanced || saving) return;
+    if (saving) return;
     setSaving(true);
     try {
       await adoptOpeningBalances(orgId, {
@@ -436,7 +436,7 @@ export default function OpeningBalancesPage() {
     } finally {
       setSaving(false);
     }
-  }, [balanced, saving, orgId, piece, label, lines, setOpeningBalancesAdopted, showToast]);
+  }, [saving, orgId, piece, label, lines, setOpeningBalancesAdopted, showToast]);
 
   /* ── bank amount for success card ── */
   const bankAmt = useMemo(() => {
@@ -663,16 +663,18 @@ export default function OpeningBalancesPage() {
 
             {/* footer */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-              <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Icon name="alert-triangle" size={14} /> Le débit doit être égal au crédit pour pouvoir adopter
-              </span>
+              {!balanced && (
+                <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="alert-triangle" size={14} /> Écriture déséquilibrée — vous pouvez tout de même adopter
+                </span>
+              )}
               <span style={{ flex: 1 }} />
               <button className="btn" onClick={() => navigate('/accounting/journals')}>Annuler</button>
               <button
                 className="btn btn-primary btn-lg"
-                disabled={!balanced || saving}
+                disabled={saving}
                 onClick={handleAdopt}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '11px 18px', fontSize: 13.5, fontWeight: 700, opacity: balanced && !saving ? 1 : 0.5, cursor: balanced && !saving ? 'pointer' : 'not-allowed' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '11px 18px', fontSize: 13.5, fontWeight: 700, opacity: saving ? 0.5 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
               >
                 <Icon name="check" /> {saving ? 'Enregistrement…' : 'Adopter comme position d\'ouverture'}
               </button>

@@ -34,8 +34,8 @@ export default function InvoicesPage() {
 
   // New invoice form state
   const [fClient,  setFClient]  = useState('');
-  const [fDate,    setFDate]    = useState('2026-06-07');
-  const [fDue,     setFDue]     = useState('2026-06-21');
+  const [fDate,    setFDate]    = useState(() => new Date().toISOString().slice(0, 10));
+  const [fDue,     setFDue]     = useState(() => new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10));
   const [fSubject, setFSubject] = useState('');
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [fPay,     setFPay]     = useState('Mobile Money (MTN / Orange / Wave)');
@@ -57,7 +57,9 @@ export default function InvoicesPage() {
   const total    = subtotal + tax;
 
   const openPanel = () => {
-    setFClient(''); setFSubject(''); setFNotes('');
+    const today = new Date().toISOString().slice(0, 10);
+    const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+    setFClient(''); setFDate(today); setFDue(due); setFSubject(''); setFNotes('');
     setLineItems([newLineItem('', 1, 250_000), newLineItem('', 3, 75_000)]);
     setPanelOpen(true);
   };
@@ -75,8 +77,14 @@ export default function InvoicesPage() {
     e.stopPropagation();
     const actEntry: Activity = { kind: 'sent', parts: [{ text: 'Relance envoyée pour ' }, { text: `#${id}`, bold: true }], time: "À l'instant" };
     setActivity((prev: Activity[]) => [actEntry, ...prev]);
-    await createActivity(orgId, { kind: actEntry.kind, parts: actEntry.parts });
-    showToast(`Relance envoyée pour #${id}`);
+    try {
+      await createActivity(orgId, { kind: actEntry.kind, parts: actEntry.parts });
+      showToast(`Relance envoyée pour #${id}`);
+    } catch (err) {
+      console.error('[sendReminder] error:', err);
+      setActivity((prev: Activity[]) => prev.filter(a => a !== actEntry));
+      showToast('Erreur lors de l\'envoi de la relance. Veuillez réessayer.', true);
+    }
   };
 
   const submitInvoice = async (status: 'draft' | 'pending') => {
@@ -86,28 +94,35 @@ export default function InvoicesPage() {
     const id    = nextId(invoices);
     const cName = clientsMap[fClient]?.name ?? fClient;
     const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status };
-    setInvoices(prev => [newInv, ...prev]);
-    await createInvoice(orgId, newInv);
-    await saveLineItems(orgId, lineItems, { invoiceId: id });
-    if (status === 'pending') {
-      await recordInvoiceIssuanceEntry(orgId, {
-        invoiceId:  id,
-        htAmount:   subtotal,
-        tvaAmount:  tax,
-        date:       fDate,
-        clientName: cName,
-      });
+
+    try {
+      await createInvoice(orgId, newInv);
+      await saveLineItems(orgId, lineItems, { invoiceId: id });
+      if (status === 'pending') {
+        await recordInvoiceIssuanceEntry(orgId, {
+          invoiceId:  id,
+          htAmount:   subtotal,
+          tvaAmount:  tax,
+          date:       fDate,
+          clientName: cName,
+        });
+      }
+
+      setInvoices(prev => [newInv, ...prev]);
+
+      const actPayload = status === 'pending'
+        ? { kind: 'sent'   as const, parts: [{ text: 'Facture ' }, { text: `#${id}`, bold: true as const }, { text: ' envoyée à ' }, { text: cName, bold: true as const }] }
+        : { kind: 'viewed' as const, parts: [{ text: 'Brouillon ' }, { text: `#${id}`, bold: true as const }, { text: ' enregistré pour ' }, { text: cName, bold: true as const }] };
+      const actEntry: Activity = { ...actPayload, time: "À l'instant" };
+      setActivity((prev: Activity[]) => [actEntry, ...prev]);
+      await createActivity(orgId, actPayload);
+
+      closePanel();
+      showToast(status === 'pending' ? `Facture #${id} envoyée à ${cName}` : `Brouillon #${id} enregistré`);
+    } catch (err) {
+      console.error('[submitInvoice] error:', err);
+      showToast('Une erreur est survenue. Veuillez réessayer.', true);
     }
-
-    const actPayload = status === 'pending'
-      ? { kind: 'sent'   as const, parts: [{ text: 'Facture ' }, { text: `#${id}`, bold: true as const }, { text: ' envoyée à ' }, { text: cName, bold: true as const }] }
-      : { kind: 'viewed' as const, parts: [{ text: 'Brouillon ' }, { text: `#${id}`, bold: true as const }, { text: ' enregistré pour ' }, { text: cName, bold: true as const }] };
-    const actEntry: Activity = { ...actPayload, time: "À l'instant" };
-    setActivity((prev: Activity[]) => [actEntry, ...prev]);
-    await createActivity(orgId, actPayload);
-
-    closePanel();
-    showToast(status === 'pending' ? `Facture #${id} envoyée à ${cName}` : `Brouillon #${id} enregistré`);
   };
 
   return (
