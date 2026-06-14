@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import posthog from 'posthog-js';
 import Icon from './Icon';
 import { PLANS, formatPrice, minPlanForFeature, type Feature, type PlanId } from '../lib/plans';
 import { useApp } from '../context/AppContext';
@@ -96,7 +97,10 @@ export default function UpgradeModal({ feature, onClose }: Props) {
                 {!isCurrent && (
                   <button
                     className={`btn upg-cta-btn${isRequired ? ' btn-primary' : ''}`}
-                    onClick={onClose}
+                    onClick={() => {
+                      posthog.capture('plan_upgrade_clicked', { current_plan: currentPlan, target_plan: p.id, feature });
+                      onClose();
+                    }}
                   >
                     {p.ctaLabel}
                   </button>

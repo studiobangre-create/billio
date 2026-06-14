@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
@@ -91,6 +92,7 @@ export default function InvoicesPage() {
     if (!fClient)      { showToast('Veuillez sélectionner un client.', true); return; }
     if (subtotal <= 0) { showToast('Ajoutez au moins une ligne de facturation.', true); return; }
 
+    const isFirstInvoice = invoices.length === 0;
     const id    = nextId(invoices);
     const cName = clientsMap[fClient]?.name ?? fClient;
     const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status };
@@ -107,6 +109,10 @@ export default function InvoicesPage() {
           clientName: cName,
         });
       }
+
+      posthog.capture('invoice_created', { invoice_type: status, item_count: lineItems.length, total_amount: total, currency: 'XOF' });
+      if (status === 'pending') posthog.capture('invoice_sent', { invoice_id: id, delivery_method: fPay });
+      if (isFirstInvoice) posthog.capture('first_invoice_created');
 
       setInvoices(prev => [newInv, ...prev]);
 

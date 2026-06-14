@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
 import { ProductsEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -110,6 +111,7 @@ export default function ProductsPage() {
       };
       setProducts(prev => [item, ...prev]);
       await createProduct(orgId, item);
+      posthog.capture('product_created', { type: fType, unit: fUnit });
       setPanelOpen(false);
       showToast(`"${item.name}" ajouté au catalogue`);
     }

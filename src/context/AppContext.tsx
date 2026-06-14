@@ -53,7 +53,7 @@ interface AppContextValue {
   userRole:    'admin' | 'accountant' | 'member';
   // Onboarding
   needsOnboarding:    boolean;
-  completeOnboarding: (bizName: string) => void;
+  completeOnboarding: (bizName: string, newOrgId?: string) => void;
   // Opening balances
   openingBalancesAdopted:    boolean;
   setOpeningBalancesAdopted: Dispatch<SetStateAction<boolean>>;
@@ -313,9 +313,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const completeOnboarding = useCallback((bizName: string) => {
+  const completeOnboarding = useCallback((bizName: string, newOrgId?: string) => {
     setNeedsOnboarding(false);
     setUserLabel(prev => prev || bizName);
+    if (newOrgId) setOrgId(newOrgId);
   }, []);
 
   const hasFeature = useCallback((feature: Feature) => checkFeature(plan, feature), [plan]);

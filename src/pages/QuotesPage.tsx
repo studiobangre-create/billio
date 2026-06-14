@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
 import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -119,6 +120,7 @@ export default function QuotesPage() {
     setQuotes(prev => [newQuote, ...prev]);
     await createQuote(orgId, payload);
     await saveLineItems(orgId, lines, { quoteId: id });
+    posthog.capture('quote_created', { item_count: lines.length, total_amount: total, status });
     closePanel();
     showToast(status === 'sent' ? `Devis ${id} envoyé à ${cName}` : `Brouillon ${id} enregistré`);
   }
@@ -160,6 +162,7 @@ export default function QuotesPage() {
       clientName: cName,
     });
 
+    posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invId });
     showToast(`Devis ${id} → Facture #${invId} créée`);
   }
 

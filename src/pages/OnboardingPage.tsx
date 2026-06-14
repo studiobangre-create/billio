@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useApp } from '../context/AppContext';
@@ -150,6 +151,9 @@ export default function OnboardingPage() {
   /* ── saving ── */
   const [saving, setSaving] = useState(false);
 
+  const startTimeRef = useRef(Date.now());
+  useEffect(() => { posthog.capture('onboarding_started'); }, []);
+
   /* ── derived ── */
   const logoInitials = initials(bizName || 'B');
   const docNum = `#${prefix}${nextNum}`;
@@ -230,9 +234,18 @@ export default function OnboardingPage() {
 
   /* ── finish: save to Supabase ── */
   async function handleFinish() {
-    if (!orgId) return;
     setSaving(true);
     try {
+      // Ensure an org exists — call the RPC if the trigger didn't fire on signup
+      let resolvedOrgId = orgId;
+      if (!resolvedOrgId) {
+        const { data: newOrgId, error: rpcErr } = await supabase.rpc('create_initial_org', {
+          p_name: bizName.trim() || 'Mon entreprise',
+        });
+        if (rpcErr) throw rpcErr;
+        resolvedOrgId = newOrgId as string;
+      }
+
       // Step 1 + Step 2 — org details and invoice defaults
       const { error: orgErr } = await supabase
         .from('organizations')
@@ -252,7 +265,7 @@ export default function OnboardingPage() {
           invoice_footer:        footer,
           onboarding_completed_at: new Date().toISOString(),
         })
-        .eq('id', orgId);
+        .eq('id', resolvedOrgId);
       if (orgErr) throw orgErr;
 
       // Step 3 — team invitations
@@ -269,7 +282,7 @@ export default function OnboardingPage() {
             teamInvites.map(t => ({
               id:         t.id,
               token:      t.id,
-              org_id:     orgId,
+              org_id:     resolvedOrgId,
               email:      t.email.toLowerCase().trim(),
               role:       ROLE_MAP[t.role] ?? 'member',
               invited_by: userId || undefined,
@@ -283,7 +296,7 @@ export default function OnboardingPage() {
       if (clients.length > 0) {
         const { error: cliErr } = await supabase.from('clients').insert(
           clients.map((c, i) => ({
-            org_id:     orgId,
+            org_id:     resolvedOrgId,
             created_by: userId || undefined,
             code:       `CLI-${String(i + 1).padStart(4, '0')}`,
             name:       c.name,
@@ -299,7 +312,13 @@ export default function OnboardingPage() {
         if (cliErr) throw cliErr;
       }
 
-      completeOnboarding(bizName.trim() || 'Mon entreprise');
+      posthog.capture('onboarding_completed', {
+        org_name:              bizName.trim() || 'Mon entreprise',
+        clients_added:         clients.length,
+        team_invites:          teamInvites.length,
+        time_to_complete_seconds: Math.round((Date.now() - startTimeRef.current) / 1000),
+      });
+      completeOnboarding(bizName.trim() || 'Mon entreprise', resolvedOrgId !== orgId ? resolvedOrgId : undefined);
       navigate('/dashboard');
     } catch (err) {
       console.error('Onboarding save error:', err);

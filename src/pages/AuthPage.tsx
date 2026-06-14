@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { supabase } from '../lib/supabase';
 import BillioMark from '../components/BillioMark';
@@ -56,12 +57,14 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
           options: { data: { country } },
         });
         if (error) throw error;
+        posthog.capture('signed_up', { method: 'email', country });
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
         if (error) throw error;
+        posthog.capture('signed_in', { method: 'email' });
       }
       onLogin?.();
     } catch (err: unknown) {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
 import { TemplatesEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -486,6 +487,8 @@ export default function TemplatesPage() {
   }
 
   function useTemplate(id: string) {
+    const tpl = templates.find(t => t.id === id);
+    posthog.capture('template_changed', { template_name: tpl?.name, layout: tpl?.config.layout });
     setTemplates(prev => prev.map(t => ({ ...t, isDefault: t.id === id })));
   }
 

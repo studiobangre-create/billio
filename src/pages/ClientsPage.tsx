@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { EmptyState, EmptyInline } from '../components/EmptyState';
 import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -130,8 +131,11 @@ export default function ClientsPage() {
       city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime,
       status: form.status,
     };
+    const isFirstClient = clients.length === 0;
     setClients(prev => [{ ...payload, invoices: 0, billed: 0, balance: 0 }, ...prev]);
     await createClient(orgId, payload);
+    posthog.capture('client_created');
+    if (isFirstClient) posthog.capture('first_client_added');
     setForm(EMPTY_FORM);
     closePanel();
   }

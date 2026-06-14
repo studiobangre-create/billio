@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -80,6 +81,7 @@ function ProfileSection() {
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
     setDirty(false);
+    posthog.capture('settings_saved', { section: 'profile' });
     showToast('Profil enregistré');
   }
 
@@ -216,6 +218,7 @@ function BusinessSection() {
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
     setOrgSettings({ name, ifu, rccm, taxRegime, divisionFiscale, address, city, country, email, phone });
+    posthog.capture('settings_saved', { section: 'business' });
     showToast('Entreprise enregistrée');
   }
 
@@ -343,6 +346,7 @@ function InvoicingSection() {
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
+    posthog.capture('settings_saved', { section: 'invoicing' });
     showToast('Paramètres de facturation enregistrés');
   }
 
@@ -450,6 +454,7 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
     setSaving(true);
     try {
       await upsertPaymentSettings(orgId, settings);
+      posthog.capture('settings_saved', { section: 'payments' });
       showToast('Moyens de paiement enregistrés');
       onSave();
     } catch (err) {

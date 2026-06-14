@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import Icon from '../components/Icon';
@@ -131,6 +132,7 @@ export default function InvoicePage() {
     a.download = `facture-${invoice.id.toLowerCase()}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
+    posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
   };
   const handleDelete = async () => {
     if (window.confirm(`Supprimer la facture #${invoice.id} ? Cette action est irréversible.`)) {

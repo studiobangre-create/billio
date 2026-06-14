@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import posthog from 'posthog-js';
 import Icon from '../components/Icon';
 import { EmptyState } from '../components/EmptyState';
 import { PaymentsEmptyIllustration } from '../components/PageEmptyIllustrations';
@@ -139,6 +140,7 @@ export default function PaymentsPage() {
       date,
       clientName,
     });
+    posthog.capture('payment_recorded', { amount: amt, method, invoice_id: invId });
     closePanel();
     showToast(`Paiement ${m.label} de ${fmt(amt)} F CFA enregistré`);
   }
