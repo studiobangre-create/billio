@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction, type ReactNode } from 'react';
+import posthog from 'posthog-js';
 import { useToast } from './ToastContext';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -28,6 +29,8 @@ export interface OrgSettings {
 }
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
+
+const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '' };
 
 interface AppContextValue {
   // Entities
@@ -75,7 +78,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [products,  setProducts]  = useState<Product[]>(MOCK ? INITIAL_PRODUCTS : []);
   const [quotes,    setQuotes]    = useState<Quote[]>(MOCK ? INITIAL_QUOTES : []);
 
-  const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '' };
   const [orgSettings,     setOrgSettings]     = useState<OrgSettings>(EMPTY_ORG);
 
   const [userId,          setUserId]          = useState(MOCK ? 'mock-user' : '');
@@ -214,6 +216,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
+
+      posthog.identify(user.id, {
+        email,
+        name: `${first} ${last}`.trim() || email.split('@')[0],
+        org_id: resolvedOrgId,
+        role: membership?.role ?? 'member',
+      });
+
       setLoading(false);
     }
 
@@ -285,6 +295,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       if (event === 'SIGNED_OUT') {
+        posthog.reset();
         teardownRealtime();
         setUserId('');
         setOrgId('');

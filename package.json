@@ -13,6 +13,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@sentry/react": "^10.57.0",
     "@supabase/supabase-js": "^2.107.0",
+    "posthog-js": "^1.386.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.17.0",

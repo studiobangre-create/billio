@@ -5,13 +5,7 @@ import Icon from './Icon';
 import UpgradeModal from './UpgradeModal';
 import { useApp } from '../context/AppContext';
 import { PLAN_LABELS, minPlanForFeature, type Feature } from '../lib/plans';
-
-const BillioMark = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fillOpacity="0.96" />
-    <path d="M8 8.2h6M8 11.4h7M8 14.6h4" stroke="#185FA5" strokeWidth="1.6" strokeLinecap="round" />
-  </svg>
-);
+import BillioMark from './BillioMark';
 
 type NavItem = { icon: string; label: string; to: string };
 
@@ -126,7 +120,7 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-mark">
-            <div className="logo-icon"><BillioMark /></div>
+            <div className="logo-icon"><BillioMark size={18} /></div>
             <div>
               <div className="logo-text">Billio</div>
               <div className="logo-tag">Facturation</div>

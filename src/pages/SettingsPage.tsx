@@ -7,6 +7,10 @@ import {
   SOLO_INVOICE_LIMIT,
   type PlanStatus,
 } from '../lib/plans';
+import {
+  fetchPaymentSettings, upsertPaymentSettings,
+  DEFAULT_PAYMENT_SETTINGS, type PaymentSettings,
+} from '../lib/api/payment-settings';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -47,8 +51,9 @@ function ProfileSection() {
   const [dirty,     setDirty]     = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error) { console.error('[ProfileSection] getUser:', error.message); setLoading(false); return; }
+      if (!user) { setLoading(false); return; }
       const m = (user.user_metadata ?? {}) as Record<string, string>;
       setFirstName(m.first_name ?? '');
       setLastName(m.last_name  ?? '');
@@ -81,8 +86,9 @@ function ProfileSection() {
   function handleCancel() {
     setLoading(true);
     setDirty(false);
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error) { console.error('[ProfileSection] getUser:', error.message); setLoading(false); return; }
+      if (!user) { setLoading(false); return; }
       const m = (user.user_metadata ?? {}) as Record<string, string>;
       setFirstName(m.first_name ?? '');
       setLastName(m.last_name  ?? '');
@@ -423,11 +429,36 @@ function InvoicingSection() {
 
 /* ─── Payment Methods ───────────────────────────────────────────── */
 function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
-  const [mtn, setMtn]     = useState(true);
-  const [orange, setOrange] = useState(true);
-  const [wave, setWave]   = useState(false);
-  const [bank, setBank]   = useState(true);
-  const [cash, setCash]   = useState(false);
+  const { orgId, showToast } = useApp();
+  const [settings, setSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    if (!orgId) return;
+    fetchPaymentSettings(orgId)
+      .then(s => { setSettings(s); setLoading(false); })
+      .catch(err => { console.error('[PaymentMethods] fetch:', err); setLoading(false); });
+  }, [orgId]);
+
+  function patch<K extends keyof PaymentSettings>(key: K, value: PaymentSettings[K]) {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSave() {
+    if (!orgId) return;
+    setSaving(true);
+    try {
+      await upsertPaymentSettings(orgId, settings);
+      showToast('Moyens de paiement enregistrés');
+      onSave();
+    } catch (err) {
+      console.error('[PaymentMethods] save:', err);
+      showToast('Erreur lors de l\'enregistrement', true);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="s-card">
@@ -440,211 +471,484 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
           <div className="s-row-ico"><Icon name="device-mobile" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Mobile Money — MTN</div><div className="s-row-sub">Recevez les paiements sur votre compte MTN MoMo.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} defaultValue="70 12 34 56" type="tel" />
-            <Toggle on={mtn} onChange={setMtn} />
+            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="70 12 34 56"
+              value={settings.methodMtnPhone} disabled={loading}
+              onChange={e => patch('methodMtnPhone', e.target.value)} />
+            <Toggle on={settings.methodMtnEnabled} onChange={v => patch('methodMtnEnabled', v)} />
           </div>
         </div>
         <div className="s-row">
           <div className="s-row-ico"><Icon name="device-mobile" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Mobile Money — Orange</div><div className="s-row-sub">Recevez les paiements sur votre compte Orange Money.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} defaultValue="76 98 76 54" type="tel" />
-            <Toggle on={orange} onChange={setOrange} />
+            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="76 98 76 54"
+              value={settings.methodOrangePhone} disabled={loading}
+              onChange={e => patch('methodOrangePhone', e.target.value)} />
+            <Toggle on={settings.methodOrangeEnabled} onChange={v => patch('methodOrangeEnabled', v)} />
           </div>
         </div>
         <div className="s-row">
           <div className="s-row-ico"><Icon name="wave" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Wave</div><div className="s-row-sub">Acceptez les paiements par QR Wave et lien.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} placeholder="Numéro Wave" type="tel" />
-            <Toggle on={wave} onChange={setWave} />
+            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="Numéro Wave"
+              value={settings.methodWavePhone} disabled={loading}
+              onChange={e => patch('methodWavePhone', e.target.value)} />
+            <Toggle on={settings.methodWaveEnabled} onChange={v => patch('methodWaveEnabled', v)} />
           </div>
         </div>
         <div className="s-row">
           <div className="s-row-ico"><Icon name="building-bank" size={17} /></div>
-          <div className="s-row-main"><div className="s-row-title">Virement bancaire</div><div className="s-row-sub">Ecobank · IBAN BF76 0001 2345 6789</div></div>
+          <div className="s-row-main"><div className="s-row-title">Virement bancaire</div>
+            <div className="s-row-sub">{settings.methodBankIban || 'IBAN non configuré'}</div>
+          </div>
           <div className="s-row-aside">
-            <button className="btn btn-sm" onClick={() => {}}>Modifier</button>
-            <Toggle on={bank} onChange={setBank} />
+            <input className="form-input" style={{ width: 220 }} placeholder="BF76 0001 2345 6789"
+              value={settings.methodBankIban} disabled={loading}
+              onChange={e => patch('methodBankIban', e.target.value)} />
+            <Toggle on={settings.methodBankEnabled} onChange={v => patch('methodBankEnabled', v)} />
           </div>
         </div>
         <div className="s-row">
           <div className="s-row-ico"><Icon name="cash" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Espèces</div><div className="s-row-sub">Marquer les factures comme payées en espèces manuellement.</div></div>
-          <div className="s-row-aside"><Toggle on={cash} onChange={setCash} /></div>
+          <div className="s-row-aside"><Toggle on={settings.methodCashEnabled} onChange={v => patch('methodCashEnabled', v)} /></div>
         </div>
       </div>
-      <div className="s-card-foot"><button className="btn btn-primary" onClick={onSave}>Enregistrer</button></div>
+      <div className="s-card-foot">
+        <button className="btn btn-primary" onClick={handleSave} disabled={loading || saving}>
+          {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </div>
     </div>
   );
 }
 
 /* ─── Providers ─────────────────────────────────────────────────── */
+
+type ConnectTarget = 'paystack' | 'pawapay' | null;
+
+// BF-centric bank list for Paystack settlement
+const BF_BANKS = [
+  { code: 'ecobank',  label: 'Ecobank Burkina'           },
+  { code: 'biciab',   label: 'BICIAB'                    },
+  { code: 'boa',      label: 'Bank of Africa (BOA)'      },
+  { code: 'coris',    label: 'Coris Bank International'  },
+  { code: 'sgbf',     label: 'Société Générale BF'       },
+  { code: 'uba',      label: 'UBA Burkina'               },
+  { code: 'bsic',     label: 'BSIC Burkina'              },
+];
+
+const PAWAPAY_CORRESPONDENTS: Record<string, { label: string; country: string }[]> = {
+  BFA: [
+    { label: 'MTN MoMo',    country: 'MTN_MOMO_BFA'    },
+    { label: 'Orange Money', country: 'ORANGE_MONEY_BFA'},
+    { label: 'Moov Money',  country: 'MOOV_MONEY_BFA'  },
+  ],
+  CIV: [
+    { label: 'MTN MoMo',    country: 'MTN_MOMO_CIV'    },
+    { label: 'Orange Money', country: 'ORANGE_MONEY_CIV'},
+    { label: 'Wave',         country: 'WAVE_MONEY_CIV'  },
+  ],
+  SEN: [
+    { label: 'Orange Money', country: 'ORANGE_MONEY_SEN'},
+    { label: 'Wave',         country: 'WAVE_MONEY_SEN'  },
+    { label: 'Free Money',   country: 'FREE_MONEY_SEN'  },
+  ],
+  GHA: [
+    { label: 'MTN MoMo',    country: 'MTN_MOMO_GHA'    },
+    { label: 'AirtelTigo',  country: 'AIRTELTIGO_MONEY_GHA' },
+  ],
+};
+
+const CHECKOUT_METHODS: { label: string; icon: string; cls: string; sub: string; feePaystack: string; feePawapay: string | null; key: keyof PaymentSettings }[] = [
+  { label: 'Mobile Money', icon: 'device-mobile', cls: 'pv-mi-momo', sub: 'MTN · Orange · Moov',    feePaystack: '1,5 %',       feePawapay: '1,0 %',  key: 'checkoutMomoEnabled' },
+  { label: 'Wave',         icon: 'wave',          cls: 'pv-mi-wave', sub: 'QR & lien deep-link',     feePaystack: '1,0 %',       feePawapay: '0,8 %',  key: 'checkoutWaveEnabled' },
+  { label: 'Carte',        icon: 'credit-card',   cls: 'pv-mi-card', sub: 'Visa · Mastercard · 3DS', feePaystack: '2,9 % + 100', feePawapay: null,      key: 'checkoutCardEnabled' },
+  { label: 'Virement',     icon: 'building-bank', cls: 'pv-mi-bank', sub: 'Pay-with-transfer',       feePaystack: '0,5 %',       feePawapay: null,      key: 'checkoutBankEnabled' },
+];
+
+const STATUS_BADGE: Record<string, { label: string; icon: string; cls: string }> = {
+  pending:   { label: 'Vérification en cours', icon: 'clock-pause',   cls: 'pv-badge-pending'  },
+  active:    { label: 'Actif',                  icon: 'circle-check',  cls: 'pv-badge-active'   },
+  suspended: { label: 'Suspendu',               icon: 'alert-triangle',cls: 'pv-badge-suspended'},
+};
+
 function ProvidersSection({ onSave }: { onSave: () => void }) {
-  const [mode, setMode] = useState<'test' | 'live'>('live');
-  const [reconAuto, setReconAuto] = useState(true);
-  const [momoOn, setMomoOn] = useState(true);
-  const [waveOn, setWaveOn] = useState(true);
-  const [cardOn, setCardOn] = useState(true);
-  const [bankOn, setBankOn] = useState(false);
+  const { orgId, showToast } = useApp();
+  const [settings,      setSettings]      = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [loading,       setLoading]       = useState(true);
+  const [saving,        setSaving]        = useState(false);
+  const [connectTarget, setConnectTarget] = useState<ConnectTarget>(null);
+
+  // Paystack settlement form
+  const [psBusinessName,   setPsBusinessName]   = useState('');
+  const [psBank,           setPsBank]           = useState('');
+  const [psAccountNumber,  setPsAccountNumber]  = useState('');
+
+  // PawaPay settlement form
+  const [ppCountry,        setPpCountry]        = useState('BFA');
+  const [ppCorrespondent,  setPpCorrespondent]  = useState('');
+  const [ppPhone,          setPpPhone]          = useState('');
+
+  useEffect(() => {
+    if (!orgId) return;
+    fetchPaymentSettings(orgId)
+      .then(s => { setSettings(s); setLoading(false); })
+      .catch(err => { console.error('[Providers] fetch:', err); setLoading(false); });
+  }, [orgId]);
+
+  function patchLocal<K extends keyof PaymentSettings>(key: K, value: PaymentSettings[K]) {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  }
+
+  async function persist(patch: Partial<PaymentSettings>) {
+    if (!orgId) return;
+    setSaving(true);
+    try {
+      await upsertPaymentSettings(orgId, patch);
+      setSettings(prev => ({ ...prev, ...patch }));
+      onSave();
+    } catch (err) {
+      console.error('[Providers] save:', err);
+      showToast('Erreur lors de l\'enregistrement', true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openConnect(target: 'paystack' | 'pawapay') {
+    // Pre-fill from existing settings if already set
+    if (target === 'paystack') {
+      setPsBusinessName(settings.paystackBusinessName);
+      setPsBank(settings.paystackSettlementBank);
+      setPsAccountNumber(settings.paystackAccountNumber);
+    } else {
+      setPpCountry(settings.pawapayCountry || 'BFA');
+      setPpCorrespondent(settings.pawapayCorrespondent);
+      setPpPhone(settings.pawapayPhone);
+    }
+    setConnectTarget(target);
+  }
+
+  async function handleSubmitConnect() {
+    if (!connectTarget) return;
+    if (connectTarget === 'paystack') {
+      if (!psBusinessName.trim() || !psBank || !psAccountNumber.trim()) {
+        showToast('Remplissez tous les champs de règlement', true); return;
+      }
+      await persist({
+        activeProvider:         'paystack',
+        providerStatus:         'pending',
+        paystackBusinessName:   psBusinessName.trim(),
+        paystackSettlementBank: psBank,
+        paystackAccountNumber:  psAccountNumber.trim(),
+      });
+    } else {
+      if (!ppCountry || !ppCorrespondent || !ppPhone.trim()) {
+        showToast('Remplissez tous les champs de règlement', true); return;
+      }
+      await persist({
+        activeProvider:      'pawapay',
+        providerStatus:      'pending',
+        pawapayCountry:      ppCountry,
+        pawapayCorrespondent: ppCorrespondent,
+        pawapayPhone:        ppPhone.trim(),
+      });
+    }
+    showToast('Demande envoyée — activation sous 24 h');
+    setConnectTarget(null);
+  }
+
+  async function handleDisconnect() {
+    await persist({ activeProvider: null, providerStatus: 'pending' });
+    showToast('Prestataire déconnecté');
+  }
+
+  async function handleSaveMethods() {
+    await persist({
+      checkoutMomoEnabled: settings.checkoutMomoEnabled,
+      checkoutWaveEnabled: settings.checkoutWaveEnabled,
+      checkoutCardEnabled: settings.checkoutCardEnabled,
+      checkoutBankEnabled: settings.checkoutBankEnabled,
+    });
+    showToast('Méthodes enregistrées');
+  }
+
+  async function handleToggleReconcile(value: boolean) {
+    patchLocal('autoReconcile', value);
+    await persist({ autoReconcile: value });
+  }
+
+  const provider      = settings.activeProvider;
+  const isPaystack    = provider === 'paystack';
+  const providerLabel = isPaystack ? 'Paystack' : 'PawaPay';
+  const statusMeta    = STATUS_BADGE[settings.providerStatus] ?? STATUS_BADGE.pending;
+  const visibleMethods = CHECKOUT_METHODS.filter(m => isPaystack || m.feePawapay !== null);
+
+  // Sub-account summary line shown in the connected card
+  const connectedMeta = provider
+    ? isPaystack
+      ? `${settings.paystackBusinessName || '—'} · ${(BF_BANKS.find(b => b.code === settings.paystackSettlementBank)?.label ?? settings.paystackSettlementBank) || '—'} ••${settings.paystackAccountNumber.slice(-3) || '?'}`
+      : `${settings.pawapayPhone || '—'} · ${settings.pawapayCorrespondent || '—'} · ${settings.pawapayCountry || '—'}`
+    : '';
 
   return (
     <>
-      <div className="s-card">
-        <div className="s-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
-          <div>
-            <div className="s-card-title">Prestataires de paiement</div>
-            <div className="s-card-desc">Connectez un prestataire pour collecter les paiements en ligne via liens et QR codes.</div>
-          </div>
-          <div className="pv-mode">
-            <button className={'pv-mode-opt' + (mode === 'test' ? ' active' : '')} onClick={() => setMode('test')}>Test</button>
-            <button className={'pv-mode-opt' + (mode === 'live' ? ' active' : '')} onClick={() => setMode('live')}>Live</button>
-          </div>
-        </div>
-        <div className="s-card-body">
-          <div className="pv-intro">
-            <div className="pv-intro-ico"><Icon name="bolt" size={18} /></div>
+      {/* ── Status card (when a provider is set) ── */}
+      {provider && !connectTarget && (
+        <div className="s-card">
+          <div className="s-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
             <div>
-              <div className="pv-intro-title">Un lien, toutes les méthodes locales</div>
-              <div className="pv-intro-sub">Votre prestataire connecté alimente le checkout <b>billio.app/pay</b> — Mobile Money, Wave, carte et banque — et confirme les paiements automatiquement.</div>
+              <div className="s-card-title">Prestataire de paiement</div>
+              <div className="s-card-desc">Billio collecte les paiements via votre sous-compte — aucune clé API à gérer.</div>
+            </div>
+            <div className="pv-mode">
+              <button className={'pv-mode-opt' + (settings.providerMode === 'test' ? ' active' : '')}
+                onClick={() => persist({ providerMode: 'test' })}>Test</button>
+              <button className={'pv-mode-opt' + (settings.providerMode === 'live' ? ' active' : '')}
+                onClick={() => persist({ providerMode: 'live' })}>Live</button>
             </div>
           </div>
-
-          <div className="pv-connected-head">
-            <div className="pv-logo pv-paystack">P</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="pv-conn-name">
-                Paystack
-                <span className="pv-conn-badge">
-                  <Icon name="circle-check" size={12} /> {mode === 'live' ? 'Connecté' : 'Mode test'}
-                </span>
+          <div className="s-card-body">
+            <div className="pv-connected-head">
+              <div className={`pv-logo ${isPaystack ? 'pv-paystack' : 'pv-pawapay'}`}>
+                {isPaystack ? 'P' : 'PP'}
               </div>
-              <div className="pv-conn-meta">studiowend · connecté le 4 juin 2026 · règlement Ecobank •••6789</div>
-            </div>
-            <button className="icon-btn"><Icon name="dots" size={16} /></button>
-          </div>
-
-          <div className="pv-stats">
-            <div className="pv-stat">
-              <div className="pv-stat-label"><Icon name="credit-card" size={13} /> Collecté (juin)</div>
-              <div className="pv-stat-val tnum">2,41M <small>F CFA</small></div>
-              <div className="pv-stat-sub">38 paiements</div>
-            </div>
-            <div className="pv-stat">
-              <div className="pv-stat-label"><Icon name="clock-pause" size={13} /> Prochain virement</div>
-              <div className="pv-stat-val tnum">486K <small>F CFA</small></div>
-              <div className="pv-stat-sub">Demain, J+1</div>
-            </div>
-            <div className="pv-stat">
-              <div className="pv-stat-label"><Icon name="refresh" size={13} /> Auto-rapprochés</div>
-              <div className="pv-stat-val">100<small>%</small></div>
-              <div className="pv-stat-sub">38 sur 38 réconciliés</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="s-card">
-        <div className="s-card-head">
-          <div className="s-card-title">Méthodes &amp; frais</div>
-          <div className="s-card-desc">Les méthodes activées apparaissent sur votre checkout. Les frais sont déduits par Paystack.</div>
-        </div>
-        <div className="s-card-body">
-          <div className="pv-method-row">
-            <div className="pv-m-ico pv-mi-momo"><Icon name="device-mobile" size={18} /></div>
-            <div className="pv-m-main"><div className="pv-m-title">Mobile Money</div><div className="pv-m-sub">MTN MoMo · Orange Money</div></div>
-            <div className="pv-m-fee">1,5 %</div>
-            <Toggle on={momoOn} onChange={setMomoOn} />
-          </div>
-          <div className="pv-method-row">
-            <div className="pv-m-ico pv-mi-wave"><Icon name="wave" size={18} /></div>
-            <div className="pv-m-main"><div className="pv-m-title">Wave</div><div className="pv-m-sub">QR &amp; lien deep-link</div></div>
-            <div className="pv-m-fee">1,0 %</div>
-            <Toggle on={waveOn} onChange={setWaveOn} />
-          </div>
-          <div className="pv-method-row">
-            <div className="pv-m-ico pv-mi-card"><Icon name="credit-card" size={18} /></div>
-            <div className="pv-m-main"><div className="pv-m-title">Carte</div><div className="pv-m-sub">Visa · Mastercard · 3-D Secure</div></div>
-            <div className="pv-m-fee">2,9 % + 100</div>
-            <Toggle on={cardOn} onChange={setCardOn} />
-          </div>
-          <div className="pv-method-row">
-            <div className="pv-m-ico pv-mi-bank"><Icon name="building-bank" size={18} /></div>
-            <div className="pv-m-main"><div className="pv-m-title">Virement bancaire</div><div className="pv-m-sub">Pay-with-transfer · auto-vérifié</div></div>
-            <div className="pv-m-fee">0,5 %</div>
-            <Toggle on={bankOn} onChange={setBankOn} />
-          </div>
-        </div>
-        <div className="s-card-foot"><button className="btn btn-primary" onClick={onSave}>Enregistrer</button></div>
-      </div>
-
-      <div className="s-card">
-        <div className="s-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
-          <div>
-            <div className="s-card-title">Rapprochement automatique</div>
-            <div className="s-card-desc">À chaque paiement réussi, Billio associe le montant à la facture et la marque payée.</div>
-          </div>
-          <Toggle on={reconAuto} onChange={setReconAuto} />
-        </div>
-        <div className="s-card-body">
-          <div className="pv-flow">
-            <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="device-mobile" size={14} /></span> Client paie</div>
-            <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-            <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="bolt" size={14} /></span> Webhook</div>
-            <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-            <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="link" size={14} /></span> Correspondance</div>
-            <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-            <div className="pv-flow-step pv-flow-paid"><span className="pv-fs-ico"><Icon name="check" size={14} /></span> Payée</div>
-          </div>
-
-          <div className="pv-recon-head">
-            <span className="pv-recon-label">Derniers rapprochements</span>
-          </div>
-          <div className="pv-recon-list">
-            {[
-              { inv: 'FAC-0010', client: 'Société Bâtir', amt: '1 200 000', time: "Aujourd'hui 09h14" },
-              { inv: 'FAC-0012', client: 'Ouaga Tech',    amt: '960 000',   time: "Aujourd'hui 08h30" },
-              { inv: 'FAC-0014', client: 'NoCode BF',     amt: '280 000',   time: '4 juin 11h02'      },
-            ].map(r => (
-              <div key={r.inv} className="pv-recon-item">
-                <div className="pv-recon-dot"><Icon name="circle-check" size={15} /></div>
-                <div className="pv-recon-main">
-                  <div className="pv-recon-text"><b>{r.inv}</b> — {r.client}</div>
-                  <div className="pv-recon-time">{r.time}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="pv-conn-name">
+                  {providerLabel}
+                  <span className={`pv-conn-badge ${statusMeta.cls}`}>
+                    <Icon name={statusMeta.icon} size={12} /> {statusMeta.label}
+                  </span>
                 </div>
-                <div className="pv-recon-amt">+{r.amt} F CFA</div>
-                <span className="pv-recon-badge">Réconcilié</span>
+                <div className="pv-conn-meta">{connectedMeta}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-sm" onClick={() => openConnect(provider)} disabled={saving}>
+                  Modifier
+                </button>
+                <button className="btn btn-sm" onClick={handleDisconnect} disabled={saving}>
+                  Déconnecter
+                </button>
+              </div>
+            </div>
+
+            {settings.providerStatus === 'pending' && (
+              <div className="pv-notice pv-notice-pending">
+                <Icon name="clock-pause" size={15} />
+                <span>Votre sous-compte est en cours de vérification. Vous recevrez un email sous 24 h à l'activation.</span>
+              </div>
+            )}
+            {settings.providerStatus === 'suspended' && (
+              <div className="pv-notice pv-notice-suspended">
+                <Icon name="alert-triangle" size={15} />
+                <span>Ce sous-compte a été suspendu. Contactez le support pour rétablir l'accès.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── No provider — show picker ── */}
+      {!provider && !connectTarget && (
+        <div className="s-card">
+          <div className="s-card-head">
+            <div className="s-card-title">Prestataires de paiement</div>
+            <div className="s-card-desc">Billio crée un sous-compte en votre nom — vos règlements arrivent directement sur votre compte bancaire ou mobile.</div>
+          </div>
+          <div className="s-card-body">
+            {loading ? (
+              <div style={{ color: 'var(--color-text-tertiary)', padding: '8px 0' }}>Chargement…</div>
+            ) : (
+              <div className="pv-avail-grid">
+                <div className="pv-avail-card pv-avail-card--featured">
+                  <div className="pv-logo pv-paystack">P</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="pv-avail-name">Paystack</div>
+                    <div className="pv-avail-sub">MoMo · Wave · carte · virement — règlement J+1</div>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => openConnect('paystack')}>Activer</button>
+                </div>
+                <div className="pv-avail-card">
+                  <div className="pv-logo pv-pawapay">PP</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="pv-avail-name">PawaPay</div>
+                    <div className="pv-avail-sub">MoMo · Wave — agrégateur Afrique subsaharienne</div>
+                  </div>
+                  <button className="btn btn-sm" onClick={() => openConnect('pawapay')}>Activer</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Connect / edit form ── */}
+      {connectTarget && (
+        <div className="s-card">
+          <div className="s-card-head">
+            <div className="s-card-title">
+              {provider === connectTarget ? 'Modifier le compte de règlement' : `Activer ${connectTarget === 'paystack' ? 'Paystack' : 'PawaPay'}`}
+            </div>
+            <div className="s-card-desc">
+              {connectTarget === 'paystack'
+                ? 'Billio crée un sous-compte Paystack lié à votre banque. Vos règlements arrivent directement sur ce compte sous 24 h.'
+                : 'Billio enregistre votre numéro de règlement auprès de PawaPay. Les fonds sont versés sur ce mobile money après chaque transaction.'}
+            </div>
+          </div>
+          <div className="s-card-body">
+            {connectTarget === 'paystack' ? (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Nom de l'entreprise</label>
+                  <input className="form-input" placeholder="Studio Wend SARL"
+                    value={psBusinessName} onChange={e => setPsBusinessName(e.target.value)} />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Banque de règlement</label>
+                    <select className="form-input" value={psBank} onChange={e => setPsBank(e.target.value)}>
+                      <option value="">Sélectionner…</option>
+                      {BF_BANKS.map(b => <option key={b.code} value={b.code}>{b.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Numéro de compte</label>
+                    <input className="form-input" placeholder="BF76 0001 2345 6789"
+                      value={psAccountNumber} onChange={e => setPsAccountNumber(e.target.value)} />
+                  </div>
+                </div>
+                <div className="pv-notice pv-notice-info">
+                  <Icon name="info-circle" size={15} />
+                  <span>Paystack vérifie le titulaire du compte automatiquement. Aucune clé API ne vous sera demandée.</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Pays</label>
+                    <select className="form-input" value={ppCountry}
+                      onChange={e => { setPpCountry(e.target.value); setPpCorrespondent(''); }}>
+                      <option value="BFA">Burkina Faso</option>
+                      <option value="CIV">Côte d'Ivoire</option>
+                      <option value="SEN">Sénégal</option>
+                      <option value="GHA">Ghana</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Opérateur mobile</label>
+                    <select className="form-input" value={ppCorrespondent} onChange={e => setPpCorrespondent(e.target.value)}>
+                      <option value="">Sélectionner…</option>
+                      {(PAWAPAY_CORRESPONDENTS[ppCountry] ?? []).map(c => (
+                        <option key={c.country} value={c.country}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Numéro de règlement</label>
+                  <input className="form-input" type="tel" placeholder="70 12 34 56"
+                    value={ppPhone} onChange={e => setPpPhone(e.target.value)} />
+                </div>
+                <div className="pv-notice pv-notice-info">
+                  <Icon name="info-circle" size={15} />
+                  <span>PawaPay versera les règlements sur ce numéro après chaque paiement client réussi.</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="s-card-foot" style={{ gap: 8 }}>
+            <button className="btn" onClick={() => setConnectTarget(null)} disabled={saving}>Annuler</button>
+            <button className="btn btn-primary" onClick={handleSubmitConnect} disabled={saving}>
+              {saving ? 'Envoi…' : 'Envoyer la demande'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkout methods (only when active) ── */}
+      {provider && settings.providerStatus === 'active' && (
+        <div className="s-card">
+          <div className="s-card-head">
+            <div className="s-card-title">Méthodes de paiement en ligne</div>
+            <div className="s-card-desc">Les méthodes activées s'affichent sur votre lien de paiement billio.app/pay. Les frais sont prélevés par {providerLabel}.</div>
+          </div>
+          <div className="s-card-body">
+            {visibleMethods.map(m => (
+              <div key={m.key} className="pv-method-row">
+                <div className={`pv-m-ico ${m.cls}`}><Icon name={m.icon} size={18} /></div>
+                <div className="pv-m-main">
+                  <div className="pv-m-title">{m.label}</div>
+                  <div className="pv-m-sub">{m.sub}</div>
+                </div>
+                <div className="pv-m-fee">{isPaystack ? m.feePaystack : m.feePawapay}</div>
+                <Toggle on={Boolean(settings[m.key])} onChange={v => patchLocal(m.key, v as PaymentSettings[typeof m.key])} />
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      <div className="s-card">
-        <div className="s-card-head">
-          <div className="s-card-title">Autres prestataires</div>
-          <div className="s-card-desc">Changer ou ajouter un prestataire. Un seul peut alimenter votre checkout à la fois.</div>
-        </div>
-        <div className="s-card-body">
-          <div className="pv-avail-grid">
-            {[
-              { name: 'Flutterwave', cls: 'pv-flutter', letter: 'F', sub: 'MoMo · carte · banque' },
-              { name: 'Wave Business', cls: 'pv-wave-biz', letter: 'W', sub: 'Règlement Wave direct' },
-              { name: 'Stripe', cls: 'pv-stripe', letter: 'S', sub: 'Cartes internationales' },
-              { name: 'API personnalisée', cls: 'pv-custom', letter: 'A', sub: 'Custom / self-hosted' },
-            ].map(p => (
-              <div key={p.name} className="pv-avail-card">
-                <div className={`pv-logo ${p.cls}`}>{p.letter}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="pv-avail-name">{p.name}</div>
-                  <div className="pv-avail-sub">{p.sub}</div>
-                </div>
-                <button className="btn btn-sm">Connecter</button>
-              </div>
-            ))}
+          <div className="s-card-foot">
+            <button className="btn btn-primary" onClick={handleSaveMethods} disabled={saving}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Auto-reconciliation (only when active) ── */}
+      {provider && settings.providerStatus === 'active' && (
+        <div className="s-card">
+          <div className="s-card-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+            <div>
+              <div className="s-card-title">Rapprochement automatique</div>
+              <div className="s-card-desc">À chaque webhook de paiement reçu, Billio marque la facture correspondante comme payée.</div>
+            </div>
+            <Toggle on={settings.autoReconcile} onChange={handleToggleReconcile} />
+          </div>
+          <div className="s-card-body">
+            <div className="pv-flow">
+              <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="device-mobile" size={14} /></span>Client paie</div>
+              <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
+              <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="bolt" size={14} /></span>Webhook</div>
+              <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
+              <div className="pv-flow-step"><span className="pv-fs-ico"><Icon name="link" size={14} /></span>Correspondance</div>
+              <Icon name="arrow-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
+              <div className="pv-flow-step pv-flow-paid"><span className="pv-fs-ico"><Icon name="check" size={14} /></span>Payée</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Switch provider (only when one is already connected) ── */}
+      {provider && !connectTarget && (
+        <div className="s-card">
+          <div className="s-card-head">
+            <div className="s-card-title">Changer de prestataire</div>
+            <div className="s-card-desc">Un seul prestataire actif à la fois. L'ancien sous-compte sera désactivé.</div>
+          </div>
+          <div className="s-card-body">
+            <div className="pv-avail-grid">
+              {([
+                { id: 'paystack' as const, name: 'Paystack', cls: 'pv-paystack', letter: 'P',  sub: 'MoMo · Wave · carte · virement' },
+                { id: 'pawapay' as const, name: 'PawaPay',  cls: 'pv-pawapay',  letter: 'PP', sub: 'MoMo · Wave — agrégateur Afrique' },
+              ] as const).map(p => (
+                <div key={p.id} className="pv-avail-card">
+                  <div className={`pv-logo ${p.cls}`}>{p.letter}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="pv-avail-name">{p.name}</div>
+                    <div className="pv-avail-sub">{p.sub}</div>
+                  </div>
+                  {provider === p.id
+                    ? <span className="pv-conn-badge pv-badge-active"><Icon name="circle-check" size={12} /> Actif</span>
+                    : <button className="btn btn-sm" onClick={() => openConnect(p.id)}>Passer à {p.name}</button>
+                  }
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -709,7 +1013,7 @@ function InviteModal({ orgId, userId, onClose, onDone }: InviteModalProps) {
   const [emailErr, setEmailErr] = useState(false);
   const [saving,   setSaving]   = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!/.+@.+\..+/.test(email.trim())) { setEmailErr(true); return; }
     setSaving(true);

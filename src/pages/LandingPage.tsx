@@ -1,14 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { PLANS, formatPrice, type PlanDef } from '../lib/plans';
+import BillioMark from '../components/BillioMark';
 import './LandingPage.css';
-
-const BillioMark = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fillOpacity="0.96" />
-    <path d="M8 8.2h6M8 11.4h7M8 14.6h4" stroke="#185FA5" strokeWidth="1.7" strokeLinecap="round" />
-  </svg>
-);
 
 /* ── Nav ─────────────────────────────────────────────────── */
 function Nav() {
@@ -24,7 +18,7 @@ function Nav() {
     <header className={`lp-nav${scrolled ? ' lp-nav--scrolled' : ''}`}>
       <div className="lp-wrap lp-nav-in">
         <a href="#top" className="lp-brand">
-          <span className="lp-brand-icon"><BillioMark /></span>
+          <span className="lp-brand-icon"><BillioMark size={18} /></span>
           <span className="lp-brand-name">Billio</span>
         </a>
         <nav className="lp-nav-links">
@@ -510,7 +504,7 @@ function Footer() {
         <div className="lp-foot-grid">
           <div className="lp-foot-about">
             <a href="#top" className="lp-brand">
-              <span className="lp-brand-icon"><BillioMark /></span>
+              <span className="lp-brand-icon"><BillioMark size={18} /></span>
               <span className="lp-brand-name">Billio</span>
             </a>
             <p>La conformité SYSCOHADA sans prise de tête, pour les entreprises de la zone UEMOA.</p>

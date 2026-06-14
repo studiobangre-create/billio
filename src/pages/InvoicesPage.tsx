@@ -225,7 +225,10 @@ export default function InvoicesPage() {
                 description="Créez votre première facture pour commencer à facturer vos clients."
               />
             ) : filteredInvoices.map(inv => {
-              const c = clientsMap[inv.client] ?? { name: inv.client, city: '—', av: 'av-a' };
+              const c = clientsMap[inv.client] ?? (() => {
+                if (import.meta.env.DEV) console.warn(`[InvoicesPage] client not in clientsMap: "${inv.client}" (invoice #${inv.id})`);
+                return { name: inv.client, city: '—', av: 'av-a' };
+              })();
               return (
                 <div key={inv.id} className="inv-row grid-cols" onClick={() => navigate(`/invoices/${inv.id}`)}>
                   <div>
@@ -314,7 +317,7 @@ export default function InvoicesPage() {
           <div className="form-group">
             <label className="form-label">Référence / Objet</label>
             <input type="text" className="form-input" placeholder="ex. Développement web — sprint 5"
-              value={fSubject} onChange={e => setFSubject(e.target.value)} />
+              maxLength={255} value={fSubject} onChange={e => setFSubject(e.target.value)} />
           </div>
 
           <div className="subhead"><span>Lignes de facturation</span></div>
@@ -363,7 +366,7 @@ export default function InvoicesPage() {
           <div className="form-group">
             <label className="form-label">Notes</label>
             <textarea className="form-input" rows={2} placeholder="Merci pour votre confiance…"
-              style={{ resize: 'none', lineHeight: 1.5 }} value={fNotes}
+              style={{ resize: 'none', lineHeight: 1.5 }} maxLength={1000} value={fNotes}
               onChange={e => setFNotes(e.target.value)} />
           </div>
         </div>

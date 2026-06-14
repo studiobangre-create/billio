@@ -16,7 +16,6 @@ const PLAN_ORDER_ARR: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
 export default function UpgradeModal({ feature, onClose }: Props) {
   const { plan: currentPlan } = useApp();
   const requiredPlan = minPlanForFeature(feature);
-  const requiredIdx  = PLAN_ORDER_ARR.indexOf(requiredPlan);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -41,7 +40,6 @@ export default function UpgradeModal({ feature, onClose }: Props) {
           {PLANS.map((p, i) => {
             const isCurrent  = p.id === currentPlan;
             const isRequired = p.id === requiredPlan;
-            const isLocked   = i < PLAN_ORDER_ARR.indexOf(currentPlan);
             const isDisabled = i < PLAN_ORDER_ARR.indexOf(currentPlan);
 
             return (
