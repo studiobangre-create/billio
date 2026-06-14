@@ -70,28 +70,28 @@ export default function QuotePage() {
   const isTerminal  = ['invoiced', 'declined', 'expired'].includes(quote.status);
   const canConvert  = !isTerminal;
 
-  function handleCopyLink() {
+  const handleCopyLink = () => {
     navigator.clipboard?.writeText(quoteUrl);
     showToast('Lien copié dans le presse-papiers');
-  }
+  };
 
-  function handleShareEmail() {
+  const handleShareEmail = () => {
     const subject = encodeURIComponent(`Devis #${quote.id} — ${orgSettings.name || 'Billio'}`);
     const body = encodeURIComponent(
       `Bonjour,\n\nVeuillez trouver ci-joint notre devis #${quote.id} d'un montant de ${fmt(total)} F CFA.\n\nObjet : ${quote.subject}\nValide jusqu'au : ${fmtDateLong(quote.valid)}\n\nConsultez le devis en ligne :\n${quoteUrl}\n\nCordialement,\n${orgSettings.name || ''}`.trim()
     );
-    window.open(`mailto:${client.email && client.email !== '—' ? client.email : ''}?subject=${subject}&body=${body}`);
-  }
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  };
 
-  function handleShareWhatsApp() {
+  const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
       `Bonjour,\n\nVoici notre devis *#${quote.id}* d'un montant de *${fmt(total)} F CFA*.\n\n📋 *${quote.subject}*\n📅 Valide jusqu'au ${fmtDateLong(quote.valid)}\n\nConsultez-le ici : ${quoteUrl}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
     posthog.capture('quote_shared_whatsapp', { quote_id: quote.id });
-  }
+  };
 
-  async function handleDownloadPDF() {
+  const handleDownloadPDF = async () => {
     const blob = await pdf(
       <InvoicePDFDocument
         invoice={{ id: quote.id, subject: quote.subject, client: quote.client, issued: quote.issued, due: quote.valid, amount: total, status: 'pending' }}
@@ -107,9 +107,9 @@ export default function QuotePage() {
     a.click();
     URL.revokeObjectURL(url);
     posthog.capture('quote_pdf_downloaded', { quote_id: quote.id });
-  }
+  };
 
-  async function handleConvertToInvoice() {
+  const handleConvertToInvoice = async () => {
     if (converting) return;
     setConverting(true);
     const today   = new Date().toISOString().slice(0, 10);
@@ -118,6 +118,7 @@ export default function QuotePage() {
     const htAmount  = Math.round(total / 1.18);
     const tvaAmount = total - htAmount;
     const newInv = { id: invId, subject: quote.subject, client: quote.client, issued: today, due: dueDate, amount: total, status: 'pending' as const };
+    const prevStatus = quote.status;
     try {
       setInvoices(prev => [newInv, ...prev]);
       setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced' } : q));
@@ -132,11 +133,11 @@ export default function QuotePage() {
     } catch {
       showToast('Erreur lors de la conversion. Veuillez réessayer.', true);
       setInvoices(prev => prev.filter(i => i.id !== invId));
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: quote.status } : q));
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: prevStatus } : q));
     } finally {
       setConverting(false);
     }
-  }
+  };
 
   return (
     <div className="main">
