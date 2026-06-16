@@ -470,11 +470,11 @@ select.form-input {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
 
 .subhead { font-size: 11.5px; color: var(--color-text-secondary); margin-bottom: 9px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
-.line-items-head { display: grid; grid-template-columns: 1fr 52px 88px 28px; gap: 8px; padding: 0 2px 5px; }
+.line-items-head { display: grid; grid-template-columns: 1fr 72px 52px 88px 28px; gap: 8px; padding: 0 2px 5px; }
 .li-col { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); font-weight: 600; }
 .li-col.right { text-align: right; }
 .line-item { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 9px 10px; margin-bottom: 8px; }
-.line-item-row { display: grid; grid-template-columns: 1fr 52px 88px 28px; gap: 8px; align-items: center; }
+.line-item-row { display: grid; grid-template-columns: 1fr 72px 52px 88px 28px; gap: 8px; align-items: center; }
 .li-input {
   padding: 6px 9px; border: 0.5px solid var(--color-border-secondary); border-radius: 6px;
   font-size: 12px; font-family: var(--font-sans);

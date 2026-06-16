@@ -23,11 +23,16 @@ export async function fetchProducts(orgId: string): Promise<Product[]> {
   if (MOCK) return [...INITIAL_PRODUCTS];
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('*, line_items(count)')
     .eq('org_id', orgId)
     .order('name', { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(dbToProduct);
+  return (data ?? []).map(row => {
+    const r = row as Record<string, unknown>;
+    const countArr = r.line_items as Array<{ count: number }> | undefined;
+    const used = countArr?.[0]?.count ?? 0;
+    return dbToProduct({ ...r, used });
+  });
 }
 
 export async function createProduct(

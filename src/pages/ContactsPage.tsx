@@ -467,17 +467,33 @@ export default function ContactsPage() {
   const [supplierFilter, setSupplierFilter] = useState<SupplierFilterKey>('all');
 
   // ── useMemo calls must be unconditional (before any early return) ─────────
+
+  // Compute invoice counts and amounts from the live invoices array — the stored
+  // invoices_count/billed/balance columns on clients are never updated after creation.
+  const clientStatsMap = useMemo(() => {
+    const map = new Map<string, { count: number; billed: number; balance: number }>();
+    for (const inv of invoices) {
+      if (inv.status === 'draft') continue;
+      const s = map.get(inv.client) ?? { count: 0, billed: 0, balance: 0 };
+      s.count  += 1;
+      s.billed += inv.amount;
+      if (inv.status === 'pending' || inv.status === 'overdue') s.balance += inv.amount;
+      map.set(inv.client, s);
+    }
+    return map;
+  }, [invoices]);
+
   const filteredClients = useMemo(() => {
     let list = clients;
     if (clientFilter === 'active')  list = list.filter(c => c.status === 'active');
     if (clientFilter === 'lead')    list = list.filter(c => c.status === 'lead');
-    if (clientFilter === 'balance') list = list.filter(c => c.balance > 0);
+    if (clientFilter === 'balance') list = list.filter(c => (clientStatsMap.get(c.code)?.balance ?? 0) > 0);
     if (clientSearch.trim()) {
       const q = clientSearch.toLowerCase();
       list = list.filter(c => c.name.toLowerCase().includes(q) || c.contact.toLowerCase().includes(q) || c.city.toLowerCase().includes(q));
     }
     return list;
-  }, [clients, clientFilter, clientSearch]);
+  }, [clients, clientFilter, clientSearch, clientStatsMap]);
 
   const supplierBillsAll = bills ?? [];
   const supplierContacts = useMemo((): SupplierContact[] => {
@@ -513,10 +529,10 @@ export default function ContactsPage() {
   if (loading) return <PageSkeleton title="Contacts" variant="accounting" rows={6} />;
 
   // ── Clients computed ──────────────────────────────────────────────────────
-  const totalBilled  = clients.reduce((s, c) => s + c.billed, 0);
-  const outstanding  = clients.reduce((s, c) => s + c.balance, 0);
+  const totalBilled  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.billed, 0);
+  const outstanding  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.balance, 0);
   const activeCount  = clients.filter(c => c.status === 'active').length;
-  const withBalance  = clients.filter(c => c.balance > 0).length;
+  const withBalance  = clients.filter(c => (clientStatsMap.get(c.code)?.balance ?? 0) > 0).length;
   const leadCount    = clients.filter(c => c.status === 'lead').length;
   const clientCounts = { all: clients.length, active: activeCount, lead: leadCount, balance: withBalance };
 
@@ -691,32 +707,35 @@ export default function ContactsPage() {
                 </div>
                 {filteredClients.length === 0 ? (
                   <EmptyState illustration={<ClientsEmptyIllustration />} title="Aucun client trouvé" description="Aucun client ne correspond à votre recherche. Essayez d'autres termes." />
-                ) : filteredClients.map(cl => (
-                  <div key={cl.code} className="client-row client-grid-cols" onClick={() => setClientPanel({ kind: 'detail', code: cl.code })}>
-                    <div className="name-cell">
-                      <div className={`cl-av ${cl.av}`}>{cl.code}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="cl-name">{cl.name}</div>
-                        <div className="cl-contact">{cl.contact}</div>
+                ) : filteredClients.map(cl => {
+                    const stats = clientStatsMap.get(cl.code) ?? { count: 0, billed: 0, balance: 0 };
+                    return (
+                      <div key={cl.code} className="client-row client-grid-cols" onClick={() => setClientPanel({ kind: 'detail', code: cl.code })}>
+                        <div className="name-cell">
+                          <div className={`cl-av ${cl.av}`}>{cl.code}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="cl-name">{cl.name}</div>
+                            <div className="cl-contact">{cl.contact}</div>
+                          </div>
+                        </div>
+                        <div className="loc-cell"><Icon name="map-pin" size={14} />{cl.city}</div>
+                        <div className="inv-count tnum">{stats.count} <span>facture{stats.count !== 1 ? 's' : ''}</span></div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="billed tnum">{fmt(stats.billed)}<span className="cur">F CFA</span></div>
+                          {stats.balance > 0
+                            ? <div className="billed-sub bal">{fmt(stats.balance)} F CFA dû</div>
+                            : stats.billed > 0
+                              ? <div className="billed-sub clear">Tout réglé</div>
+                              : <div className="billed-sub" style={{ color: 'var(--color-text-tertiary)' }}>Aucune facture</div>
+                          }
+                        </div>
+                        <div><span className={`status-pill s-${cl.status}`}>{CLIENT_STATUS_LABEL[cl.status]}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--color-text-tertiary)' }}>
+                          <Icon name="chevron-right" size={16} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="loc-cell"><Icon name="map-pin" size={14} />{cl.city}</div>
-                    <div className="inv-count tnum">{cl.invoices} <span>facture{cl.invoices !== 1 ? 's' : ''}</span></div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="billed tnum">{fmt(cl.billed)}<span className="cur">F CFA</span></div>
-                      {cl.balance > 0
-                        ? <div className="billed-sub bal">{fmt(cl.balance)} F CFA dû</div>
-                        : cl.billed > 0
-                          ? <div className="billed-sub clear">Tout réglé</div>
-                          : <div className="billed-sub" style={{ color: 'var(--color-text-tertiary)' }}>Aucune facture</div>
-                      }
-                    </div>
-                    <div><span className={`status-pill s-${cl.status}`}>{CLIENT_STATUS_LABEL[cl.status]}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--color-text-tertiary)' }}>
-                      <Icon name="chevron-right" size={16} />
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
                 {/* Table footer */}
                 {filteredClients.length > 0 && (
                   <div className="dir-foot">
@@ -724,8 +743,8 @@ export default function ContactsPage() {
                       {filteredClients.length} sur {clients.length} client{clients.length !== 1 ? 's' : ''}
                     </span>
                     <div className="dir-foot-r">
-                      <span>Facturé<b>{fmt(filteredClients.reduce((a, c) => a + c.billed, 0))} F CFA</b></span>
-                      <span>Solde impayé<b className={filteredClients.reduce((a, c) => a + c.balance, 0) > 0 ? 'due' : ''}>{fmt(filteredClients.reduce((a, c) => a + c.balance, 0))} F CFA</b></span>
+                      <span>Facturé<b>{fmt(filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.billed ?? 0), 0))} F CFA</b></span>
+                      <span>Solde impayé<b className={filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.balance ?? 0), 0) > 0 ? 'due' : ''}>{fmt(filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.balance ?? 0), 0))} F CFA</b></span>
                     </div>
                   </div>
                 )}
@@ -838,11 +857,11 @@ export default function ContactsPage() {
               <div className="stat-row">
                 <div className="stat-box">
                   <div className="stat-label">Total facturé</div>
-                  <div className="stat-val tnum">{fmtCompact(detailClient.billed)}<span className="cur">F CFA</span></div>
+                  <div className="stat-val tnum">{fmtCompact(clientStatsMap.get(detailClient.code)?.billed ?? 0)}<span className="cur">F CFA</span></div>
                 </div>
                 <div className="stat-box">
                   <div className="stat-label">Solde impayé</div>
-                  <div className={'stat-val tnum' + (detailClient.balance > 0 ? ' bal' : '')}>{fmtCompact(detailClient.balance)}<span className="cur">F CFA</span></div>
+                  <div className={'stat-val tnum' + ((clientStatsMap.get(detailClient.code)?.balance ?? 0) > 0 ? ' bal' : '')}>{fmtCompact(clientStatsMap.get(detailClient.code)?.balance ?? 0)}<span className="cur">F CFA</span></div>
                 </div>
               </div>
               <div className="detail-block">

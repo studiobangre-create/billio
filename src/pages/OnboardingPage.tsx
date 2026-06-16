@@ -234,18 +234,9 @@ export default function OnboardingPage() {
 
   /* ── finish: save to Supabase ── */
   async function handleFinish() {
+    if (!orgId) return;
     setSaving(true);
     try {
-      // Ensure an org exists — call the RPC if the trigger didn't fire on signup
-      let resolvedOrgId = orgId;
-      if (!resolvedOrgId) {
-        const { data: newOrgId, error: rpcErr } = await supabase.rpc('create_initial_org', {
-          p_name: bizName.trim() || 'Mon entreprise',
-        });
-        if (rpcErr) throw rpcErr;
-        resolvedOrgId = newOrgId as string;
-      }
-
       // Step 1 + Step 2 — org details and invoice defaults
       const { error: orgErr } = await supabase
         .from('organizations')
@@ -265,7 +256,7 @@ export default function OnboardingPage() {
           invoice_footer:        footer,
           onboarding_completed_at: new Date().toISOString(),
         })
-        .eq('id', resolvedOrgId);
+        .eq('id', orgId);
       if (orgErr) throw orgErr;
 
       // Step 3 — team invitations
@@ -282,7 +273,7 @@ export default function OnboardingPage() {
             teamInvites.map(t => ({
               id:         t.id,
               token:      t.id,
-              org_id:     resolvedOrgId,
+              org_id:     orgId,
               email:      t.email.toLowerCase().trim(),
               role:       ROLE_MAP[t.role] ?? 'member',
               invited_by: userId || undefined,
@@ -296,7 +287,7 @@ export default function OnboardingPage() {
       if (clients.length > 0) {
         const { error: cliErr } = await supabase.from('clients').insert(
           clients.map((c, i) => ({
-            org_id:     resolvedOrgId,
+            org_id:     orgId,
             created_by: userId || undefined,
             code:       `CLI-${String(i + 1).padStart(4, '0')}`,
             name:       c.name,
@@ -318,7 +309,7 @@ export default function OnboardingPage() {
         team_invites:          teamInvites.length,
         time_to_complete_seconds: Math.round((Date.now() - startTimeRef.current) / 1000),
       });
-      completeOnboarding(bizName.trim() || 'Mon entreprise', resolvedOrgId !== orgId ? resolvedOrgId : undefined);
+      completeOnboarding(bizName.trim() || 'Mon entreprise');
       navigate('/dashboard');
     } catch (err) {
       console.error('Onboarding save error:', err);

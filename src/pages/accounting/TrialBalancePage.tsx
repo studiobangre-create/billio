@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Icon from '../../components/Icon';
 import { PageSkeleton } from '../../components/SkeletonLoader';
 import KPIStrip from '../../components/accounting/KPIStrip';
@@ -6,15 +6,47 @@ import DrawerPanel from '../../components/accounting/DrawerPanel';
 import JournalBadge from '../../components/accounting/JournalBadge';
 import { EmptyState } from '../../components/EmptyState';
 import { AccountMovementsEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
-import type { Account, AccountClass, Journal } from '../../lib/accounting-data';
-import { fmt, fmtCompact, clsOf, openingOf, ledgerOf } from '../../lib/accounting-data';
+import type { Account, AccountClass, Journal, LedgerRow } from '../../lib/accounting-data';
+import { fmt, fmtCompact, clsOf, openingOf } from '../../lib/accounting-data';
 import { useTrialBalance, useBalanceFns } from '../../lib/accounting-hooks';
+import { useApp } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 
 function LedgerDrawer({
   account, classes, journals, onClose,
 }: { account: Account; classes: Record<number, AccountClass>; journals: Record<string, Journal>; onClose: () => void }) {
-  const ledger = ledgerOf(account.num);
+  const { orgId } = useApp();
+  const [ledger, setLedger] = useState<LedgerRow[]>([]);
+  const [loadingLedger, setLoadingLedger] = useState(true);
   const opening = openingOf(account.num);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setLoadingLedger(true);
+    supabase
+      .from('journal_entries')
+      .select('id, date, piece, label, posted, journals!inner(code), entry_lines!inner(account_num, debit, credit)')
+      .eq('org_id', orgId)
+      .eq('entry_lines.account_num', account.num)
+      .eq('posted', true)
+      .order('date', { ascending: true })
+      .then(({ data }) => {
+        if (!data) return;
+        let running = openingOf(account.num);
+        const rows: LedgerRow[] = [];
+        for (const e of data as Array<Record<string, unknown>>) {
+          const j = e.journals as Record<string, unknown>;
+          const lines = (e.entry_lines as Array<Record<string, unknown>>) ?? [];
+          for (const l of lines) {
+            const d = Number(l.debit), c = Number(l.credit);
+            running += d - c;
+            rows.push({ entry: { id: String(e.id), date: String(e.date), piece: String(e.piece), label: String(e.label), journal: String(j?.code ?? ''), lines: [], posted: Boolean(e.posted) }, d, c, running });
+          }
+        }
+        setLedger(rows);
+      })
+      .finally(() => setLoadingLedger(false));
+  }, [orgId, account.num]);
   const cls = clsOf(account.num);
   const clsInfo = classes[cls];
 
@@ -40,7 +72,22 @@ function LedgerDrawer({
         </div>
       )}
 
-      {ledger.length === 0 ? (
+      {loadingLedger ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '13px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="skel" style={{ width: '65%', height: 12, borderRadius: 5 }} />
+                <div className="skel" style={{ width: '40%', height: 10, borderRadius: 5 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                <div className="skel" style={{ width: 72, height: 12, borderRadius: 5 }} />
+                <div className="skel" style={{ width: 52, height: 10, borderRadius: 5 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : ledger.length === 0 ? (
         <EmptyState
           illustration={<AccountMovementsEmptyIllustration />}
           title="Aucun mouvement"

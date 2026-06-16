@@ -7,10 +7,10 @@ import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { createQuote, updateQuote, removeQuote } from '../lib/api/quotes';
-import { createInvoice } from '../lib/api/invoices';
+import { createInvoice, nextInvoiceId } from '../lib/api/invoices';
 import { fetchLineItems, saveLineItems } from '../lib/api/line-items';
 import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
-import { fmt, fmtDate, newLineItem, nextId } from '../data';
+import { fmt, fmtDate, newLineItem } from '../data';
 import type { LineItem, QuoteStatus, Quote } from '../lib/schemas';
 
 type FilterKey = 'all' | QuoteStatus;
@@ -35,8 +35,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 function nextQuoteId(quotes: Quote[]): string {
-  const nums = quotes.map(q => parseInt(q.id.split('-')[1], 10));
-  return 'DEV-' + String(Math.max(...nums) + 1).padStart(4, '0');
+  const nums = quotes.map(q => parseInt(q.id.split('-')[1], 10)).filter(n => isFinite(n));
+  const next  = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  return 'DEV-' + String(next).padStart(4, '0');
 }
 
 function fmtCompact(n: number) {
@@ -48,7 +49,7 @@ function fmtCompact(n: number) {
 const TVA = 0.18;
 
 export default function QuotesPage() {
-  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, products, orgId, loading } = useApp();
+  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const navigate = useNavigate();
 
   if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
@@ -68,6 +69,7 @@ export default function QuotesPage() {
   ]);
   const [showPicker, setShowPicker]   = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
+  const convertingRef = useRef<Set<string>>(new Set());
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,13 +89,14 @@ export default function QuotesPage() {
   function addFromProduct(productId: string) {
     const p = products.find(pr => pr.id === productId);
     if (!p) return;
-    setLines(prev => [...prev, newLineItem(p.name, 1, p.price)]);
+    setLines(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
     setShowPicker(false);
     setPickerQuery('');
   }
 
+  const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
   const subtotal = lines.reduce((s, li) => s + li.qty * li.price, 0);
-  const tax      = Math.round(subtotal * TVA);
+  const tax      = canInvoiceTVA ? Math.round(subtotal * TVA) : 0;
   const total    = subtotal + tax;
 
   // Metrics
@@ -131,10 +134,10 @@ export default function QuotesPage() {
   function removeLine(id: string) {
     setLines(prev => prev.length > 1 ? prev.filter(l => l.id !== id) : prev);
   }
-  function updateLine(id: string, field: 'desc' | 'qty' | 'price', val: string) {
+  function updateLine(id: string, field: 'desc' | 'unit' | 'qty' | 'price', val: string) {
     setLines(prev => prev.map(l => l.id !== id ? l : {
       ...l,
-      [field]: field === 'desc' ? val : parseFloat(val) || 0,
+      [field]: field === 'desc' || field === 'unit' ? val : parseFloat(val) || 0,
     }));
   }
 
@@ -155,43 +158,50 @@ export default function QuotesPage() {
 
   async function convertToInvoice(id: string, e: React.MouseEvent) {
     e.stopPropagation();
+    if (convertingRef.current.has(id)) return;
     const quote = quotes.find(q => q.id === id);
     if (!quote) return;
+    convertingRef.current.add(id);
 
-    const today   = new Date().toISOString().slice(0, 10);
-    const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-    const invId   = nextId(invoices);
-    const cName   = clientsMap[quote.client]?.name ?? quote.client;
-    const htAmount  = Math.round(quote.amount / 1.18);
-    const tvaAmount = quote.amount - htAmount;
+    try {
+      const today   = new Date().toISOString().slice(0, 10);
+      const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+      const invId   = await nextInvoiceId(orgId);
+      const cName   = clientsMap[quote.client]?.name ?? quote.client;
+      const htAmount  = canInvoiceTVA ? Math.round(quote.amount / 1.18) : quote.amount;
+      const tvaAmount = canInvoiceTVA ? quote.amount - htAmount : 0;
 
-    const newInv = {
-      id:      invId,
-      subject: quote.subject,
-      client:  quote.client,
-      issued:  today,
-      due:     dueDate,
-      amount:  quote.amount,
-      status:  'pending' as const,
-    };
+      const newInv = {
+        id:      invId,
+        subject: quote.subject,
+        client:  quote.client,
+        issued:  today,
+        due:     dueDate,
+        amount:  quote.amount,
+        status:  'pending' as const,
+      };
 
-    setInvoices(prev => [newInv, ...prev]);
-    setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
+      const quoteLines = await fetchLineItems(undefined, id);
+      await createInvoice(orgId, newInv);
+      await saveLineItems(orgId, quoteLines.map(l => ({ ...l })), { invoiceId: invId });
+      await updateQuote(id, { status: 'invoiced' });
 
-    const quoteLines = await fetchLineItems(undefined, id);
-    await createInvoice(orgId, newInv);
-    await saveLineItems(orgId, quoteLines.map(l => ({ ...l })), { invoiceId: invId });
-    await updateQuote(id, { status: 'invoiced' });
-    await recordInvoiceIssuanceEntry(orgId, {
-      invoiceId:  invId,
-      htAmount,
-      tvaAmount,
-      date:       today,
-      clientName: cName,
-    });
+      setInvoices(prev => [newInv, ...prev]);
+      setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
 
-    posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invId });
-    showToast(`Devis ${id} → Facture #${invId} créée`);
+      posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invId });
+      showToast(`Devis ${id} → Facture #${invId} créée`);
+
+      recordInvoiceIssuanceEntry(orgId, {
+        invoiceId:  invId,
+        htAmount,
+        tvaAmount,
+        date:       today,
+        clientName: cName,
+      }).catch(err => console.error('[recordInvoiceIssuanceEntry] failed:', err));
+    } finally {
+      convertingRef.current.delete(id);
+    }
   }
 
   function sendReminder(id: string, e: React.MouseEvent) {
@@ -449,6 +459,7 @@ export default function QuotesPage() {
           <div className="subhead">Lignes</div>
           <div className="line-items-head">
             <div className="li-col">Description</div>
+            <div className="li-col">Unité</div>
             <div className="li-col right">Qté</div>
             <div className="li-col right">Prix</div>
             <div />
@@ -464,6 +475,15 @@ export default function QuotesPage() {
                   value={li.desc}
                   onChange={e => updateLine(li.id, 'desc', e.target.value)}
                 />
+                <select
+                  className="li-input"
+                  value={li.unit ?? 'unité'}
+                  onChange={e => updateLine(li.id, 'unit', e.target.value)}
+                >
+                  {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   className="li-input num"
@@ -524,13 +544,15 @@ export default function QuotesPage() {
           {/* Totals */}
           <div className="total-block">
             <div className="total-row">
-              <span>Sous-total</span>
+              <span>Sous-total HT</span>
               <span>{fmt(subtotal)} F CFA</span>
             </div>
-            <div className="total-row">
-              <span>TVA (18%)</span>
-              <span>{fmt(tax)} F CFA</span>
-            </div>
+            {canInvoiceTVA && (
+              <div className="total-row">
+                <span>TVA (18%)</span>
+                <span>{fmt(tax)} F CFA</span>
+              </div>
+            )}
             <div className="total-row final">
               <span>Total estimé</span>
               <span>{fmt(total)} F CFA</span>

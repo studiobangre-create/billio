@@ -16,21 +16,23 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { hasFeature as checkFeature, type PlanId, type PlanStatus, type Feature } from '../lib/plans';
 
 export interface OrgSettings {
-  name:           string;
-  address:        string;
-  city:           string;
-  country:        string;
-  email:          string;
-  phone:          string;
-  ifu:            string;
-  rccm:           string;
-  taxRegime:      string;
-  divisionFiscale: string;
+  name:                 string;
+  address:              string;
+  city:                 string;
+  country:              string;
+  email:                string;
+  phone:                string;
+  ifu:                  string;
+  rccm:                 string;
+  taxRegime:            string;
+  divisionFiscale:      string;
+  /** ISO date string (YYYY-MM-DD) — used for first-year IS exemption and threshold prorating */
+  businessCreationDate: string;
 }
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '' };
+const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', businessCreationDate: '' };
 
 interface AppContextValue {
   // Entities
@@ -152,7 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         const { data: org, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
+          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, business_creation_date, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
           .eq('id', resolvedOrgId)
           .single();
         if (orgErr) {
@@ -172,8 +174,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             phone:          org.phone           ?? '',
             ifu:            org.ifu             ?? '',
             rccm:           org.rccm            ?? '',
-            taxRegime:      org.tax_regime      ?? '',
-            divisionFiscale: org.division_fiscale ?? '',
+            taxRegime:            org.tax_regime            ?? '',
+            divisionFiscale:      org.division_fiscale      ?? '',
+            businessCreationDate: org.business_creation_date ?? '',
           });
           const rawPlan = org.plan as string | null;
           const validPlans: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];

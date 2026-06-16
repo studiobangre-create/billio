@@ -159,6 +159,6 @@ export function nextId(invoices: Invoice[]): string {
   return 'INV-' + String(max + 1).padStart(4, '0');
 }
 
-export function newLineItem(desc = '', qty = 1, price = 0): LineItem {
-  return { id: crypto.randomUUID(), desc, qty, price };
+export function newLineItem(desc = '', qty = 1, price = 0, unit = 'unité', productId?: string): LineItem {
+  return { id: crypto.randomUUID(), desc, unit, qty, price, ...(productId ? { productId } : {}) };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
@@ -6,11 +6,11 @@ import Icon from '../components/Icon';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { updateQuote } from '../lib/api/quotes';
-import { createInvoice } from '../lib/api/invoices';
-import { fetchLineItems, saveLineItems } from '../lib/api/line-items';
+import { createInvoice, nextInvoiceId, removeInvoice } from '../lib/api/invoices';
+import { fetchLineItems, saveLineItems, deleteLineItems } from '../lib/api/line-items';
 import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
 import { InvoicePDFDocument } from '../components/InvoicePDF';
-import { fmt, fmtDateLong, nextId } from '../data';
+import { fmt, fmtDateLong, newLineItem } from '../data';
 import type { LineItem } from '../lib/schemas';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,12 +32,34 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, invoices, setInvoices, showToast, clientsMap, orgSettings, orgId, loading } = useApp();
+  const { quotes, setQuotes, invoices, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const [lines, setLines] = useState<LineItem[]>([]);
   const [converting, setConverting] = useState(false);
+  const convertingRef = useRef(false);
+
+  // Edit panel state
+  const [editOpen,    setEditOpen]    = useState(false);
+  const [eClient,     setEClient]     = useState('');
+  const [eSubject,    setESubject]    = useState('');
+  const [eDate,       setEDate]       = useState('');
+  const [eValid,      setEValid]      = useState('');
+  const [eLines,      setELines]      = useState<LineItem[]>([]);
+  const [saving,      setSaving]      = useState(false);
+  const [showPicker,  setShowPicker]  = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (id) fetchLineItems(undefined, id).then(setLines).catch(() => setLines([]));
+    if (!showPicker) return;
+    function onClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showPicker]);
+
+  useEffect(() => {
+    if (id) fetchLineItems(undefined, id).then(setLines).catch(err => { console.error('[QuotePage] fetchLineItems error:', err); setLines([]); });
   }, [id]);
 
   if (loading) return <PageSkeleton title="Devis" variant="table-only" metrics={0} rows={4} />;
@@ -61,14 +83,72 @@ export default function QuotePage() {
     );
   }
 
-  const client   = clientsMap[quote.client] ?? { name: quote.client, city: '—', av: 'av-a' };
-  const subtotal = lines.reduce((s, li) => s + li.qty * li.price, 0);
-  const tax      = Math.round(subtotal * 0.18);
-  const total    = subtotal + tax;
+  const client       = clientsMap[quote.client] ?? { name: quote.client, city: '—', av: 'av-a' };
+  const subtotal     = lines.reduce((s, li) => s + li.qty * li.price, 0);
+  const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
+  const tax          = canInvoiceTVA ? Math.round(subtotal * 0.18) : 0;
+  const total        = subtotal + tax;
 
   const quoteUrl    = window.location.href;
   const isTerminal  = ['invoiced', 'declined', 'expired'].includes(quote.status);
   const canConvert  = !isTerminal;
+  const canEdit     = !isTerminal;
+
+  const eSubtotal = eLines.reduce((s, l) => s + l.qty * l.price, 0);
+  const eTax      = canInvoiceTVA ? Math.round(eSubtotal * 0.18) : 0;
+  const eTotal    = eSubtotal + eTax;
+
+  const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
+
+  const openEdit = () => {
+    setEClient(quote.client);
+    setESubject(quote.subject);
+    setEDate(quote.issued);
+    setEValid(quote.valid);
+    setELines(lines.length ? lines.map(l => ({ ...l })) : [newLineItem()]);
+    setEditOpen(true);
+  };
+
+  const updateELine = (lid: string, field: string, val: string) => {
+    const asNum = Number(val);
+    setELines(prev => prev.map(l => l.id === lid
+      ? { ...l, [field]: field === 'qty' || field === 'price' ? (isNaN(asNum) ? 0 : asNum) : val }
+      : l));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!eClient) { showToast('Veuillez sélectionner un client.', true); return; }
+    if (!eDate)   { showToast('La date du devis est requise.', true); return; }
+    if (!eValid)  { showToast('La date de validité est requise.', true); return; }
+    if (eValid < eDate) { showToast('La date de validité doit être après la date du devis.', true); return; }
+    if (eSubtotal <= 0) { showToast('Ajoutez au moins une ligne.', true); return; }
+    setSaving(true);
+    const prevLines = lines;
+    try {
+      await updateQuote(quote.id, { subject: eSubject.trim() || 'Devis sans titre', client: eClient, issued: eDate, valid: eValid, amount: eTotal });
+      await deleteLineItems({ quoteId: quote.id });
+      try {
+        await saveLineItems(orgId, eLines, { quoteId: quote.id });
+      } catch (lineErr) {
+        // Restore original lines so the quote is not left empty in the DB
+        if (prevLines.length > 0) {
+          await saveLineItems(orgId, prevLines, { quoteId: quote.id }).catch(() => {});
+        }
+        throw lineErr;
+      }
+      setQuotes(prev => prev.map(q => q.id === quote.id
+        ? { ...q, subject: eSubject.trim() || 'Devis sans titre', client: eClient, issued: eDate, valid: eValid, amount: eTotal }
+        : q));
+      setLines(eLines);
+      setEditOpen(false);
+      showToast('Devis mis à jour');
+    } catch (err) {
+      console.error('Edit quote failed:', err);
+      showToast('Erreur lors de la mise à jour', true);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(quoteUrl);
@@ -92,10 +172,15 @@ export default function QuotePage() {
   };
 
   const handleDownloadPDF = async () => {
+    const pdfLines   = editOpen ? eLines : lines;
+    const pdfSubject = editOpen ? (eSubject.trim() || 'Devis sans titre') : quote.subject;
+    const pdfIssued  = editOpen ? eDate : quote.issued;
+    const pdfValid   = editOpen ? eValid : quote.valid;
+    const pdfAmount  = editOpen ? eTotal : total;
     const blob = await pdf(
       <InvoicePDFDocument
-        invoice={{ id: quote.id, subject: quote.subject, client: quote.client, issued: quote.issued, due: quote.valid, amount: total, status: 'pending' }}
-        lines={lines}
+        invoice={{ id: quote.id, subject: pdfSubject, client: quote.client, issued: pdfIssued, due: pdfValid, amount: pdfAmount, status: 'pending' }}
+        lines={pdfLines}
         client={client}
         biz={orgSettings}
       />
@@ -110,36 +195,56 @@ export default function QuotePage() {
   };
 
   const handleConvertToInvoice = async () => {
-    if (converting) return;
+    if (convertingRef.current) return;
+    convertingRef.current = true;
     setConverting(true);
     const today   = new Date().toISOString().slice(0, 10);
     const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-    const invId   = nextId(invoices);
-    const htAmount  = Math.round(total / 1.18);
-    const tvaAmount = total - htAmount;
-    const newInv = { id: invId, subject: quote.subject, client: quote.client, issued: today, due: dueDate, amount: total, status: 'pending' as const };
-    const prevStatus = quote.status;
+    let invId: string | undefined;
+    let invoiceCreated = false;
     try {
-      setInvoices(prev => [newInv, ...prev]);
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced' } : q));
+      invId = await nextInvoiceId(orgId);
+      // Use the stored quote.amount to avoid drift if orgSettings.taxRegime changed
+      // after the quote was issued.
+      const invAmount = quote.amount;
+      const htAmount  = canInvoiceTVA ? Math.round(invAmount / 1.18) : invAmount;
+      const tvaAmount = canInvoiceTVA ? invAmount - htAmount : 0;
+      const newInv = { id: invId, subject: quote.subject, client: quote.client, issued: today, due: dueDate, amount: invAmount, status: 'pending' as const };
       const quoteLines = await fetchLineItems(undefined, quote.id);
       await createInvoice(orgId, newInv);
+      invoiceCreated = true;
       await saveLineItems(orgId, quoteLines, { invoiceId: invId });
       await updateQuote(quote.id, { status: 'invoiced' });
-      await recordInvoiceIssuanceEntry(orgId, { invoiceId: invId, htAmount, tvaAmount, date: today, clientName: client.name });
+
+      setInvoices(prev => [newInv, ...prev]);
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced' } : q));
       posthog.capture('quote_converted_to_invoice', { quote_id: quote.id, invoice_id: invId });
       showToast(`Devis ${quote.id} → Facture #${invId} créée`);
+
+      recordInvoiceIssuanceEntry(orgId, { invoiceId: invId, htAmount, tvaAmount, date: today, clientName: client.name })
+        .catch(err => {
+          console.error('[recordInvoiceIssuanceEntry] failed:', err);
+          showToast('Écriture comptable non enregistrée. Vérifiez la comptabilité.', true);
+        });
+
       navigate(`/invoices/${invId}`);
     } catch {
       showToast('Erreur lors de la conversion. Veuillez réessayer.', true);
-      setInvoices(prev => prev.filter(i => i.id !== invId));
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: prevStatus } : q));
+      if (invoiceCreated && invId) {
+        const id = invId;
+        deleteLineItems({ invoiceId: id })
+          .catch(() => {})
+          .then(() => removeInvoice(id))
+          .catch(e => console.error('[rollback] removeInvoice failed:', e));
+      }
     } finally {
+      convertingRef.current = false;
       setConverting(false);
     }
   };
 
   return (
+    <>
     <div className="main">
       <div className="topbar">
         <div className="crumbs">
@@ -155,6 +260,11 @@ export default function QuotePage() {
           <button className="btn" onClick={handleDownloadPDF}>
             <Icon name="printer" ariaHidden /> Télécharger PDF
           </button>
+          {canEdit && (
+            <button className="btn" onClick={openEdit} disabled={converting}>
+              <Icon name="edit" ariaHidden /> Modifier
+            </button>
+          )}
           {canConvert && (
             <button className="btn btn-primary" onClick={handleConvertToInvoice} disabled={converting}>
               <Icon name="arrow-right" ariaHidden />
@@ -222,6 +332,7 @@ export default function QuotePage() {
               <thead>
                 <tr>
                   <th>Description</th>
+                  <th>Unité</th>
                   <th className="r">Qté</th>
                   <th className="r">Prix unitaire</th>
                   <th className="r">Montant</th>
@@ -229,10 +340,11 @@ export default function QuotePage() {
               </thead>
               <tbody>
                 {lines.length === 0 ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '16px 0' }}>Aucune ligne</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: '16px 0' }}>Aucune ligne</td></tr>
                 ) : lines.map(li => (
                   <tr key={li.id}>
                     <td><div className="li-desc">{li.desc}</div></td>
+                    <td style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>{li.unit ?? 'unité'}</td>
                     <td className="r">{li.qty}</td>
                     <td className="r">{fmt(li.price)}</td>
                     <td className="r">{fmt(li.qty * li.price)}</td>
@@ -244,7 +356,9 @@ export default function QuotePage() {
             <div className="pp-totals">
               <div className="pp-totals-inner">
                 <div className="tot-row"><span>Sous-total</span><span className="tv">{fmt(subtotal)} F CFA</span></div>
-                <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>
+                {canInvoiceTVA && (
+                  <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>
+                )}
                 <div className="tot-row grand"><span>Total estimé</span><span className="tv">{fmt(total)} F CFA</span></div>
               </div>
             </div>
@@ -321,5 +435,129 @@ export default function QuotePage() {
         </div>
       </div>
     </div>
+
+    {/* Edit panel */}
+    <div className={`scrim${editOpen ? ' open' : ''}`} onClick={() => { if (!saving) setEditOpen(false); }} />
+    <div className={`new-inv-panel${editOpen ? ' open' : ''}`} role="dialog" aria-label="Modifier le devis" aria-modal="true">
+      <div className="panel-slide-head">
+        <div>
+          <div className="panel-slide-title">Modifier le devis</div>
+          <div className="panel-slide-sub">#{quote.id}</div>
+        </div>
+        <button className="icon-btn" onClick={() => setEditOpen(false)} aria-label="Fermer" disabled={saving}>
+          <Icon name="x" size={15} ariaHidden />
+        </button>
+      </div>
+
+      <div className="panel-body">
+        <div className="form-group">
+          <label className="form-label">Client</label>
+          <select className="form-input" value={eClient} onChange={e => setEClient(e.target.value)}>
+            <option value="">Sélectionner un client…</option>
+            {Object.entries(clientsMap).map(([code, c]) => (
+              <option key={code} value={code}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Date du devis</label>
+            <input type="date" className="form-input" value={eDate} onChange={e => setEDate(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Valide jusqu'au</label>
+            <input type="date" className="form-input" value={eValid} onChange={e => setEValid(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Objet</label>
+          <input type="text" className="form-input" placeholder="ex. Refonte site web — périmètre complet"
+            maxLength={255} value={eSubject} onChange={e => setESubject(e.target.value)} />
+        </div>
+
+        <div className="subhead">Lignes</div>
+        <div className="line-items-head">
+          <div className="li-col">Description</div>
+          <div className="li-col">Unité</div>
+          <div className="li-col right">Qté</div>
+          <div className="li-col right">Prix</div>
+          <div />
+        </div>
+
+        {eLines.map(li => (
+          <div key={li.id} className="line-item">
+            <div className="line-item-row">
+              <input className="li-input" placeholder="Description du service" value={li.desc}
+                onChange={e => updateELine(li.id, 'desc', e.target.value)} />
+              <select className="li-input" value={li.unit ?? 'unité'}
+                onChange={e => updateELine(li.id, 'unit', e.target.value)}>
+                {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+              <input className="li-input num" type="number" min="0" value={li.qty}
+                onChange={e => updateELine(li.id, 'qty', e.target.value)} />
+              <input className="li-input num" type="number" min="0" value={li.price || ''}
+                placeholder="0" onChange={e => updateELine(li.id, 'price', e.target.value)} />
+              <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label="Supprimer la ligne">
+                <Icon name="trash" size={15} ariaHidden />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <div className="line-actions">
+          <button className="add-line" onClick={() => setELines(prev => [...prev, newLineItem()])}>
+            <Icon name="plus" size={14} ariaHidden /> Ajouter une ligne
+          </button>
+          {products.length > 0 && (
+            <div className="product-picker-wrap" ref={pickerRef}>
+              <button className="catalog-btn" onClick={() => setShowPicker(v => !v)}>
+                <Icon name="package" size={14} ariaHidden /> Depuis le catalogue
+              </button>
+              {showPicker && (
+                <div className="product-picker-dropdown">
+                  <input autoFocus placeholder="Rechercher…" value={pickerQuery}
+                    onChange={e => setPickerQuery(e.target.value)} />
+                  {filteredProducts.length === 0
+                    ? <div className="picker-empty">Aucun produit trouvé</div>
+                    : filteredProducts.map(p => (
+                        <div key={p.id} className="picker-item" onClick={() => {
+                          setELines(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
+                          setShowPicker(false); setPickerQuery('');
+                        }}>
+                          <div>
+                            <div className="picker-item-name">{p.name}</div>
+                            <div className="picker-item-meta">{p.unit}</div>
+                          </div>
+                          <div className="picker-item-price">{fmt(p.price)} F</div>
+                        </div>
+                      ))
+                  }
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="total-block">
+          <div className="total-row"><span>Sous-total HT</span><span>{fmt(eSubtotal)} F CFA</span></div>
+          {canInvoiceTVA && <div className="total-row"><span>TVA (18 %)</span><span>{fmt(eTax)} F CFA</span></div>}
+          <div className="total-row final"><span>Total estimé</span><span>{fmt(eTotal)} F CFA</span></div>
+        </div>
+      </div>
+
+      <div className="panel-footer">
+        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditOpen(false)} disabled={saving}>
+          Annuler
+        </button>
+        <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={saving} onClick={handleSaveEdit}>
+          <Icon name="check" ariaHidden /> {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+    </>
   );
 }

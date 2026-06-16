@@ -11,13 +11,13 @@ import { recordInvoicePaymentEntry } from '../lib/api/accounting';
 import { fmt, fmtDate } from '../data';
 import type { PayMethod, PayStatus, Payment } from '../lib/schemas';
 
-type FilterKey = 'all' | 'cash' | 'wave' | 'momo' | 'card' | 'online' | 'pending';
+type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
 
 const METHOD_META: Record<PayMethod, { label: string; icon: string; cls: string; sub: string }> = {
-  cash: { label: 'Cash',         icon: 'cash',          cls: 'm-cash', sub: 'En personne'    },
-  wave: { label: 'Wave',         icon: 'wave',          cls: 'm-wave', sub: 'Transfert Wave'  },
-  momo: { label: 'Mobile Money', icon: 'device-mobile', cls: 'm-momo', sub: 'MTN / Orange'    },
-  card: { label: 'Carte',        icon: 'credit-card',   cls: 'm-card', sub: 'Visa / Mastercard' },
+  cash:   { label: 'Cash',         icon: 'cash',          cls: 'm-cash',   sub: 'En personne'     },
+  wire:   { label: 'Virement',     icon: 'building-bank', cls: 'm-wire',   sub: 'Virement bancaire' },
+  momo:   { label: 'Mobile Money', icon: 'device-mobile', cls: 'm-momo',   sub: 'MTN / Orange'    },
+  cheque: { label: 'Chèque',       icon: 'writing',       cls: 'm-cheque', sub: 'Chèque bancaire'  },
 };
 
 
@@ -31,17 +31,17 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Tous'          },
   { key: 'online',  label: 'En ligne'      },
   { key: 'momo',    label: 'Mobile Money'  },
-  { key: 'wave',    label: 'Wave'          },
-  { key: 'card',    label: 'Carte'         },
+  { key: 'wire',    label: 'Virement'      },
+  { key: 'cheque',  label: 'Chèque'        },
   { key: 'cash',    label: 'Cash'          },
   { key: 'pending', label: 'En attente'    },
 ];
 
 const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
-  cash: { label: 'Numéro de reçu',    placeholder: 'Reçu #0212'          },
-  wave: { label: 'Référence Wave',    placeholder: '#WV0000'              },
-  momo: { label: 'ID de transaction', placeholder: 'Réf MTN / Orange'    },
-  card: { label: 'Référence Paystack', placeholder: 'ch_3PXyZ...'         },
+  cash:   { label: 'Numéro de reçu',      placeholder: 'Reçu #0212'       },
+  wire:   { label: 'Référence virement',   placeholder: '#WV0000'          },
+  momo:   { label: 'ID de transaction',    placeholder: 'Réf MTN / Orange' },
+  cheque: { label: 'Numéro de chèque',     placeholder: 'CHQ-0001'         },
 };
 
 function fmtCompact(n: number) {
@@ -69,17 +69,17 @@ export default function PaymentsPage() {
   // Metrics
   const completed = payments.filter(p => p.status === 'completed');
   const total     = completed.reduce((s, p) => s + p.amount, 0);
-  const byMethod  = { cash: 0, wave: 0, momo: 0, card: 0 } as Record<PayMethod, number>;
+  const byMethod  = { cash: 0, wire: 0, momo: 0, cheque: 0 } as Record<PayMethod, number>;
   completed.forEach(p => { byMethod[p.method] += p.amount; });
   const share = (m: PayMethod) => total ? Math.round((byMethod[m] / total) * 100) : 0;
 
   const counts: Record<FilterKey, number> = {
     all:     payments.length,
     online:  payments.filter(p => p.source === 'online').length,
-    cash:    payments.filter(p => p.method === 'cash').length,
-    wave:    payments.filter(p => p.method === 'wave').length,
-    momo:    payments.filter(p => p.method === 'momo').length,
-    card:    payments.filter(p => p.method === 'card').length,
+    cash:   payments.filter(p => p.method === 'cash').length,
+    wire:   payments.filter(p => p.method === 'wire').length,
+    momo:   payments.filter(p => p.method === 'momo').length,
+    cheque: payments.filter(p => p.method === 'cheque').length,
     pending: payments.filter(p => p.status === 'pending').length,
   };
 
@@ -129,16 +129,25 @@ export default function PaymentsPage() {
       source: 'manual',
     };
 
+    try {
+      await createPayment(orgId, newPayment);
+      await updateInvoice(invId, { status: 'paid' });
+    } catch (err) {
+      console.error('Payment failed:', err);
+      showToast('Erreur lors de l\'enregistrement du paiement', true);
+      return;
+    }
     setPayments(prev => [newPayment, ...prev]);
     setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: 'paid' as const } : i));
-    await createPayment(orgId, newPayment);
-    await updateInvoice(invId, { status: 'paid' });
     const clientName = clientsMap[inv?.client ?? '']?.name ?? (inv?.client ?? '?');
-    await recordInvoicePaymentEntry(orgId, {
+    recordInvoicePaymentEntry(orgId, {
       invoiceId:  invId,
       total:      amt,
       date,
       clientName,
+    }).catch(err => {
+      console.error('[recordInvoicePaymentEntry] failed:', err);
+      showToast('Écriture comptable non enregistrée. Vérifiez la comptabilité.', true);
     });
     posthog.capture('payment_recorded', { amount: amt, method, invoice_id: invId });
     closePanel();
@@ -198,34 +207,34 @@ export default function PaymentsPage() {
               <div className="metric-change neutral">{share('momo')}% du volume</div>
             </div>
 
-            {/* Wave */}
+            {/* Wire */}
             <div className="metric-card">
               <div className="metric-top">
-                <div className="metric-ico wave"><Icon name="wave" size={15} /></div>
-                <div className="metric-label">Wave</div>
+                <div className="metric-ico wire"><Icon name="building-bank" size={15} /></div>
+                <div className="metric-label">Virement</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(byMethod.wave)}<span className="metric-unit">F CFA</span>
+                {fmtCompact(byMethod.wire)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="share-bar">
-                <div className="share-fill" style={{ width: `${share('wave')}%`, background: 'var(--pm-wave)' }} />
+                <div className="share-fill" style={{ width: `${share('wire')}%`, background: 'var(--pm-wire)' }} />
               </div>
-              <div className="metric-change neutral">{share('wave')}% du volume</div>
+              <div className="metric-change neutral">{share('wire')}% du volume</div>
             </div>
 
-            {/* Card */}
+            {/* Cheque */}
             <div className="metric-card">
               <div className="metric-top">
-                <div className="metric-ico card"><Icon name="credit-card" size={15} /></div>
-                <div className="metric-label">Carte</div>
+                <div className="metric-ico cheque"><Icon name="writing" size={15} /></div>
+                <div className="metric-label">Chèque</div>
               </div>
               <div className="metric-value tnum">
-                {fmtCompact(byMethod.card)}<span className="metric-unit">F CFA</span>
+                {fmtCompact(byMethod.cheque)}<span className="metric-unit">F CFA</span>
               </div>
               <div className="share-bar">
-                <div className="share-fill" style={{ width: `${share('card')}%`, background: 'var(--pm-card)' }} />
+                <div className="share-fill" style={{ width: `${share('cheque')}%`, background: 'var(--pm-cheque)' }} />
               </div>
-              <div className="metric-change neutral">{share('card')}% du volume</div>
+              <div className="metric-change neutral">{share('cheque')}% du volume</div>
             </div>
           </div>
 
@@ -363,7 +372,7 @@ export default function PaymentsPage() {
           <div className="form-group">
             <label className="form-label">Méthode de paiement</label>
             <div className="method-pick">
-              {(['cash', 'wave', 'momo', 'card'] as PayMethod[]).map(m => (
+              {(['cash', 'wire', 'momo', 'cheque'] as PayMethod[]).map(m => (
                 <div
                   key={m}
                   className={'mp-opt' + (method === m ? ' active' : '')}

@@ -461,7 +461,7 @@ async function resolveJournalAndPeriod(
 
   const { data: period } = await supabase
     .from('fiscal_periods')
-    .select('id')
+    .select('id, status')
     .eq('org_id', orgId)
     .eq('year', year)
     .eq('month', month)
@@ -469,7 +469,9 @@ async function resolveJournalAndPeriod(
 
   let periodId: string;
   if (period) {
-    periodId = String((period as Record<string, unknown>).id);
+    const p = period as Record<string, unknown>;
+    if (p.status === 'closed') throw new Error(`Fiscal period ${year}-${String(month).padStart(2, '0')} is closed`);
+    periodId = String(p.id);
   } else {
     const { data: newPeriod, error: cpErr } = await supabase
       .from('fiscal_periods')
@@ -510,7 +512,7 @@ export async function recordInvoiceIssuanceEntry(
     lines: [
       { accountNum: '411', debit: total,          credit: 0              },
       { accountNum: '706', debit: 0,               credit: opts.htAmount  },
-      { accountNum: '443', debit: 0,               credit: opts.tvaAmount },
+      ...(opts.tvaAmount > 0 ? [{ accountNum: '443', debit: 0, credit: opts.tvaAmount }] : []),
     ],
   });
   await postJournalEntry(entryId);
@@ -571,13 +573,15 @@ export async function recordSupplierBillEntry(
 
 const PAYMENT_METHOD_JOURNAL: Record<string, string> = {
   wire:   'BQ',
-  mobile: 'BQ',
+  momo:   'BQ',
   cash:   'CA',
+  cheque: 'BQ',
 };
 const PAYMENT_METHOD_ACCOUNT: Record<string, string> = {
   wire:   '521',
-  mobile: '521',
+  momo:   '521',
   cash:   '571',
+  cheque: '521',
 };
 
 export async function recordSupplierBillPaymentEntry(
@@ -607,6 +611,32 @@ export async function recordSupplierBillPaymentEntry(
     ],
   });
   await postJournalEntry(entryId);
+}
+
+export async function updateInvoiceIssuanceEntry(
+  orgId: string,
+  opts: {
+    invoiceId: string;
+    htAmount: number;
+    tvaAmount: number;
+    date: string;
+    clientName: string;
+  },
+): Promise<void> {
+  if (MOCK) return;
+  // Delete the original VE entry, then re-record with updated amounts
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('piece', `VE-${opts.invoiceId}`);
+  if (error) throw error;
+  if (data?.length) {
+    await Promise.all(
+      (data as Array<Record<string, unknown>>).map(r => deleteJournalEntry(String(r.id)))
+    );
+  }
+  await recordInvoiceIssuanceEntry(orgId, opts);
 }
 
 export async function deleteInvoiceEntries(orgId: string, invoiceId: string): Promise<void> {

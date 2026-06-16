@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 export const invoiceStatusSchema = z.enum(['paid', 'pending', 'overdue', 'draft']);
 export const clientStatusSchema  = z.enum(['active', 'lead', 'inactive']);
-export const payMethodSchema     = z.enum(['cash', 'wave', 'momo', 'card']);
+export const payMethodSchema     = z.enum(['cash', 'wire', 'momo', 'cheque']);
 export const paySourceSchema     = z.enum(['online', 'manual']);
 export const payStatusSchema     = z.enum(['completed', 'pending', 'failed']);
 export const productTypeSchema   = z.enum(['service', 'product']);
@@ -18,20 +18,23 @@ export const activityKindSchema  = z.enum(['paid', 'sent', 'overdue', 'viewed'])
 // ---------------------------------------------------------------------------
 
 export const lineItemSchema = z.object({
-  id:    z.string(),
-  desc:  z.string(),
-  qty:   z.number().min(0),
-  price: z.number().min(0),
+  id:        z.string(),
+  desc:      z.string(),
+  unit:      z.string().default('unité'),
+  qty:       z.number().min(0),
+  price:     z.number().min(0),
+  productId: z.string().optional(),
 });
 
 export const invoiceSchema = z.object({
-  id:      z.string(),
-  subject: z.string(),
-  client:  z.string(),
-  issued:  z.string(),
-  due:     z.string(),
-  amount:  z.number().min(0),
-  status:  invoiceStatusSchema,
+  id:          z.string(),
+  subject:     z.string(),
+  client:      z.string(),
+  issued:      z.string(),
+  due:         z.string(),
+  amount:      z.number().min(0),
+  status:      invoiceStatusSchema,
+  discountPct: z.number().min(0).max(100).default(0),
 });
 
 export const clientSchema = z.object({

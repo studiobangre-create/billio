@@ -232,9 +232,12 @@ interface Props {
 }
 
 export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5' }: Props) {
-  const subtotal = lines.reduce((sum, li) => sum + li.qty * li.price, 0);
-  const tax = Math.round(subtotal * 0.18);
-  const total = subtotal + tax;
+  const subtotal      = lines.reduce((sum, li) => sum + li.qty * li.price, 0);
+  const discountPct   = invoice.discountPct ?? 0;
+  const discountAmt   = Math.round(subtotal * (discountPct / 100));
+  const discountedSub = subtotal - discountAmt;
+  const tax           = Math.round(discountedSub * 0.18);
+  const total         = discountedSub + tax;
   const isPaid = invoice.status === 'paid';
 
   const bizAddr = [biz.address, biz.city, biz.country].filter(Boolean).join(', ');
@@ -331,6 +334,12 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
               <Text style={s.totLabel}>Sous-total</Text>
               <Text style={s.totVal}>{pdfFmt(subtotal)} F CFA</Text>
             </View>
+            {discountPct > 0 && (
+              <View style={s.totRow}>
+                <Text style={s.totLabel}>Remise ({discountPct}%)</Text>
+                <Text style={[s.totVal, { color: '#888' }]}>{'-'}{pdfFmt(discountAmt)} F CFA</Text>
+              </View>
+            )}
             <View style={s.totRow}>
               <Text style={s.totLabel}>TVA (18 %)</Text>
               <Text style={s.totVal}>{pdfFmt(tax)} F CFA</Text>

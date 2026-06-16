@@ -172,8 +172,9 @@ function BusinessSection() {
   const [name,     setName]    = useState('');
   const [ifu,             setIfu]            = useState('');
   const [rccm,            setRccm]           = useState('');
-  const [taxRegime,       setTaxRegime]      = useState('');
-  const [divisionFiscale, setDivisionFiscale]= useState('');
+  const [taxRegime,            setTaxRegime]           = useState('');
+  const [divisionFiscale,      setDivisionFiscale]     = useState('');
+  const [businessCreationDate, setBusinessCreationDate]= useState('');
   const [address,  setAddress] = useState('');
   const [city,     setCity]    = useState('');
   const [country,  setCountry] = useState('Burkina Faso');
@@ -187,7 +188,7 @@ function BusinessSection() {
     if (!orgId) return;
     supabase
       .from('organizations')
-      .select('name, ifu, rccm, tax_regime, division_fiscale, address, city, country, currency, email, phone')
+      .select('name, ifu, rccm, tax_regime, division_fiscale, business_creation_date, address, city, country, currency, email, phone')
       .eq('id', orgId)
       .single()
       .then(({ data, error }) => {
@@ -196,8 +197,9 @@ function BusinessSection() {
         setName(data.name     ?? '');
         setIfu(data.ifu               ?? '');
         setRccm(data.rccm             ?? '');
-        setTaxRegime(data.tax_regime       ?? '');
+        setTaxRegime(data.tax_regime             ?? '');
         setDivisionFiscale(data.division_fiscale ?? '');
+        setBusinessCreationDate(data.business_creation_date ?? '');
         setAddress(data.address ?? '');
         setCity(data.city     ?? '');
         setCountry(data.country  ?? 'Burkina Faso');
@@ -213,11 +215,11 @@ function BusinessSection() {
     setSaving(true);
     const { error } = await supabase
       .from('organizations')
-      .update({ name, ifu, rccm, tax_regime: taxRegime, division_fiscale: divisionFiscale, address, city, country, currency, email, phone })
+      .update({ name, ifu, rccm, tax_regime: taxRegime, division_fiscale: divisionFiscale, business_creation_date: businessCreationDate || null, address, city, country, currency, email, phone })
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
-    setOrgSettings({ name, ifu, rccm, taxRegime, divisionFiscale, address, city, country, email, phone });
+    setOrgSettings({ name, ifu, rccm, taxRegime, divisionFiscale, businessCreationDate, address, city, country, email, phone });
     posthog.capture('settings_saved', { section: 'business' });
     showToast('Entreprise enregistrée');
   }
@@ -256,6 +258,13 @@ function BusinessSection() {
           <div className="s-field">
             <label className="s-label">Division fiscale</label>
             <input className="form-input" value={divisionFiscale} onChange={e => setDivisionFiscale(e.target.value)} disabled={loading} placeholder="ex. Ouagadougou I" />
+          </div>
+        </div>
+        <div className="s-field">
+          <label className="s-label">Date de création de l'entreprise</label>
+          <input className="form-input" type="date" value={businessCreationDate} onChange={e => setBusinessCreationDate(e.target.value)} disabled={loading} />
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+            Utilisée pour le calcul du prorata des seuils de régime et l'exonération du minimum forfaitaire IS (1ère année).
           </div>
         </div>
         <div className="s-field">

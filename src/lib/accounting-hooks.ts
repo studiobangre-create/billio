@@ -324,13 +324,26 @@ export interface TaxData {
 
 export function useTaxData() {
   const { orgId } = useApp();
-  return useAsyncData<TaxData>(`tax:${orgId}`, async () => {
+  const result = useAsyncData<TaxData>(`tax:${orgId}`, async () => {
     const [journals, entries] = await Promise.all([
       fetchJournals(orgId),
       fetchJournalEntries(orgId, { includeDraft: false }),
     ]);
     return { journals, entries };
   }, [orgId]);
+
+  // Reload whenever a journal entry is posted (e.g. invoice paid, payment recorded).
+  useEffect(() => {
+    if (MOCK || !orgId) return;
+    const ch = supabase
+      .channel(`tax-entries:${orgId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_entries', filter: `org_id=eq.${orgId}` },
+        () => result.reload())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return result;
 }
 
 // ─── Period Closing ───────────────────────────────────────────────────────────

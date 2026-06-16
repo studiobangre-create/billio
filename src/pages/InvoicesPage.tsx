@@ -6,7 +6,7 @@ import { EmptyState } from '../components/EmptyState';
 import { InvoicesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { createInvoice } from '../lib/api/invoices';
+import { createInvoice, nextInvoiceId } from '../lib/api/invoices';
 import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
 import { saveLineItems } from '../lib/api/line-items';
 import { createActivity } from '../lib/api/activities';
@@ -25,7 +25,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 export default function InvoicesPage() {
-  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgId, loading } = useApp();
+  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
 
   if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
   const navigate = useNavigate();
@@ -39,10 +39,13 @@ export default function InvoicesPage() {
   const [fDue,     setFDue]     = useState(() => new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10));
   const [fSubject, setFSubject] = useState('');
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
-  const [fPay,     setFPay]     = useState('Mobile Money (MTN / Orange / Wave)');
-  const [fNotes,   setFNotes]   = useState('');
+  const [fPay,      setFPay]      = useState('Mobile Money (MTN / Orange / Wave)');
+  const [fNotes,    setFNotes]    = useState('');
+  const [fDiscount, setFDiscount] = useState(0);
   const [showPicker, setShowPicker]   = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const submittingRef = useRef(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,7 +65,7 @@ export default function InvoicesPage() {
   function addFromProduct(productId: string) {
     const p = products.find(pr => pr.id === productId);
     if (!p) return;
-    setLineItems(prev => [...prev, newLineItem(p.name, 1, p.price)]);
+    setLineItems(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
     setShowPicker(false);
     setPickerQuery('');
   }
@@ -78,14 +81,17 @@ export default function InvoicesPage() {
     return counts;
   }, [invoices]);
 
-  const subtotal = useMemo(() => lineItems.reduce((s, li) => s + li.qty * li.price, 0), [lineItems]);
-  const tax      = Math.round(subtotal * 0.18);
-  const total    = subtotal + tax;
+  const canInvoiceTVA   = orgSettings.taxRegime === 'RNI';
+  const subtotal        = useMemo(() => lineItems.reduce((s, li) => s + li.qty * li.price, 0), [lineItems]);
+  const discountAmt     = Math.round(subtotal * (fDiscount / 100));
+  const discountedSub   = subtotal - discountAmt;
+  const tax             = canInvoiceTVA ? Math.round(discountedSub * 0.18) : 0;
+  const total           = discountedSub + tax;
 
   const openPanel = () => {
     const today = new Date().toISOString().slice(0, 10);
     const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
-    setFClient(''); setFDate(today); setFDue(due); setFSubject(''); setFNotes('');
+    setFClient(''); setFDate(today); setFDue(due); setFSubject(''); setFNotes(''); setFDiscount(0);
     setLineItems([newLineItem('', 1, 250_000), newLineItem('', 3, 75_000)]);
     setShowPicker(false); setPickerQuery('');
     setPanelOpen(true);
@@ -95,9 +101,9 @@ export default function InvoicesPage() {
   const addLine    = () => setLineItems(prev => [...prev, newLineItem()]);
   const removeLine = (id: string) =>
     setLineItems(prev => prev.length > 1 ? prev.filter(li => li.id !== id) : [newLineItem()]);
-  const updateLine = (id: string, field: 'desc' | 'qty' | 'price', val: string) =>
+  const updateLine = (id: string, field: 'desc' | 'unit' | 'qty' | 'price', val: string) =>
     setLineItems(prev => prev.map(li => li.id !== id ? li : {
-      ...li, [field]: field === 'desc' ? val : (parseFloat(val) || 0),
+      ...li, [field]: field === 'desc' || field === 'unit' ? val : (parseFloat(val) || 0),
     }));
 
   const sendReminder = async (e: React.MouseEvent, id: string) => {
@@ -115,26 +121,20 @@ export default function InvoicesPage() {
   };
 
   const submitInvoice = async (status: 'draft' | 'pending') => {
+    if (submittingRef.current) return;
     if (!fClient)      { showToast('Veuillez sélectionner un client.', true); return; }
     if (subtotal <= 0) { showToast('Ajoutez au moins une ligne de facturation.', true); return; }
+    submittingRef.current = true;
+    setSubmitting(true);
 
     const isFirstInvoice = invoices.length === 0;
-    const id    = nextId(invoices);
+    const id    = await nextInvoiceId(orgId);
     const cName = clientsMap[fClient]?.name ?? fClient;
-    const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status };
+    const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status, discountPct: fDiscount };
 
     try {
       await createInvoice(orgId, newInv);
       await saveLineItems(orgId, lineItems, { invoiceId: id });
-      if (status === 'pending') {
-        await recordInvoiceIssuanceEntry(orgId, {
-          invoiceId:  id,
-          htAmount:   subtotal,
-          tvaAmount:  tax,
-          date:       fDate,
-          clientName: cName,
-        });
-      }
 
       posthog.capture('invoice_created', { invoice_type: status, item_count: lineItems.length, total_amount: total, currency: 'XOF' });
       if (status === 'pending') posthog.capture('invoice_sent', { invoice_id: id, delivery_method: fPay });
@@ -151,9 +151,22 @@ export default function InvoicesPage() {
 
       closePanel();
       showToast(status === 'pending' ? `Facture #${id} envoyée à ${cName}` : `Brouillon #${id} enregistré`);
+
+      if (status === 'pending') {
+        recordInvoiceIssuanceEntry(orgId, {
+          invoiceId:  id,
+          htAmount:   discountedSub,
+          tvaAmount:  tax,
+          date:       fDate,
+          clientName: cName,
+        }).catch(err => console.error('[recordInvoiceIssuanceEntry] failed:', err));
+      }
     } catch (err) {
       console.error('[submitInvoice] error:', err);
       showToast('Une erreur est survenue. Veuillez réessayer.', true);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -355,6 +368,7 @@ export default function InvoicesPage() {
           <div className="subhead"><span>Lignes de facturation</span></div>
           <div className="line-items-head">
             <div className="li-col">Description</div>
+            <div className="li-col">Unité</div>
             <div className="li-col right">Qté</div>
             <div className="li-col right">Prix</div>
             <div />
@@ -365,6 +379,12 @@ export default function InvoicesPage() {
               <div className="line-item-row">
                 <input className="li-input" placeholder="Description du service" value={li.desc}
                   onChange={e => updateLine(li.id, 'desc', e.target.value)} />
+                <select className="li-input" value={li.unit ?? 'unité'}
+                  onChange={e => updateLine(li.id, 'unit', e.target.value)}>
+                  {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
                 <input className="li-input num" type="number" min="0" value={li.qty}
                   onChange={e => updateLine(li.id, 'qty', e.target.value)} />
                 <input className="li-input num" type="number" min="0" value={li.price || ''}
@@ -412,8 +432,20 @@ export default function InvoicesPage() {
           </div>
 
           <div className="total-block">
-            <div className="total-row"><span>Sous-total</span><span>{fmt(subtotal)} F CFA</span></div>
-            <div className="total-row"><span>TVA (18 %)</span><span>{fmt(tax)} F CFA</span></div>
+            <div className="total-row"><span>Sous-total HT</span><span>{fmt(subtotal)} F CFA</span></div>
+            <div className="total-row" style={{ alignItems: 'center' }}>
+              <span>Remise (%)</span>
+              <input
+                type="number" min="0" max="100" step="0.5"
+                className="form-input"
+                style={{ width: 80, textAlign: 'right', padding: '3px 8px', fontSize: 13 }}
+                value={fDiscount || ''}
+                placeholder="0"
+                onChange={e => setFDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+              />
+            </div>
+            {fDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(discountAmt)} F CFA</span></div>}
+            {canInvoiceTVA && <div className="total-row"><span>TVA (18 %)</span><span>{fmt(tax)} F CFA</span></div>}
             <div className="total-row final"><span>Total à payer</span><span>{fmt(total)} F CFA</span></div>
           </div>
 
@@ -435,11 +467,11 @@ export default function InvoicesPage() {
         </div>
 
         <div className="panel-footer">
-          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => submitInvoice('draft')}>
-            Enregistrer brouillon
+          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('draft')}>
+            {submitting ? 'Enregistrement…' : 'Enregistrer brouillon'}
           </button>
-          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => submitInvoice('pending')}>
-            <Icon name="send" ariaHidden /> Envoyer la facture
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('pending')}>
+            <Icon name="send" ariaHidden /> {submitting ? 'Envoi en cours…' : 'Envoyer la facture'}
           </button>
         </div>
       </div>
