@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { QAIllustration } from '../components/QAIllustrations';
-import { EmptyState, EmptyInline } from '../components/EmptyState';
-import { ActivityEmptyIllustration } from '../components/PageEmptyIllustrations';
+import { EmptyState } from '../components/EmptyState';
+import { ActivityEmptyIllustration, InvoicesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue } from '../data';
@@ -140,7 +140,11 @@ export default function DashboardPage() {
         </div>
         <div className="invoice-table" style={{ marginBottom: 18 }}>
           {invoices.length === 0 ? (
-            <EmptyInline message="Aucune facture récente." />
+            <EmptyState
+                illustration={<InvoicesEmptyIllustration />}
+                title="Aucune facture récente"
+                description="Vos factures récentes apparaîtront ici."
+              />
           ) : (
           <>
           <div className="table-head grid-cols">
