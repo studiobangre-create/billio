@@ -85,10 +85,11 @@ export function calculateIUTS(input: IutsInput): IutsResult {
   const grossSalary = monthlySalaireBase + indemnitesLogement + indemniteFonction
     + indemniteTransport + autresIndemnites + avantagesNature;
 
-  // Art.106 exempt allowances — lesser of actual, % of gross, and cap
-  const exemptLogement  = Math.min(indemnitesLogement,  0.20 * grossSalary, 75_000);
-  const exemptFonction  = Math.min(indemniteFonction,   0.05 * grossSalary, 50_000);
-  const exemptTransport = Math.min(indemniteTransport,  0.05 * grossSalary, 30_000);
+  // Art.106: "salaire brut … diminué des retenues pour cotisation sociale"
+  const grossSalaryForCaps = grossSalary - pensionContribution;
+  const exemptLogement  = Math.min(indemnitesLogement,  0.20 * grossSalaryForCaps, 75_000);
+  const exemptFonction  = Math.min(indemniteFonction,   0.05 * grossSalaryForCaps, 50_000);
+  const exemptTransport = Math.min(indemniteTransport,  0.05 * grossSalaryForCaps, 30_000);
 
   const taxableGross = grossSalary - exemptLogement - exemptFonction - exemptTransport;
 
@@ -175,10 +176,12 @@ export interface IsInput {
   isFirstYear?:    boolean;
   isAdherentCGA:   boolean;
   taxYear?:        number;
+  /** Annual turnover HT — required for the 0.5% CA component of the minimum forfaitaire (Art.89) */
+  annualTurnoverHT?: number;
 }
 
 export function calculateIS(input: IsInput): number {
-  const { taxableProfit, regime, creationDate, isAdherentCGA } = input;
+  const { taxableProfit, regime, creationDate, isAdherentCGA, annualTurnoverHT } = input;
   const taxYear    = input.taxYear ?? new Date().getFullYear();
   const firstYear  = input.isFirstYear ?? isFirstFiscalYear(creationDate, taxYear);
 
@@ -190,7 +193,11 @@ export function calculateIS(input: IsInput): number {
 
   if (firstYear) return iSDue;
 
-  let minimum = regime === 'RNI' ? 1_000_000 : 300_000;
+  // Art.89: minimum = max(0.5% × CA rounded to 100,000 F, fixed floor)
+  const caRounded = Math.floor((annualTurnoverHT ?? 0) / 100_000) * 100_000;
+  const caMin     = Math.round(caRounded * 0.005);
+  const fixedFloor = regime === 'RNI' ? 1_000_000 : 300_000;
+  let minimum = Math.max(caMin, fixedFloor);
   if (isAdherentCGA) minimum = Math.round(minimum * 0.50);
 
   return Math.max(iSDue, minimum);
