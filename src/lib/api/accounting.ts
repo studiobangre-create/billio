@@ -252,6 +252,23 @@ export async function adoptOpeningBalances(
 
   const validLines = opts.lines.filter(l => l.acct && (l.d || l.c));
 
+  // Auto-balance with account 110 (Report à nouveau) if the entry is unbalanced
+  const totalD = validLines.reduce((s, l) => s + l.d, 0);
+  const totalC = validLines.reduce((s, l) => s + l.c, 0);
+  const diff = Math.round(totalD - totalC);
+  if (Math.abs(diff) >= 1) {
+    const existing110 = validLines.find(l => l.acct === '110');
+    if (existing110) {
+      if (diff > 0) existing110.c += diff;
+      else          existing110.d += -diff;
+    } else {
+      validLines.push(diff > 0
+        ? { acct: '110', d: 0,     c: diff  }
+        : { acct: '110', d: -diff, c: 0     },
+      );
+    }
+  }
+
   const { error: obErr } = await supabase
     .from('opening_balances')
     .upsert(
