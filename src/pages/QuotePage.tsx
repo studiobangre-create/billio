@@ -179,7 +179,7 @@ export default function QuotePage() {
     const pdfAmount  = editOpen ? eTotal : total;
     const blob = await pdf(
       <InvoicePDFDocument
-        invoice={{ id: quote.id, subject: pdfSubject, client: quote.client, issued: pdfIssued, due: pdfValid, amount: pdfAmount, status: 'pending' }}
+        invoice={{ id: quote.id, subject: pdfSubject, client: quote.client, issued: pdfIssued, due: pdfValid, amount: pdfAmount, status: 'pending', discountPct: 0 }}
         lines={pdfLines}
         client={client}
         biz={orgSettings}

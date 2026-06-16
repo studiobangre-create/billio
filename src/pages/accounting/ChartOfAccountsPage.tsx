@@ -60,7 +60,7 @@ function AccountDrawer({ account, classes, journals, onClose, mvtOf, signedOf }:
         }
         setLedger(rows);
       })
-      .finally(() => setLoadingLedger(false));
+      .then(() => setLoadingLedger(false), () => setLoadingLedger(false));
   }, [orgId, account.num]);
 
   const mvt = mvtOf(account.num);

@@ -45,7 +45,7 @@ function LedgerDrawer({
         }
         setLedger(rows);
       })
-      .finally(() => setLoadingLedger(false));
+      .then(() => setLoadingLedger(false), () => setLoadingLedger(false));
   }, [orgId, account.num]);
   const cls = clsOf(account.num);
   const clsInfo = classes[cls];
