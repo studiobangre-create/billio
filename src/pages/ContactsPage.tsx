@@ -121,8 +121,8 @@ interface SupplierContact {
   overdueCount: number;
 }
 
-interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; paymentMethod: PaymentMethod }
-const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', paymentMethod: 'wire' };
+interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; paymentMethod: PaymentMethod; ifu: string; rccm: string; taxRegime: string }
+const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', paymentMethod: 'wire', ifu: '', rccm: '', taxRegime: '' };
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   wire:   'Virement',
@@ -233,17 +233,29 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
   );
 }
 
+const TAX_REGIME_OPTIONS = [
+  { value: '', label: 'Sélectionner…' },
+  { value: 'reel', label: 'Réel normal' },
+  { value: 'simplifie', label: 'Réel simplifié' },
+  { value: 'micro', label: 'Micro-entreprise' },
+  { value: 'forfait', label: 'Forfait' },
+  { value: 'exonere', label: 'Exonéré' },
+];
+
 function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: BillForm) => Promise<void>; onClose: () => void; initialSupplier?: string }) {
   const [form, setForm] = useState<BillForm>({ ...EMPTY_BILL_FORM, supplier: initialSupplier });
+  const [amountMode, setAmountMode] = useState<'ht' | 'ttc'>('ht');
   const [saving, setSaving] = useState(false);
   const set = (k: keyof BillForm, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const ht = parseFloat(form.htAmount) || 0;
+  const raw = parseFloat(form.htAmount) || 0;
+  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + TVA_RATE));
   const tva = Math.round(ht * TVA_RATE);
-  const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && ht > 0;
+  const ttc = ht + tva;
+  const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && raw > 0;
   const handleSave = async () => {
     if (!valid) return;
     setSaving(true);
-    try { await onSave(form); onClose(); } finally { setSaving(false); }
+    try { await onSave({ ...form, htAmount: String(ht) }); onClose(); } finally { setSaving(false); }
   };
   return (
     <DrawerPanel open onClose={onClose} title="Nouvelle facture fournisseur" subtitle="Enregistrement d'une dette">
@@ -254,7 +266,7 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
         </div>
         <div>
           <label className="form-label">Ville</label>
-          <input className="form-input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Abidjan" />
+          <input className="form-input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Ouagadougou" />
         </div>
         <div>
           <label className="form-label">Référence pièce *</label>
@@ -269,8 +281,23 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
           <input className="form-input" type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         </div>
         <div style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Montant HT (F CFA) *</label>
-          <input className="form-input" type="number" min="0" value={form.htAmount} onChange={e => set('htAmount', e.target.value)} placeholder="0" />
+          <label className="form-label">Saisie du montant</label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {(['ht', 'ttc'] as const).map(m => (
+              <button key={m} type="button" onClick={() => setAmountMode(m)}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  padding: '7px 10px', borderRadius: 'var(--border-radius-md)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .1s',
+                  border: amountMode === m ? '1.5px solid var(--brand)' : '0.5px solid var(--color-border-secondary)',
+                  background: amountMode === m ? 'var(--brand-tint)' : 'var(--color-background-primary)',
+                  color: amountMode === m ? 'var(--brand)' : 'var(--color-text-secondary)',
+                }}>
+                {m === 'ht' ? 'Montant HT (hors taxe)' : 'Montant TTC (taxe incluse)'}
+              </button>
+            ))}
+          </div>
+          <input className="form-input" type="number" min="0" value={form.htAmount}
+            onChange={e => set('htAmount', e.target.value)}
+            placeholder={amountMode === 'ht' ? 'Montant hors taxe' : 'Montant toutes taxes comprises'} />
         </div>
         <div style={{ gridColumn: '1/-1' }}>
           <label className="form-label">Mode de règlement</label>
@@ -291,9 +318,10 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
           </div>
         </div>
       </div>
-      {ht > 0 && (
+
+      {raw > 0 && (
         <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '11px 14px', marginBottom: 16 }}>
-          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ht + tva }].map(({ label, value }, i) => (
+          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: i > 0 ? '0.5px solid var(--color-border-tertiary)' : 'none', fontWeight: i === 2 ? 700 : 400, fontSize: 12.5 }}>
               <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
               <span className="mono">{fmt(value)} F CFA</span>
@@ -301,6 +329,25 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
           ))}
         </div>
       )}
+
+      <div className="dsec-label" style={{ marginTop: 4 }}><Icon name="id-badge-2" size={13} />Informations fiscales fournisseur</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label className="form-label">IFU</label>
+          <input className="form-input" value={form.ifu} onChange={e => set('ifu', e.target.value)} placeholder="Identifiant fiscal unique" />
+        </div>
+        <div>
+          <label className="form-label">RCCM</label>
+          <input className="form-input" value={form.rccm} onChange={e => set('rccm', e.target.value)} placeholder="Registre de commerce" />
+        </div>
+        <div style={{ gridColumn: '1/-1' }}>
+          <label className="form-label">Régime fiscal</label>
+          <select className="form-input" value={form.taxRegime} onChange={e => set('taxRegime', e.target.value)}>
+            {TAX_REGIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 9 }}>
         <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Annuler</button>
         <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={!valid || saving} onClick={handleSave}>
@@ -609,7 +656,7 @@ export default function ContactsPage() {
 
   async function handleCreateBill(billForm: BillForm) {
     const ht = parseFloat(billForm.htAmount);
-    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * TVA_RATE), status: 'open', paymentMethod: billForm.paymentMethod });
+    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * TVA_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined });
   }
 
   // ── Contextual KPIs ───────────────────────────────────────────────────────

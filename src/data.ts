@@ -42,12 +42,12 @@ export const CLIENTS: Record<string, Client> = Object.fromEntries(
 // ---------------------------------------------------------------------------
 
 export const INITIAL_INVOICES: Invoice[] = [
-  { id: 'INV-0041', subject: 'Refonte web — phase 2',        client: 'TK', issued: '2026-06-01', due: '2026-06-15', amount: 780_000,   status: 'overdue' },
-  { id: 'INV-0040', subject: 'Licence intégration ERP',      client: 'SB', issued: '2026-05-28', due: '2026-06-12', amount: 1_200_000, status: 'paid'    },
-  { id: 'INV-0039', subject: 'Audit sécurité T2',            client: 'AM', issued: '2026-05-22', due: '2026-06-05', amount: 450_000,   status: 'overdue' },
-  { id: 'INV-0038', subject: 'Dév. appli mobile — sprint 4', client: 'OT', issued: '2026-05-18', due: '2026-06-02', amount: 960_000,   status: 'paid'    },
-  { id: 'INV-0037', subject: 'Abonnement SaaS annuel',       client: 'BF', issued: '2026-05-14', due: '2026-05-28', amount: 320_000,   status: 'pending' },
-  { id: 'INV-0036', subject: 'Conseil infra réseau',         client: 'MF', issued: '2026-05-05', due: '2026-05-19', amount: 625_000,   status: 'draft'   },
+  { id: 'INV-0041', subject: 'Refonte web — phase 2',        client: 'TK', issued: '2026-06-01', due: '2026-06-15', amount: 780_000,   status: 'overdue', discountPct: 0 },
+  { id: 'INV-0040', subject: 'Licence intégration ERP',      client: 'SB', issued: '2026-05-28', due: '2026-06-12', amount: 1_200_000, status: 'paid',    discountPct: 0 },
+  { id: 'INV-0039', subject: 'Audit sécurité T2',            client: 'AM', issued: '2026-05-22', due: '2026-06-05', amount: 450_000,   status: 'overdue', discountPct: 0 },
+  { id: 'INV-0038', subject: 'Dév. appli mobile — sprint 4', client: 'OT', issued: '2026-05-18', due: '2026-06-02', amount: 960_000,   status: 'paid',    discountPct: 0 },
+  { id: 'INV-0037', subject: 'Abonnement SaaS annuel',       client: 'BF', issued: '2026-05-14', due: '2026-05-28', amount: 320_000,   status: 'pending', discountPct: 0 },
+  { id: 'INV-0036', subject: 'Conseil infra réseau',         client: 'MF', issued: '2026-05-05', due: '2026-05-19', amount: 625_000,   status: 'draft',   discountPct: 0 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -68,13 +68,13 @@ export const INITIAL_ACTIVITY: Activity[] = [
 
 export const INITIAL_PAYMENTS: Payment[] = [
   { id: 'PAI-2052', date: '2026-06-09', client: 'TK', inv: 'INV-0041', method: 'momo', ref: 'MTN · ****7741',      amount: 780_000,   status: 'pending',   source: 'manual' },
-  { id: 'PAI-2051', date: '2026-06-09', client: 'SB', inv: 'INV-0040', method: 'card', ref: 'ch_3PXyZ2',           amount: 1_200_000, status: 'completed', source: 'online' },
-  { id: 'PAI-2050', date: '2026-06-09', client: 'OT', inv: 'INV-0038', method: 'wave', ref: 'Wave · #WV8842',      amount: 960_000,   status: 'completed', source: 'online' },
+  { id: 'PAI-2051', date: '2026-06-09', client: 'SB', inv: 'INV-0040', method: 'cheque', ref: 'ch_3PXyZ2',         amount: 1_200_000, status: 'completed', source: 'online' },
+  { id: 'PAI-2050', date: '2026-06-09', client: 'OT', inv: 'INV-0038', method: 'wire',   ref: 'VIR · #WV8842',    amount: 960_000,   status: 'completed', source: 'online' },
   { id: 'PAI-2049', date: '2026-06-08', client: 'BF', inv: 'INV-0037', method: 'cash', ref: 'Reçu #0211',          amount: 320_000,   status: 'completed', source: 'manual' },
   { id: 'PAI-2048', date: '2026-06-04', client: 'NC', inv: 'INV-0036', method: 'momo', ref: 'Orange · ****2210',   amount: 280_000,   status: 'completed', source: 'online' },
   { id: 'PAI-2047', date: '2026-06-03', client: 'TK', inv: 'INV-0041', method: 'momo', ref: 'MTN · ****5532',      amount: 720_000,   status: 'completed', source: 'manual' },
   { id: 'PAI-2046', date: '2026-06-02', client: 'AM', inv: 'INV-0039', method: 'cash', ref: 'Reçu #0208',          amount: 600_000,   status: 'completed', source: 'manual' },
-  { id: 'PAI-2045', date: '2026-06-01', client: 'OT', inv: 'INV-0038', method: 'wave', ref: 'Wave · #WV8703',      amount: 1_240_000, status: 'completed', source: 'online' },
+  { id: 'PAI-2045', date: '2026-06-01', client: 'OT', inv: 'INV-0038', method: 'wire',  ref: 'VIR · #WV8703',    amount: 1_240_000, status: 'completed', source: 'online' },
 ];
 
 // ---------------------------------------------------------------------------

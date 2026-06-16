@@ -105,22 +105,34 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
   );
 }
 
-interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string }
-const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '' };
+interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; ifu: string; rccm: string; taxRegime: string }
+const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', ifu: '', rccm: '', taxRegime: '' };
 const TVA_RATE = 0.18;
 
-function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm) => Promise<void>; onClose: () => void }) {
+const TAX_REGIME_OPTIONS = [
+  { value: '', label: 'Sélectionner…' },
+  { value: 'reel', label: 'Réel normal' },
+  { value: 'simplifie', label: 'Réel simplifié' },
+  { value: 'micro', label: 'Micro-entreprise' },
+  { value: 'forfait', label: 'Forfait' },
+  { value: 'exonere', label: 'Exonéré' },
+];
+
+function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm, htAmount: number) => Promise<void>; onClose: () => void }) {
   const [form, setForm] = useState<BillForm>(EMPTY_BILL_FORM);
+  const [amountMode, setAmountMode] = useState<'ht' | 'ttc'>('ht');
   const [saving, setSaving] = useState(false);
   const set = (k: keyof BillForm, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const ht = parseFloat(form.htAmount) || 0;
+  const raw = parseFloat(form.htAmount) || 0;
+  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + TVA_RATE));
   const tva = Math.round(ht * TVA_RATE);
-  const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && ht > 0;
+  const ttc = ht + tva;
+  const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && raw > 0;
 
   const handleSave = async () => {
     if (!valid) return;
     setSaving(true);
-    try { await onSave(form); onClose(); } finally { setSaving(false); }
+    try { await onSave(form, ht); onClose(); } finally { setSaving(false); }
   };
 
   return (
@@ -132,7 +144,7 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm) => Promise<v
         </div>
         <div>
           <label className="form-label">Ville</label>
-          <input className="form-input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Abidjan" />
+          <input className="form-input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Ouagadougou" />
         </div>
         <div>
           <label className="form-label">Référence pièce *</label>
@@ -147,14 +159,29 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm) => Promise<v
           <input className="form-input" type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         </div>
         <div style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Montant HT (F CFA) *</label>
-          <input className="form-input" type="number" min="0" value={form.htAmount} onChange={e => set('htAmount', e.target.value)} placeholder="0" />
+          <label className="form-label">Saisie du montant</label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {(['ht', 'ttc'] as const).map(m => (
+              <button key={m} type="button" onClick={() => setAmountMode(m)}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  padding: '7px 10px', borderRadius: 'var(--border-radius-md)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .1s',
+                  border: amountMode === m ? '1.5px solid var(--brand)' : '0.5px solid var(--color-border-secondary)',
+                  background: amountMode === m ? 'var(--brand-tint)' : 'var(--color-background-primary)',
+                  color: amountMode === m ? 'var(--brand)' : 'var(--color-text-secondary)',
+                }}>
+                {m === 'ht' ? 'Montant HT (hors taxe)' : 'Montant TTC (taxe incluse)'}
+              </button>
+            ))}
+          </div>
+          <input className="form-input" type="number" min="0" value={form.htAmount}
+            onChange={e => set('htAmount', e.target.value)}
+            placeholder={amountMode === 'ht' ? 'Montant hors taxe' : 'Montant toutes taxes comprises'} />
         </div>
       </div>
 
-      {ht > 0 && (
+      {raw > 0 && (
         <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '11px 14px', marginBottom: 16 }}>
-          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ht + tva }].map(({ label, value }, i) => (
+          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: i > 0 ? '0.5px solid var(--color-border-tertiary)' : 'none', fontWeight: i === 2 ? 700 : 400, fontSize: 12.5 }}>
               <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
               <span className="mono">{fmt(value)} F CFA</span>
@@ -162,6 +189,24 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm) => Promise<v
           ))}
         </div>
       )}
+
+      <div className="dsec-label" style={{ marginTop: 4 }}><Icon name="id-badge-2" size={13} />Informations fiscales fournisseur</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label className="form-label">IFU</label>
+          <input className="form-input" value={form.ifu} onChange={e => set('ifu', e.target.value)} placeholder="Identifiant fiscal unique" />
+        </div>
+        <div>
+          <label className="form-label">RCCM</label>
+          <input className="form-input" value={form.rccm} onChange={e => set('rccm', e.target.value)} placeholder="Registre de commerce" />
+        </div>
+        <div style={{ gridColumn: '1/-1' }}>
+          <label className="form-label">Régime fiscal</label>
+          <select className="form-input" value={form.taxRegime} onChange={e => set('taxRegime', e.target.value)}>
+            {TAX_REGIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: 9 }}>
         <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Annuler</button>
@@ -179,18 +224,20 @@ export default function SuppliersPage() {
   const [selected, setSelected] = useState<SupplierBill | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const handleCreate = async (form: BillForm) => {
-    const ht = parseFloat(form.htAmount);
+  const handleCreate = async (form: BillForm, ht: number) => {
     await createBill({
-      supplier:  form.supplier,
-      city:      form.city,
-      piece:     form.piece,
-      date:      form.date,
-      dueDate:   form.dueDate,
-      htAmount:  ht,
+      supplier:      form.supplier,
+      city:          form.city,
+      piece:         form.piece,
+      date:          form.date,
+      dueDate:       form.dueDate,
+      htAmount:      ht,
       tvaAmount:     Math.round(ht * TVA_RATE),
       status:        'open',
       paymentMethod: 'wire',
+      ifu:           form.ifu || undefined,
+      rccm:          form.rccm || undefined,
+      taxRegime:     form.taxRegime || undefined,
     });
   };
 

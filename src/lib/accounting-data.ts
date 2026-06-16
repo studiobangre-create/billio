@@ -63,6 +63,9 @@ export interface SupplierBill {
   status: 'open' | 'overdue' | 'paid';
   paymentMethod: PaymentMethod;
   acctLines: { acct: string; label: string; amount: number; side: 'D' | 'C' }[];
+  ifu?: string;
+  rccm?: string;
+  taxRegime?: string;
 }
 
 export interface LedgerRow {

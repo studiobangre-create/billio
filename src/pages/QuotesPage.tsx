@@ -49,7 +49,7 @@ function fmtCompact(n: number) {
 const TVA = 0.18;
 
 export default function QuotesPage() {
-  const { showToast, quotes, setQuotes, invoices, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const { showToast, quotes, setQuotes, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const navigate = useNavigate();
 
   if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
@@ -172,13 +172,14 @@ export default function QuotesPage() {
       const tvaAmount = canInvoiceTVA ? quote.amount - htAmount : 0;
 
       const newInv = {
-        id:      invId,
-        subject: quote.subject,
-        client:  quote.client,
-        issued:  today,
-        due:     dueDate,
-        amount:  quote.amount,
-        status:  'pending' as const,
+        id:          invId,
+        subject:     quote.subject,
+        client:      quote.client,
+        issued:      today,
+        due:         dueDate,
+        amount:      quote.amount,
+        status:      'pending' as const,
+        discountPct: 0,
       };
 
       const quoteLines = await fetchLineItems(undefined, id);

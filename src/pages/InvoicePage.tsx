@@ -86,6 +86,8 @@ export default function InvoicePage() {
   const [payDialog, setPayDialog] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
   const [payRef, setPayRef] = useState('');
+  const [tvaRetenue, setTvaRetenue] = useState(0);
+  const [serviceWithholding, setServiceWithholding] = useState(0);
 
   // Edit panel state
   const [editOpen,   setEditOpen]   = useState(false);
@@ -267,6 +269,8 @@ export default function InvoicePage() {
         total,
         date:       today,
         clientName: client.name,
+        tvaRetenue:         tvaRetenue       > 0 ? tvaRetenue       : undefined,
+        serviceWithholding: serviceWithholding > 0 ? serviceWithholding : undefined,
       }).catch(err => {
         console.error('[recordInvoicePaymentEntry] failed:', err);
         showToast('Écriture comptable non enregistrée. Vérifiez la comptabilité.', true);
@@ -474,7 +478,7 @@ export default function InvoicePage() {
               )}
               <div className="rail-actions">
                 {(isOverdue || invoice.status === 'pending') && (<>
-                  <button className="btn btn-primary btn-block" onClick={() => { setPayRef(''); setPayMethod('cash'); setPayDialog(true); }}>
+                  <button className="btn btn-primary btn-block" onClick={() => { setPayRef(''); setPayMethod('cash'); setTvaRetenue(0); setServiceWithholding(0); setPayDialog(true); }}>
                     <Icon name="cash" ariaHidden /> Enregistrer un paiement
                   </button>
                   <button
@@ -555,7 +559,7 @@ export default function InvoicePage() {
                 ))}
               </div>
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group">
               <label className="form-label">Référence (optionnel)</label>
               <input
                 className="form-input"
@@ -565,8 +569,47 @@ export default function InvoicePage() {
                 placeholder={REF_PLACEHOLDER[payMethod]}
               />
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              Montant : <b>{fmt(total)} F CFA</b>
+            {canInvoiceTVA && (
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Retenue TVA (30 % = {fmt(Math.round(tax * 0.30))} F)</span>
+                  <button
+                    type="button"
+                    style={{ fontSize: 11, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    onClick={() => setTvaRetenue(Math.round(tax * 0.30))}
+                  >
+                    Appliquer 30 %
+                  </button>
+                </label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={0}
+                  max={tax}
+                  value={tvaRetenue || ''}
+                  placeholder="0"
+                  onChange={e => setTvaRetenue(Math.max(0, Math.min(tax, Number(e.target.value) || 0)))}
+                />
+              </div>
+            )}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Retenue services opérée par le client (optionnel)</label>
+              <input
+                className="form-input"
+                type="number"
+                min={0}
+                value={serviceWithholding || ''}
+                placeholder="0 — ex. 20–25% pour prestataire non-résident"
+                onChange={e => setServiceWithholding(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div>Montant facturé : <b>{fmt(total)} F CFA</b></div>
+              {(tvaRetenue > 0 || serviceWithholding > 0) && (<>
+                {tvaRetenue > 0       && <div style={{ color: '#2E7D32' }}>TVA retenue (4449) : −{fmt(tvaRetenue)} F</div>}
+                {serviceWithholding > 0 && <div style={{ color: '#B26A09' }}>Ret. services (4091) : −{fmt(serviceWithholding)} F</div>}
+                <div style={{ fontWeight: 700 }}>Vous recevrez : {fmt(total - tvaRetenue - serviceWithholding)} F CFA</div>
+              </>)}
             </div>
           </div>
           <div className="inv-modal-foot">

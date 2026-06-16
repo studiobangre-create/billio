@@ -119,6 +119,9 @@ function toSupplierBill(row: Record<string, unknown>): SupplierBill {
     status:        row.status as SupplierBill['status'],
     paymentMethod: (row.payment_method as SupplierBill['paymentMethod']) ?? 'wire',
     acctLines,
+    ifu:       row.ifu ? String(row.ifu) : undefined,
+    rccm:      row.rccm ? String(row.rccm) : undefined,
+    taxRegime: row.tax_regime ? String(row.tax_regime) : undefined,
   };
 }
 
@@ -525,10 +528,17 @@ export async function recordInvoicePaymentEntry(
     total: number;
     date: string;
     clientName: string;
+    /** Retenue TVA 30% withheld by assujettied client and remitted directly to DGI (→ D 4449) */
+    tvaRetenue?: number;
+    /** Retenue sur prestations de services 20–25% withheld by client (→ D 4091) */
+    serviceWithholding?: number;
   },
 ): Promise<void> {
   if (MOCK) return;
   const { journalId, periodId } = await resolveJournalAndPeriod(orgId, 'BQ', opts.date);
+  const tvaRet = opts.tvaRetenue       ?? 0;
+  const svcRet = opts.serviceWithholding ?? 0;
+  const netReceived = opts.total - tvaRet - svcRet;
   const entryId = await createJournalEntry(orgId, {
     journalId,
     periodId,
@@ -536,8 +546,10 @@ export async function recordInvoicePaymentEntry(
     piece: `REG-${opts.invoiceId}`,
     label: `Règlement reçu — ${opts.clientName} (${opts.invoiceId})`,
     lines: [
-      { accountNum: '521', debit: opts.total, credit: 0          },
-      { accountNum: '411', debit: 0,          credit: opts.total },
+      { accountNum: '521',  debit: netReceived, credit: 0          },
+      ...(tvaRet > 0 ? [{ accountNum: '4449', debit: tvaRet, credit: 0 }] : []),
+      ...(svcRet > 0 ? [{ accountNum: '4091', debit: svcRet, credit: 0 }] : []),
+      { accountNum: '411',  debit: 0,           credit: opts.total },
     ],
   });
   await postJournalEntry(entryId);
@@ -678,6 +690,9 @@ export async function createSupplierBill(
     tva_amount:      bill.tvaAmount,
     payment_method:  bill.paymentMethod,
     status:          'open',
+    ifu:             bill.ifu ?? '',
+    rccm:            bill.rccm ?? '',
+    tax_regime:      bill.taxRegime ?? '',
   });
   if (error) throw error;
 }

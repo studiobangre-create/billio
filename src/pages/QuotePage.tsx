@@ -32,7 +32,7 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, invoices, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const [lines, setLines] = useState<LineItem[]>([]);
   const [converting, setConverting] = useState(false);
   const convertingRef = useRef(false);
@@ -209,7 +209,7 @@ export default function QuotePage() {
       const invAmount = quote.amount;
       const htAmount  = canInvoiceTVA ? Math.round(invAmount / 1.18) : invAmount;
       const tvaAmount = canInvoiceTVA ? invAmount - htAmount : 0;
-      const newInv = { id: invId, subject: quote.subject, client: quote.client, issued: today, due: dueDate, amount: invAmount, status: 'pending' as const };
+      const newInv = { id: invId, subject: quote.subject, client: quote.client, issued: today, due: dueDate, amount: invAmount, status: 'pending' as const, discountPct: 0 };
       const quoteLines = await fetchLineItems(undefined, quote.id);
       await createInvoice(orgId, newInv);
       invoiceCreated = true;

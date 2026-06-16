@@ -71,6 +71,14 @@ function sumPostedCreditPrefix(entries: JournalEntry[], prefix: string): number 
     .reduce((s, l) => s + l.c, 0);
 }
 
+function sumPostedDebit(entries: JournalEntry[], acct: string): number {
+  return entries
+    .filter(e => e.posted)
+    .flatMap(e => e.lines)
+    .filter(l => l.acct === acct)
+    .reduce((s, l) => s + l.d, 0);
+}
+
 interface TaxLine {
   entryId: string;
   journal: string;
@@ -135,7 +143,9 @@ export default function TaxPage() {
   const taxLines   = buildTaxLines(entries);
   const collected  = taxLines.filter(l => l.type === 'collected').reduce((s, l) => s + l.tvaAmount, 0);
   const deductible = taxLines.filter(l => l.type === 'deductible').reduce((s, l) => s + l.tvaAmount, 0);
-  const netDue     = collected - deductible;
+  // 4449 = TVA retenue par clients assujettis (already remitted to DGI by the client)
+  const alreadyWithheld = sumPostedDebit(entries, '4449');
+  const netDue     = collected - deductible - alreadyWithheld;
   const collectedLines  = taxLines.filter(l => l.type === 'collected');
   const deductibleLines = taxLines.filter(l => l.type === 'deductible');
 
@@ -144,9 +154,13 @@ export default function TaxPage() {
     Math.abs(calculateTVA(l.htBase, l.tvaRate === 0.10) - l.tvaAmount) <= 1
   );
 
-  // ── IUTS / TPA from payroll journal entries ───────────────────────────────
+  // ── IUTS / TPA / Soutien Patriotique from payroll journal entries ────────
   const iutsAmount = sumPostedCredit(entries, '4421');
   const tpaAmount  = sumPostedCredit(entries, '4423');
+  // 4422 = Soutien Patriotique (1% sur salaires nets)
+  const spAmount   = sumPostedCredit(entries, '4422');
+  // 4091 = Retenue services opérée par le client (20-25% sur prestations)
+  const retServices = sumPostedDebit(entries, '4091');
 
   // ── IS estimate from period P&L ───────────────────────────────────────────
   const periodRevenue  = sumPostedCreditPrefix(entries, '7');
@@ -297,7 +311,7 @@ export default function TaxPage() {
             { icon: 'receipt', iconBg: '#FAEEDA', iconColor: '#B26A09', label: 'CA période HT (estimé)', value: fmtCompact(periodRevenue), unit: 'F CFA', sub: 'Crédits comptes 7xx' },
           ] as const),
           { icon: 'building-bank', iconBg: '#E9F0FA', iconColor: 'var(--brand)', label: 'IS estimé (27,5%)', value: fmtCompact(isEstimate), unit: 'F CFA', sub: taxableProfit >= 0 ? `Bénéfice estimé ${fmtCompact(taxableProfit)} F` : `Déficit — minimum forfaitaire` },
-          { icon: 'users', iconBg: '#F3E8FF', iconColor: '#6B21A8', label: 'IUTS + TPA dus', value: fmtCompact(iutsAmount + tpaAmount), unit: 'F CFA', sub: `IUTS ${fmtCompact(iutsAmount)} · TPA ${fmtCompact(tpaAmount)}` },
+          { icon: 'users', iconBg: '#F3E8FF', iconColor: '#6B21A8', label: 'IUTS + TPA + SP dus', value: fmtCompact(iutsAmount + tpaAmount + spAmount), unit: 'F CFA', sub: `IUTS ${fmtCompact(iutsAmount)} · TPA ${fmtCompact(tpaAmount)}${spAmount > 0 ? ` · SP ${fmtCompact(spAmount)}` : ''}` },
           riskKpi,
         ]} />
 
@@ -345,9 +359,18 @@ export default function TaxPage() {
               );
             })}
 
+            {alreadyWithheld > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 70px 1fr 100px 110px 60px 110px', gap: 12, padding: '11px 18px', borderTop: '0.5px solid var(--color-border-tertiary)', background: 'var(--color-background-secondary)', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
+                <span /><span />
+                <span>4449 — Ret. TVA versée par clients</span>
+                <span /><span />
+                <span className="mono" style={{ textAlign: 'right', color: '#2E7D32' }}>−{fmt(alreadyWithheld)}</span>
+                <span style={{ textAlign: 'right' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#E7F3E2', color: '#2E7D32' }}>Déjà versé</span></span>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '80px 70px 1fr 100px 110px 60px 110px', gap: 12, padding: '11px 18px', borderTop: '1px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', fontWeight: 700, alignItems: 'center', fontSize: 12.5 }}>
               <span /><span />
-              <span>TVA nette</span>
+              <span>TVA nette à verser (CA3)</span>
               <span /><span />
               <span className="mono" style={{ textAlign: 'right', fontSize: 13, color: netDue >= 0 ? '#2E7D32' : '#A32D2D' }}>{netDue >= 0 ? '+' : ''}{fmt(netDue)}</span>
               <span />
@@ -355,7 +378,7 @@ export default function TaxPage() {
           </div>
         ) : (
           <div style={{ background: '#FAEEDA', border: '0.5px solid #F0C070', borderRadius: 'var(--border-radius-lg)', padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
-            <Icon name="info-circle" size={18} color="#B26A09" />
+            <Icon name="info-circle" size={18} />
             <div>
               <span style={{ fontWeight: 700, color: '#B26A09' }}>Régime {meta.label} — TVA non applicable.</span>
               {' '}Seuls les contribuables RNI (CA ≥ 50 M F CFA) sont habilités à facturer la TVA. Votre régime en est dispensé.
@@ -384,6 +407,13 @@ export default function TaxPage() {
             <span style={{ flex: 1 }}>IS dû (taux 27,5% · minimum forfaitaire {regime === 'RNI' ? '1 000 000' : '300 000'} F)</span>
             <span className="mono" style={{ color: 'var(--brand)', fontSize: 13 }}>{fmt(isEstimate)} F</span>
           </div>
+          {retServices > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
+              <span style={{ flex: 1 }}>4091 — Retenues services subies (20–25%)</span>
+              <span className="mono" style={{ color: '#B26A09', fontWeight: 700 }}>−{fmt(retServices)} F</span>
+              <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#FAEEDA', color: '#B26A09' }}>Imputable IS</span>
+            </div>
+          )}
           <div style={{ padding: '9px 18px', background: firstYear ? '#E7F3E2' : 'var(--color-background-secondary)', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 11, color: firstYear ? '#2E7D32' : 'var(--color-text-tertiary)', fontWeight: firstYear ? 600 : 400 }}>
             {firstYear
               ? '1ère année d\'exploitation — exonération du minimum forfaitaire IS applicable (Art.88-90 CGI).'

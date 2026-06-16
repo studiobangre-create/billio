@@ -196,6 +196,13 @@ export function calculateIS(input: IsInput): number {
   return Math.max(iSDue, minimum);
 }
 
+// ─── Soutien Patriotique (1% sur salaires nets — mesure exceptionnelle) ──────
+
+/** 1% levy on net salary withheld by employer alongside IUTS. */
+export function calculateSoutienPatriotique(netSalary: number): number {
+  return Math.round(netSalary * 0.01);
+}
+
 // ─── TVA (Art.317) ────────────────────────────────────────────────────────────
 
 /** Returns TVA amount only. Rounded down to nearest franc (Art.317). */
