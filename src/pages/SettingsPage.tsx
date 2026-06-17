@@ -219,7 +219,7 @@ function BusinessSection() {
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
-    setOrgSettings({ name, ifu, rccm, taxRegime, divisionFiscale, businessCreationDate, address, city, country, email, phone });
+    setOrgSettings(prev => ({ ...prev, name, ifu, rccm, taxRegime, divisionFiscale, businessCreationDate, address, city, country, email, phone }));
     posthog.capture('settings_saved', { section: 'business' });
     showToast('Entreprise enregistrée');
   }
