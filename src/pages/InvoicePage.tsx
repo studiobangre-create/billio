@@ -356,11 +356,12 @@ export default function InvoicePage() {
                 <div className="pp-block-label">Facturé à</div>
                 <div className="pp-client-name">{client.name}</div>
                 <div className="pp-client-meta">{client.city}, Burkina Faso</div>
-                {(client.ifu || client.rccm || client.taxRegime) && (
+                {(client.ifu || client.rccm || client.taxRegime || client.fiscalDivision) && (
                   <div className="pp-compliance-ids">
-                    {client.ifu       && <span>IFU {client.ifu}</span>}
-                    {client.rccm      && <span>RCCM {client.rccm}</span>}
-                    {client.taxRegime && <span>{client.taxRegime}</span>}
+                    {client.ifu            && <span>IFU {client.ifu}</span>}
+                    {client.rccm           && <span>RCCM {client.rccm}</span>}
+                    {client.taxRegime      && <span>{client.taxRegime}</span>}
+                    {client.fiscalDivision && <span>{client.fiscalDivision}</span>}
                   </div>
                 )}
               </div>

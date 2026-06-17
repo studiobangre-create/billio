@@ -51,6 +51,7 @@ export const clientSchema = z.object({
   ifu:                 z.string().optional(),
   rccm:                z.string().optional(),
   taxRegime:           z.string().optional(),
+  fiscalDivision:      z.string().optional(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
 });
 
@@ -65,6 +66,7 @@ export const clientRecordSchema = z.object({
   ifu:                 z.string().optional(),
   rccm:                z.string().optional(),
   taxRegime:           z.string().optional(),
+  fiscalDivision:      z.string().optional(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
   invoices:            z.number().int().min(0),
   billed:              z.number().min(0),
@@ -133,6 +135,7 @@ export const newClientFormSchema = z.object({
   ifu:                 z.string(),
   rccm:                z.string(),
   taxRegime:           z.string(),
+  fiscalDivision:      z.string(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
 });
 

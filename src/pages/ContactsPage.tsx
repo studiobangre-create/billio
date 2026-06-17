@@ -8,6 +8,7 @@ import { PageSkeleton } from '../components/SkeletonLoader';
 import DrawerPanel from '../components/accounting/DrawerPanel';
 import StatusPill from '../components/accounting/StatusPill';
 import { useApp } from '../context/AppContext';
+import FiscalDivisionSelect, { fiscalDivisionLabel } from '../components/FiscalDivisionSelect';
 import { createClient, updateClient, removeClient } from '../lib/api/clients';
 import { fmt, fmtCompact } from '../data';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '../lib/schemas';
@@ -100,7 +101,7 @@ type MiniInv = { id: string; sub: string; amt: number; status: InvoiceStatus };
 
 const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
 const INV_STATUS_LABEL: Record<MiniInv['status'], string> = { paid: 'Payée', pending: 'En attente', overdue: 'En retard', draft: 'Brouillon' };
-const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '' };
+const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
 const CLIENT_FILTERS: { key: ClientFilterKey; label: string }[] = [
   { key: 'all', label: 'Tous' }, { key: 'active', label: 'Actifs' }, { key: 'lead', label: 'Prospects' }, { key: 'balance', label: 'Avec solde' },
 ];
@@ -588,12 +589,12 @@ export default function ContactsPage() {
   function closeClientPanel() { setClientPanel(null); setEditMode(false); }
   function openDetailEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '' });
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '' });
     setEditMode(true);
   }
   async function handleSaveEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime };
+    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, fiscalDivision: editForm.fiscalDivision };
     const previous = clients.find(c => c.code === cl.code);
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
     try {
@@ -627,7 +628,7 @@ export default function ContactsPage() {
     const avs = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
     const words = form.name.trim().split(/\s+/);
     const code = ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || 'NC';
-    const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, status: form.status };
+    const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
     const optimistic = { ...payload, invoices: 0, billed: 0, balance: 0 };
     setClients(prev => [optimistic, ...prev]);
     try {
@@ -943,9 +944,13 @@ export default function ContactsPage() {
                       <label className="form-label">RCCM <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
                       <input className="form-input" type="text" placeholder="BF-OUA-2021-B-1234" value={editForm.rccm} onChange={e => setEditForm(f => ({ ...f, rccm: e.target.value }))} />
                     </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
                       <label className="form-label">Régime fiscal <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
                       <input className="form-input" type="text" placeholder="RNI, RSI…" value={editForm.taxRegime} onChange={e => setEditForm(f => ({ ...f, taxRegime: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Division fiscale <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <FiscalDivisionSelect value={editForm.fiscalDivision} onChange={v => setEditForm(f => ({ ...f, fiscalDivision: v }))} />
                     </div>
                   </>
                 ) : (
@@ -956,12 +961,13 @@ export default function ContactsPage() {
                   </>
                 )}
               </div>
-              {(detailClient.ifu || detailClient.rccm || detailClient.taxRegime) && (
+              {(detailClient.ifu || detailClient.rccm || detailClient.taxRegime || detailClient.fiscalDivision) && (
                 <div className="detail-block">
                   <div className="detail-block-title">Identifiants fiscaux</div>
                   {detailClient.ifu && <div className="contact-line"><Icon name="file-text" size={16} /><span>IFU&nbsp;<strong>{detailClient.ifu}</strong></span></div>}
                   {detailClient.rccm && <div className="contact-line"><Icon name="building" size={16} /><span>RCCM&nbsp;<strong>{detailClient.rccm}</strong></span></div>}
                   {detailClient.taxRegime && <div className="contact-line"><Icon name="tag" size={16} /><span>Régime&nbsp;<strong>{detailClient.taxRegime}</strong></span></div>}
+                  {detailClient.fiscalDivision && <div className="contact-line"><Icon name="sitemap" size={16} /><span>Division fiscale&nbsp;<strong>{fiscalDivisionLabel(detailClient.fiscalDivision)}</strong></span></div>}
                 </div>
               )}
               <div className="detail-block">
@@ -1056,6 +1062,10 @@ export default function ContactsPage() {
               <option value="RSI">RSI — Régime simplifié d'imposition (CA 15–50M F CFA)</option>
               <option value="CME">CME — Contribution des micro-entreprises (CA &lt; 15M F CFA)</option>
             </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Division fiscale <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+            <FiscalDivisionSelect value={form.fiscalDivision} onChange={v => setForm(f => ({ ...f, fiscalDivision: v }))} />
           </div>
         </form>
         <div className="panel-footer">

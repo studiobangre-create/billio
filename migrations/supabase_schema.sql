@@ -123,9 +123,10 @@ create table if not exists public.clients (
   email          text        not null default '—',
   phone          text        not null default '—',
   city           text        not null default '—',
-  ifu            text        not null default '',
-  rccm           text        not null default '',
-  status         text        not null default 'active'
+  ifu             text        not null default '',
+  rccm            text        not null default '',
+  fiscal_division text        not null default '',
+  status          text        not null default 'active'
                    check (status in ('active', 'lead', 'inactive')),
   invoices_count integer     not null default 0,
   billed         numeric     not null default 0,

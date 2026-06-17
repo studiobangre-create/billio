@@ -13,9 +13,10 @@ export function dbToClient(row: Record<string, unknown>): ClientRecord {
     email:    String(row.email ?? '—'),
     phone:    String(row.phone ?? '—'),
     city:     String(row.city ?? '—'),
-    ifu:       String(row.ifu ?? ''),
-    rccm:      String(row.rccm ?? ''),
+    ifu:            String(row.ifu ?? ''),
+    rccm:           String(row.rccm ?? ''),
     taxRegime:           String(row.tax_regime ?? ''),
+    fiscalDivision:      String(row.fiscal_division ?? ''),
     withholdingScenario: (row.withholding_scenario ?? undefined) as ClientRecord['withholdingScenario'],
     invoices: Number(row.invoices_count ?? 0),
     billed:   Number(row.billed ?? 0),
@@ -51,9 +52,10 @@ export async function createClient(
       email:          payload.email,
       phone:          payload.phone,
       city:           payload.city,
-      ifu:            payload.ifu ?? '',
-      rccm:           payload.rccm ?? '',
+      ifu:             payload.ifu ?? '',
+      rccm:            payload.rccm ?? '',
       tax_regime:            payload.taxRegime ?? '',
+      fiscal_division:       payload.fiscalDivision ?? '',
       withholding_scenario:  payload.withholdingScenario ?? null,
       status:         payload.status,
       invoices_count: 0,
@@ -78,6 +80,7 @@ export async function updateClient(orgId: string, code: string, patch: Partial<C
   if (patch.ifu       !== undefined) dbPatch.ifu            = patch.ifu;
   if (patch.rccm      !== undefined) dbPatch.rccm           = patch.rccm;
   if (patch.taxRegime            !== undefined) dbPatch.tax_regime            = patch.taxRegime;
+  if (patch.fiscalDivision       !== undefined) dbPatch.fiscal_division       = patch.fiscalDivision;
   if (patch.withholdingScenario  !== undefined) dbPatch.withholding_scenario  = patch.withholdingScenario ?? null;
   if (patch.status    !== undefined) dbPatch.status         = patch.status;
   if (Object.keys(dbPatch).length === 0) return;

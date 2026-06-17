@@ -23,6 +23,7 @@ type ClientInfo = {
   ifu?: string;
   rccm?: string;
   taxRegime?: string;
+  fiscalDivision?: string;
   withholdingScenario?: string;
 };
 
@@ -266,6 +267,7 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
     client.ifu && `IFU ${client.ifu}`,
     client.rccm && `RCCM ${client.rccm}`,
     client.taxRegime,
+    client.fiscalDivision,
   ].filter(Boolean).join(' · ');
 
   return (

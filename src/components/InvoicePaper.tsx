@@ -49,7 +49,7 @@ const MOCK_BIZ: BizInfo = {
   divisionFiscale: 'Ouagadougou I',
 };
 
-const CLI   = { name: 'TechKonsult', city: 'Ouagadougou, Burkina Faso', ifu: '00067890 C', rccm: 'BF-OUA-2020-B-5678', taxRegime: 'RSI' };
+const CLI   = { name: 'TechKonsult', city: 'Ouagadougou, Burkina Faso', ifu: '00067890 C', rccm: 'BF-OUA-2020-B-5678', taxRegime: 'RSI', fiscalDivision: 'DCI Ouaga III' };
 const INV   = { id: 'INV-0041', issued: '7 juin 2026', due: '21 juin 2026', subject: 'Refonte web — phase 2' };
 const LINES = [
   { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens', qty: 1, price: 300_000 },
@@ -90,11 +90,12 @@ function Parties() {
         <div className="tp-block-label">Facturé à</div>
         <div className="tp-client-name">{CLI.name}</div>
         <div className="tp-client-meta">{CLI.city}</div>
-        {(CLI.ifu || CLI.rccm || CLI.taxRegime) && (
+        {(CLI.ifu || CLI.rccm || CLI.taxRegime || CLI.fiscalDivision) && (
           <div className="tp-compliance-ids">
-            {CLI.ifu       && <span>IFU {CLI.ifu}</span>}
-            {CLI.rccm      && <span>RCCM {CLI.rccm}</span>}
-            {CLI.taxRegime && <span>{CLI.taxRegime}</span>}
+            {CLI.ifu            && <span>IFU {CLI.ifu}</span>}
+            {CLI.rccm           && <span>RCCM {CLI.rccm}</span>}
+            {CLI.taxRegime      && <span>{CLI.taxRegime}</span>}
+            {CLI.fiscalDivision && <span>{CLI.fiscalDivision}</span>}
           </div>
         )}
       </div>
