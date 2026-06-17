@@ -183,6 +183,7 @@ export default function QuotePage() {
         lines={pdfLines}
         client={client}
         biz={orgSettings}
+        title="Facture Proforma"
       />
     ).toBlob();
     const url = URL.createObjectURL(blob);

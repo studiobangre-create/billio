@@ -232,9 +232,10 @@ interface Props {
   client: ClientInfo;
   biz: BizInfo;
   accentColor?: string;
+  title?: string;
 }
 
-export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5' }: Props) {
+export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5', title = 'Facture' }: Props) {
   const subtotal      = lines.reduce((sum, li) => sum + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
   const discountAmt   = Math.round(subtotal * (discountPct / 100));
@@ -282,7 +283,7 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
             {bizCompliance && <Text style={s.bizMeta}>{bizCompliance}</Text>}
           </View>
           <View>
-            <Text style={[s.docTitle, { color: accentColor }]}>Facture</Text>
+            <Text style={[s.docTitle, { color: accentColor }]}>{title}</Text>
             <Text style={s.docNum}>#{invoice.id}</Text>
           </View>
         </View>
