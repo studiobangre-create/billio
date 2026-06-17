@@ -765,7 +765,7 @@ export default function ContactsPage() {
                             <div className="cl-contact">{cl.contact}</div>
                           </div>
                         </div>
-                        <div className="loc-cell"><Icon name="map-pin" size={14} />{cl.city}</div>
+                        <div className="loc-cell"><Icon name="map-pin" size={14} /><span>{cl.city}</span></div>
                         <div className="inv-count tnum">{stats.count} <span>facture{stats.count !== 1 ? 's' : ''}</span></div>
                         <div style={{ textAlign: 'right' }}>
                           <div className="billed tnum">{fmt(stats.billed)}<span className="cur">F CFA</span></div>

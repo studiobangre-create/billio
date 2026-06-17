@@ -760,8 +760,9 @@ select.form-input {
 .cl-contact { font-size: 11.5px; color: var(--color-text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Location cell */
-.loc-cell { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-secondary); }
+.loc-cell { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-secondary); min-width: 0; overflow: hidden; }
 .loc-cell svg { color: var(--color-text-tertiary); flex-shrink: 0; }
+.loc-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Invoice count */
 .inv-count { font-size: 13px; color: var(--color-text-primary); font-weight: 500; }
@@ -821,9 +822,10 @@ select.form-input {
 /* Detail blocks */
 .detail-block { margin-bottom: 18px; }
 .detail-block-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--color-text-tertiary); font-weight: 600; margin-bottom: 10px; }
-.contact-line { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 13px; color: var(--color-text-primary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+.contact-line { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 13px; color: var(--color-text-primary); border-bottom: 0.5px solid var(--color-border-tertiary); min-width: 0; }
 .contact-line:last-child { border-bottom: none; }
 .contact-line svg { color: var(--color-text-tertiary); width: 18px; flex-shrink: 0; }
+.contact-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* Mini invoice rows */
 .mini-inv { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }

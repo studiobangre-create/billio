@@ -212,9 +212,10 @@ export default function ClientsPage() {
             <div className="section-title">Répertoire</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div className="search-box">
-                <Icon name="search" size={15} />
+                <Icon name="search" size={15} ariaHidden />
                 <input
                   type="text"
+                  aria-label="Rechercher un client"
                   placeholder="Rechercher un client…"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
@@ -273,7 +274,7 @@ export default function ClientsPage() {
                   {/* Location */}
                   <div className="loc-cell">
                     <Icon name="map-pin" size={14} />
-                    {cl.city}
+                    <span>{cl.city}</span>
                   </div>
 
                   {/* Invoices */}

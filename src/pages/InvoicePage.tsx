@@ -710,22 +710,26 @@ export default function InvoicePage() {
             <div />
           </div>
 
-          {eLines.map(li => (
+          {eLines.map((li, idx) => (
             <div key={li.id} className="line-item">
               <div className="line-item-row">
                 <input className="li-input" placeholder="Description du service" value={li.desc}
+                  aria-label={`Description, ligne ${idx + 1}`}
                   onChange={e => updateELine(li.id, 'desc', e.target.value)} />
                 <select className="li-input" value={li.unit ?? 'unité'}
+                  aria-label={`Unité, ligne ${idx + 1}`}
                   onChange={e => updateELine(li.id, 'unit', e.target.value)}>
                   {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
                 <input className="li-input num" type="number" min="0" value={li.qty}
+                  aria-label={`Quantité, ligne ${idx + 1}`}
                   onChange={e => updateELine(li.id, 'qty', e.target.value)} />
                 <input className="li-input num" type="number" min="0" value={li.price || ''}
-                  placeholder="0" onChange={e => updateELine(li.id, 'price', e.target.value)} />
-                <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label="Supprimer la ligne">
+                  placeholder="0" aria-label={`Prix unitaire, ligne ${idx + 1}`}
+                  onChange={e => updateELine(li.id, 'price', e.target.value)} />
+                <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label={`Supprimer la ligne ${idx + 1}`}>
                   <Icon name="trash" size={15} ariaHidden />
                 </button>
               </div>
