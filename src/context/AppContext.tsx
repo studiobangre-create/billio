@@ -28,11 +28,13 @@ export interface OrgSettings {
   divisionFiscale:      string;
   /** ISO date string (YYYY-MM-DD) — used for first-year IS exemption and threshold prorating */
   businessCreationDate: string;
+  paymentTerms:         string;
+  deliveryTerms:        string;
 }
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', businessCreationDate: '' };
+const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', businessCreationDate: '', paymentTerms: 'Net 14 jours', deliveryTerms: 'À convenir' };
 
 interface AppContextValue {
   // Entities
@@ -100,7 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Derived client lookup
   const clientsMap = useMemo<Record<string, Client>>(
-    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario }])),
+    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario }])),
     [clients],
   );
 
@@ -154,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         const { data: org, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, business_creation_date, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
+          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, business_creation_date, payment_terms, delivery_terms, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
           .eq('id', resolvedOrgId)
           .single();
         if (orgErr) {
@@ -177,6 +179,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             taxRegime:            org.tax_regime            ?? '',
             divisionFiscale:      org.division_fiscale      ?? '',
             businessCreationDate: org.business_creation_date ?? '',
+            paymentTerms:         org.payment_terms         ?? 'Net 14 jours',
+            deliveryTerms:        org.delivery_terms        ?? 'À convenir',
           });
           const rawPlan = org.plan as string | null;
           const validPlans: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];

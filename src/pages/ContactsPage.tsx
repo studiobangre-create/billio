@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '../components/Icon';
+import ConfirmModal from '../components/ConfirmModal';
 import { EmptyState, EmptyInline } from '../components/EmptyState';
 import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { SuppliersEmptyIllustration } from '../components/accounting/EmptyIllustrations';
@@ -505,6 +506,7 @@ export default function ContactsPage() {
   const [form, setForm] = useState<NewClientForm>(EMPTY_FORM);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
+  const [deleteClient, setDeleteClient] = useState<ClientRecord | null>(null);
 
   // Suppliers data
   const { data: bills, loading: suppLoading, markPaid, createBill } = useSupplierBills();
@@ -607,9 +609,15 @@ export default function ContactsPage() {
       console.error('[updateClient]', err);
     }
   }
-  async function handleDeleteClient(cl: ClientRecord | null) {
+  function handleDeleteClient(cl: ClientRecord | null) {
     if (!cl) return;
-    if (!window.confirm(`Supprimer "${cl.name}" ? Cette action est irréversible.`)) return;
+    setDeleteClient(cl);
+  }
+
+  async function confirmDeleteClient() {
+    const cl = deleteClient;
+    if (!cl) return;
+    setDeleteClient(null);
     setClients(prev => prev.filter(c => c.code !== cl.code));
     try {
       await removeClient(orgId, cl.code);
@@ -1084,6 +1092,15 @@ export default function ContactsPage() {
         />
       )}
       {showBillForm && <NewBillDrawer initialSupplier={billInitialSupplier} onSave={handleCreateBill} onClose={() => setShowBillForm(false)} />}
+      {deleteClient && (
+        <ConfirmModal
+          title="Supprimer le client"
+          body={`Supprimer "${deleteClient.name}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer le client"
+          onConfirm={confirmDeleteClient}
+          onClose={() => setDeleteClient(null)}
+        />
+      )}
     </>
   );
 }

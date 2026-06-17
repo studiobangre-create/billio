@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
+import ConfirmModal from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
@@ -55,6 +56,7 @@ export default function QuotesPage() {
   if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form
   const [fClient,  setFClient]  = useState('');
@@ -210,9 +212,15 @@ export default function QuotesPage() {
     showToast(`Relance envoyée pour ${id}`);
   }
 
-  async function handleDelete(id: string, e: React.MouseEvent) {
+  function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm(`Supprimer le devis ${id} ? Cette action est irréversible.`)) return;
+    setDeleteId(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     setQuotes(prev => prev.filter(q => q.id !== id));
     await removeQuote(id);
     showToast(`Devis ${id} supprimé`);
@@ -579,6 +587,15 @@ export default function QuotesPage() {
           </button>
         </div>
       </div>
+      {deleteId && (
+        <ConfirmModal
+          title="Supprimer le devis"
+          body={`Supprimer le devis ${deleteId} ? Cette action est irréversible.`}
+          confirmLabel="Supprimer le devis"
+          onConfirm={confirmDelete}
+          onClose={() => setDeleteId(null)}
+        />
+      )}
     </>
   );
 }

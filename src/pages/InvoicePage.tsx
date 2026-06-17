@@ -165,6 +165,8 @@ export default function InvoicePage() {
         lines={lines}
         client={client}
         biz={orgSettings}
+        paymentTerms={orgSettings.paymentTerms || 'Net 14 jours'}
+        deliveryTerms={orgSettings.deliveryTerms || 'À convenir'}
       />
     ).toBlob();
     const url = URL.createObjectURL(blob);
@@ -356,6 +358,13 @@ export default function InvoicePage() {
                 <div className="pp-block-label">Facturé à</div>
                 <div className="pp-client-name">{client.name}</div>
                 <div className="pp-client-meta">{client.city}, Burkina Faso</div>
+                {(client.contact || client.email || client.phone) && (
+                  <div className="pp-client-meta" style={{ marginTop: 2 }}>
+                    {client.contact && <div>Contact : {client.contact}</div>}
+                    {client.phone   && <div>Tél : {client.phone}</div>}
+                    {client.email   && <div>Email : {client.email}</div>}
+                  </div>
+                )}
                 {(client.ifu || client.rccm || client.taxRegime || client.fiscalDivision) && (
                   <div className="pp-compliance-ids">
                     {client.ifu            && <span>IFU {client.ifu}</span>}
@@ -372,8 +381,10 @@ export default function InvoicePage() {
                   <div className="v">{fmtDateLong(invoice.issued)}</div>
                   <div className="k">Échéance</div>
                   <div className={`v${isOverdue ? ' due' : ''}`}>{fmtDateLong(invoice.due)}</div>
-                  <div className="k">Conditions</div>
-                  <div className="v">Net 14 jours</div>
+                  <div className="k">Paiement</div>
+                  <div className="v">{orgSettings.paymentTerms || 'Net 14 jours'}</div>
+                  <div className="k">Livraison</div>
+                  <div className="v">{orgSettings.deliveryTerms || 'À convenir'}</div>
                   <div className="k">Référence</div>
                   <div className="v">{invoice.subject}</div>
                 </div>

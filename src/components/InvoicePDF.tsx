@@ -20,6 +20,9 @@ const pdfFmtDate = (iso: string): string => {
 type ClientInfo = {
   name: string;
   city: string;
+  contact?: string;
+  email?: string;
+  phone?: string;
   ifu?: string;
   rccm?: string;
   taxRegime?: string;
@@ -233,9 +236,12 @@ interface Props {
   biz: BizInfo;
   accentColor?: string;
   title?: string;
+  clientLabel?: string;
+  paymentTerms?: string;
+  deliveryTerms?: string;
 }
 
-export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5', title = 'Facture' }: Props) {
+export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5', title = 'Facture', clientLabel = 'Facturé à', paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir' }: Props) {
   const subtotal      = lines.reduce((sum, li) => sum + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
   const discountAmt   = Math.round(subtotal * (discountPct / 100));
@@ -293,9 +299,12 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
         {/* ── Parties ── */}
         <View style={s.parties}>
           <View style={s.partiesLeft}>
-            <Text style={s.blockLabel}>Facturé à</Text>
+            <Text style={s.blockLabel}>{clientLabel}</Text>
             <Text style={s.clientName}>{client.name}</Text>
             <Text style={s.smallText}>{client.city}</Text>
+            {client.contact ? <Text style={[s.smallText, { marginTop: 2 }]}>Contact : {client.contact}</Text> : null}
+            {client.phone   ? <Text style={s.smallText}>Tél : {client.phone}</Text> : null}
+            {client.email   ? <Text style={s.smallText}>Email : {client.email}</Text> : null}
             {clientCompliance ? <Text style={[s.smallText, { marginTop: 2 }]}>{clientCompliance}</Text> : null}
           </View>
           <View style={s.partiesRight}>
@@ -309,8 +318,12 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
               <Text style={s.metaVal}>{pdfFmtDate(invoice.due)}</Text>
             </View>
             <View style={s.metaRow}>
-              <Text style={s.metaKey}>Conditions</Text>
-              <Text style={s.metaVal}>Net 14 jours</Text>
+              <Text style={s.metaKey}>Paiement</Text>
+              <Text style={s.metaVal}>{paymentTerms}</Text>
+            </View>
+            <View style={s.metaRow}>
+              <Text style={s.metaKey}>Livraison</Text>
+              <Text style={s.metaVal}>{deliveryTerms}</Text>
             </View>
             {invoice.subject ? (
               <View style={s.metaRow}>

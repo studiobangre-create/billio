@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import posthog from 'posthog-js';
 import Icon from '../components/Icon';
+import ConfirmModal from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { ProductsEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
@@ -31,6 +32,7 @@ export default function ProductsPage() {
   const [panelOpen, setPanelOpen]   = useState(false);
   const [editId,    setEditId]      = useState<string | null>(null);
   const [dotsOpen,  setDotsOpen]    = useState<string | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
 
   // New item form state
   const [fType,  setFType]  = useState<ProductType>('service');
@@ -79,9 +81,15 @@ export default function ProductsPage() {
     setPanelOpen(true);
   };
 
-  const handleDelete = async (p: Product) => {
+  const handleDelete = (p: Product) => {
     setDotsOpen(null);
-    if (!window.confirm(`Supprimer "${p.name}" ? Cette action est irréversible.`)) return;
+    setDeleteProduct(p);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteProduct) return;
+    const p = deleteProduct;
+    setDeleteProduct(null);
     setProducts(prev => prev.filter(x => x.id !== p.id));
     await removeProduct(p.id);
     showToast(`"${p.name}" supprimé`);
@@ -398,6 +406,15 @@ export default function ProductsPage() {
           </button>
         </div>
       </div>
+      {deleteProduct && (
+        <ConfirmModal
+          title="Supprimer l'article"
+          body={`Supprimer "${deleteProduct.name}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer l'article"
+          onConfirm={confirmDelete}
+          onClose={() => setDeleteProduct(null)}
+        />
+      )}
     </>
   );
 }

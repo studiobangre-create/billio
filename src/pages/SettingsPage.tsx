@@ -313,15 +313,16 @@ const TERMS_OPTIONS = ['À réception', 'Net 7 jours', 'Net 14 jours', 'Net 30 j
 
 /* ─── Invoicing ─────────────────────────────────────────────────── */
 function InvoicingSection() {
-  const { orgId, showToast } = useApp();
+  const { orgId, showToast, setOrgSettings } = useApp();
 
-  const [prefix,    setPrefix]    = useState('INV-');
-  const [nextNum,   setNextNum]   = useState('0001');
-  const [terms,     setTerms]     = useState('Net 14 jours');
-  const [taxRate,   setTaxRate]   = useState(18);
-  const [footer,    setFooter]    = useState('');
-  const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState(false);
+  const [prefix,        setPrefix]        = useState('INV-');
+  const [nextNum,       setNextNum]        = useState('0001');
+  const [terms,         setTerms]         = useState('Net 14 jours');
+  const [deliveryTerms, setDeliveryTerms] = useState('À convenir');
+  const [taxRate,       setTaxRate]       = useState(18);
+  const [footer,        setFooter]        = useState('');
+  const [loading,       setLoading]       = useState(true);
+  const [saving,        setSaving]        = useState(false);
 
   const [autoReminders, setAutoReminders] = useState(true);
   const [attachPdf,     setAttachPdf]     = useState(true);
@@ -331,17 +332,18 @@ function InvoicingSection() {
     if (!orgId) return;
     supabase
       .from('organizations')
-      .select('inv_prefix, inv_next_number, payment_terms, default_tax_rate, invoice_footer')
+      .select('inv_prefix, inv_next_number, payment_terms, delivery_terms, default_tax_rate, invoice_footer')
       .eq('id', orgId)
       .single()
       .then(({ data, error }) => {
         if (error) { console.warn('[settings] invoicing fetch:', error.message); setLoading(false); return; }
         if (!data) return;
-        setPrefix(data.inv_prefix        ?? 'INV-');
-        setNextNum(data.inv_next_number  ?? '0001');
-        setTerms(data.payment_terms      ?? 'Net 14 jours');
+        setPrefix(data.inv_prefix          ?? 'INV-');
+        setNextNum(data.inv_next_number    ?? '0001');
+        setTerms(data.payment_terms        ?? 'Net 14 jours');
+        setDeliveryTerms(data.delivery_terms ?? 'À convenir');
         setTaxRate(Number(data.default_tax_rate ?? 18));
-        setFooter(data.invoice_footer    ?? '');
+        setFooter(data.invoice_footer      ?? '');
         setLoading(false);
       });
   }, [orgId]);
@@ -351,10 +353,11 @@ function InvoicingSection() {
     setSaving(true);
     const { error } = await supabase
       .from('organizations')
-      .update({ inv_prefix: prefix, inv_next_number: nextNum, payment_terms: terms, default_tax_rate: taxRate, invoice_footer: footer })
+      .update({ inv_prefix: prefix, inv_next_number: nextNum, payment_terms: terms, delivery_terms: deliveryTerms, default_tax_rate: taxRate, invoice_footer: footer })
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
+    setOrgSettings(prev => ({ ...prev, paymentTerms: terms, deliveryTerms }));
     posthog.capture('settings_saved', { section: 'invoicing' });
     showToast('Paramètres de facturation enregistrés');
   }
@@ -385,6 +388,12 @@ function InvoicingSection() {
                 {TERMS_OPTIONS.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
+            <div className="s-field">
+              <label className="s-label">Conditions de livraison</label>
+              <input className="form-input" value={deliveryTerms} onChange={e => setDeliveryTerms(e.target.value)} disabled={loading} placeholder="ex. Ex Works, DAP, À convenir" />
+            </div>
+          </div>
+          <div className="s-field-row">
             <div className="s-field">
               <label className="s-label">TVA par défaut</label>
               <div className="input-affix">
