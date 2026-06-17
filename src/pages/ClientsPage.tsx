@@ -40,7 +40,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 const EMPTY_FORM: NewClientForm = {
-  name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '',
+  name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '',
 };
 
 function fmtCompact(n: number) {
@@ -97,7 +97,7 @@ export default function ClientsPage() {
 
   function openDetailEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', withholdingScenario: cl.withholdingScenario });
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '', withholdingScenario: cl.withholdingScenario });
     setEditMode(true);
   }
 
