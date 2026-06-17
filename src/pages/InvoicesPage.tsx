@@ -27,7 +27,6 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export default function InvoicesPage() {
   const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
 
-  if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
   const navigate = useNavigate();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
@@ -170,6 +169,8 @@ export default function InvoicesPage() {
     }
   };
 
+  if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
+
   return (
     <>
       <div className="main">
@@ -275,7 +276,14 @@ export default function InvoicesPage() {
                 return { name: inv.client, city: '—', av: 'av-a' };
               })();
               return (
-                <div key={inv.id} className="inv-row grid-cols" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <div
+                  key={inv.id}
+                  className="inv-row grid-cols"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/invoices/${inv.id}`)}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && navigate(`/invoices/${inv.id}`)}
+                >
                   <div>
                     <div className="inv-id">#{inv.id}</div>
                     <div className="inv-subject">{inv.subject}</div>

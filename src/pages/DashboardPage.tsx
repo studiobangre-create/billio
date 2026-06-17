@@ -158,7 +158,14 @@ export default function DashboardPage() {
           {invoices.slice(0, 4).map(inv => {
             const c = clientsMap[inv.client] ?? { name: inv.client, city: '—', av: 'av-a' };
             return (
-              <div key={inv.id} className="inv-row grid-cols" onClick={() => navigate(`/invoices/${inv.id}`)}>
+              <div
+                key={inv.id}
+                className="inv-row grid-cols"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/invoices/${inv.id}`)}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && navigate(`/invoices/${inv.id}`)}
+              >
                 <div>
                   <div className="inv-id">#{inv.id}</div>
                   <div className="inv-subject">{inv.subject}</div>

@@ -37,30 +37,39 @@ export const invoiceSchema = z.object({
   discountPct: z.number().min(0).max(100).default(0),
 });
 
+export const serviceWithholdingScenarioSchema = z.enum([
+  'resident-with-ifu',
+  'resident-without-ifu',
+  'construction',
+  'non-resident',
+]);
+
 export const clientSchema = z.object({
-  name:      z.string(),
-  city:      z.string(),
-  av:        z.string(),
-  ifu:       z.string().optional(),
-  rccm:      z.string().optional(),
-  taxRegime: z.string().optional(),
+  name:                z.string(),
+  city:                z.string(),
+  av:                  z.string(),
+  ifu:                 z.string().optional(),
+  rccm:                z.string().optional(),
+  taxRegime:           z.string().optional(),
+  withholdingScenario: serviceWithholdingScenarioSchema.optional(),
 });
 
 export const clientRecordSchema = z.object({
-  code:      z.string(),
-  av:        z.string(),
-  name:      z.string(),
-  contact:   z.string(),
-  email:     z.string(),
-  phone:     z.string(),
-  city:      z.string(),
-  ifu:       z.string().optional(),
-  rccm:      z.string().optional(),
-  taxRegime: z.string().optional(),
-  invoices:  z.number().int().min(0),
-  billed:    z.number().min(0),
-  balance:   z.number().min(0),
-  status:    clientStatusSchema,
+  code:                z.string(),
+  av:                  z.string(),
+  name:                z.string(),
+  contact:             z.string(),
+  email:               z.string(),
+  phone:               z.string(),
+  city:                z.string(),
+  ifu:                 z.string().optional(),
+  rccm:                z.string().optional(),
+  taxRegime:           z.string().optional(),
+  withholdingScenario: serviceWithholdingScenarioSchema.optional(),
+  invoices:            z.number().int().min(0),
+  billed:              z.number().min(0),
+  balance:             z.number().min(0),
+  status:              clientStatusSchema,
 });
 
 export const paymentSchema = z.object({
@@ -115,15 +124,16 @@ export const activitySchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const newClientFormSchema = z.object({
-  name:      z.string().min(1, 'La raison sociale est requise'),
-  contact:   z.string(),
-  email:     z.union([z.string().email('Email invalide'), z.literal('')]),
-  phone:     z.string(),
-  city:      z.string(),
-  status:    clientStatusSchema,
-  ifu:       z.string(),
-  rccm:      z.string(),
-  taxRegime: z.string(),
+  name:                z.string().min(1, 'La raison sociale est requise'),
+  contact:             z.string(),
+  email:               z.union([z.string().email('Email invalide'), z.literal('')]),
+  phone:               z.string(),
+  city:                z.string(),
+  status:              clientStatusSchema,
+  ifu:                 z.string(),
+  rccm:                z.string(),
+  taxRegime:           z.string(),
+  withholdingScenario: serviceWithholdingScenarioSchema.optional(),
 });
 
 export const lineItemFormSchema = lineItemSchema.omit({ id: true }).extend({
@@ -178,6 +188,7 @@ export const newQuoteFormSchema = z.object({
 // Inferred TypeScript types
 // ---------------------------------------------------------------------------
 
+export type ServiceWithholdingScenario = z.infer<typeof serviceWithholdingScenarioSchema>;
 export type InvoiceStatus  = z.infer<typeof invoiceStatusSchema>;
 export type ClientStatus   = z.infer<typeof clientStatusSchema>;
 export type PayMethod      = z.infer<typeof payMethodSchema>;

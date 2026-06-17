@@ -15,7 +15,8 @@ export function dbToClient(row: Record<string, unknown>): ClientRecord {
     city:     String(row.city ?? '—'),
     ifu:       String(row.ifu ?? ''),
     rccm:      String(row.rccm ?? ''),
-    taxRegime: String(row.tax_regime ?? ''),
+    taxRegime:           String(row.tax_regime ?? ''),
+    withholdingScenario: (row.withholding_scenario ?? undefined) as ClientRecord['withholdingScenario'],
     invoices: Number(row.invoices_count ?? 0),
     billed:   Number(row.billed ?? 0),
     balance:  Number(row.balance ?? 0),
@@ -52,7 +53,8 @@ export async function createClient(
       city:           payload.city,
       ifu:            payload.ifu ?? '',
       rccm:           payload.rccm ?? '',
-      tax_regime:     payload.taxRegime ?? '',
+      tax_regime:            payload.taxRegime ?? '',
+      withholding_scenario:  payload.withholdingScenario ?? null,
       status:         payload.status,
       invoices_count: 0,
       billed:         0,
@@ -75,7 +77,8 @@ export async function updateClient(orgId: string, code: string, patch: Partial<C
   if (patch.city      !== undefined) dbPatch.city           = patch.city;
   if (patch.ifu       !== undefined) dbPatch.ifu            = patch.ifu;
   if (patch.rccm      !== undefined) dbPatch.rccm           = patch.rccm;
-  if (patch.taxRegime !== undefined) dbPatch.tax_regime     = patch.taxRegime;
+  if (patch.taxRegime            !== undefined) dbPatch.tax_regime            = patch.taxRegime;
+  if (patch.withholdingScenario  !== undefined) dbPatch.withholding_scenario  = patch.withholdingScenario ?? null;
   if (patch.status    !== undefined) dbPatch.status         = patch.status;
   if (Object.keys(dbPatch).length === 0) return;
   const { error } = await supabase.from('clients').update(dbPatch).eq('org_id', orgId).eq('code', code);

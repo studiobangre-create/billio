@@ -1,10 +1,19 @@
 import { VitePWA } from 'vite-plugin-pwa';
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/lib/tax-bf.ts'],
+      reporter: ['text', 'html'],
+    },
+  },
   build: {
     sourcemap: true,
   },

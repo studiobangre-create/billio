@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
-import type { Invoice, LineItem } from '../lib/schemas';
+import { calculateServiceWithholding } from '../lib/tax-bf';
+import type { Invoice, LineItem, ServiceWithholdingScenario } from '../lib/schemas';
 import type { BizInfo } from './InvoicePaper';
 
 // toLocaleString is unreliable in the react-pdf renderer environment
@@ -22,6 +23,7 @@ type ClientInfo = {
   ifu?: string;
   rccm?: string;
   taxRegime?: string;
+  withholdingScenario?: string;
 };
 
 const s = StyleSheet.create({
@@ -240,6 +242,17 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
   const total         = discountedSub + tax;
   const isPaid = invoice.status === 'paid';
 
+  const svcWithholding = client.withholdingScenario
+    ? calculateServiceWithholding(discountedSub, client.withholdingScenario as ServiceWithholdingScenario)
+    : null;
+  const RATE_LABEL: Record<string, string> = {
+    'resident-with-ifu':    '5 %',
+    'resident-without-ifu': '25 %',
+    'construction':         '1 %',
+    'non-resident':         '20 %',
+  };
+  const netAPayer = svcWithholding !== null ? total - svcWithholding : null;
+
   const bizAddr = [biz.address, biz.city, biz.country].filter(Boolean).join(', ');
   const bizContact = [biz.email, biz.phone].filter(Boolean).join(' · ');
   const bizCompliance = [
@@ -344,6 +357,14 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
               <Text style={s.totLabel}>TVA (18 %)</Text>
               <Text style={s.totVal}>{pdfFmt(tax)} F CFA</Text>
             </View>
+            {svcWithholding !== null && !isPaid && (
+              <View style={s.totRow}>
+                <Text style={s.totLabel}>
+                  {'Retenue à la source ('}{RATE_LABEL[client.withholdingScenario!]}{') — Art.207/212'}
+                </Text>
+                <Text style={[s.totVal, { color: '#B26A09' }]}>{'−'}{pdfFmt(svcWithholding)} F CFA</Text>
+              </View>
+            )}
             {isPaid ? (
               <View style={s.totRow}>
                 <Text style={s.totLabel}>Montant payé</Text>
@@ -351,8 +372,10 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
               </View>
             ) : null}
             <View style={[s.grandRow, { backgroundColor: accentColor }]}>
-              <Text style={s.grandLabel}>Total dû</Text>
-              <Text style={s.grandVal}>{isPaid ? '0' : pdfFmt(total)} F CFA</Text>
+              <Text style={s.grandLabel}>{netAPayer !== null && !isPaid ? 'Net à payer' : 'Total dû'}</Text>
+              <Text style={s.grandVal}>
+                {isPaid ? '0' : pdfFmt(netAPayer ?? total)} F CFA
+              </Text>
             </View>
           </View>
         </View>

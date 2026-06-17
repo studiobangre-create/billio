@@ -3,6 +3,7 @@ import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import Icon from '../components/Icon';
+import ConfirmModal from '../components/ConfirmModal';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
 import { removeInvoice, updateInvoice } from '../lib/api/invoices';
@@ -12,34 +13,39 @@ import { fetchLineItems, saveLineItems, deleteLineItems } from '../lib/api/line-
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '../data';
 import { InvoicePDFDocument } from '../components/InvoicePDF';
 import type { Status } from '../data';
-import type { LineItem, PayMethod, Payment } from '../lib/schemas';
+import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '../lib/tax-bf';
+import type { LineItem, PayMethod, Payment, ServiceWithholdingScenario } from '../lib/schemas';
 
-type DotKind = 'paid' | 'sent' | 'overdue' | 'viewed' | '';
+type DotKind = 'paid' | 'sent' | 'overdue' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
 
-function timelineForStatus(status: Status, clientName: string): TlEntry[] {
-  const created: TlEntry = { dot: '', text: 'Créée par Serge W.', time: '18 mai 2026, 16h55' };
-  if (status === 'draft') return [created];
-  const sent: TlEntry = { dot: 'sent', text: 'Envoyée par e-mail', time: '18 mai 2026, 17h02' };
-  if (status === 'paid') {
+function buildTimeline(
+  invoice: { issued: string; due: string; status: Status },
+  clientName: string,
+  payment?: { date: string },
+): TlEntry[] {
+  const issuedStr = fmtDateLong(invoice.issued);
+  const created: TlEntry = { dot: '', text: 'Facture créée', time: issuedStr };
+  if (invoice.status === 'draft') return [created];
+
+  const sent: TlEntry = { dot: 'sent', text: 'Envoyée', time: issuedStr };
+
+  if (invoice.status === 'paid') {
+    const paidEntry: TlEntry = payment
+      ? { dot: 'paid', text: `Paiement reçu de ${clientName}`, time: fmtDateLong(payment.date) }
+      : { dot: 'paid', text: `Paiement reçu de ${clientName}`, time: '—' };
+    return [paidEntry, sent, created];
+  }
+
+  if (invoice.status === 'overdue') {
     return [
-      { dot: 'paid',   text: `Paiement reçu de ${clientName}`, time: '5 juin 2026, 14h00' },
-      { dot: 'viewed', text: `Consultée par ${clientName}`,    time: '20 mai 2026, 9h18' },
-      sent, created,
+      { dot: 'overdue', text: 'Passée en retard', time: fmtDateLong(invoice.due) },
+      sent,
+      created,
     ];
   }
-  if (status === 'overdue') {
-    return [
-      { dot: 'sent',    text: `Relance envoyée à ${clientName}`, time: '4 juin 2026, 15h40' },
-      { dot: 'overdue', text: 'Facture passée en retard',        time: '2 juin 2026, automatique' },
-      { dot: 'viewed',  text: `Consultée par ${clientName}`,     time: '20 mai 2026, 9h18' },
-      sent, created,
-    ];
-  }
-  return [
-    { dot: 'viewed', text: `Consultée par ${clientName}`, time: '20 mai 2026, 9h18' },
-    sent, created,
-  ];
+
+  return [sent, created];
 }
 
 function QrCodeSvg() {
@@ -100,6 +106,7 @@ export default function InvoicePage() {
   const [saving,     setSaving]     = useState(false);
   const [showPicker,   setShowPicker]   = useState(false);
   const [pickerQuery,  setPickerQuery]  = useState('');
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,6 +144,7 @@ export default function InvoicePage() {
   }
 
   const client        = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
+  const clientWithholdingScenario = (client as { withholdingScenario?: ServiceWithholdingScenario }).withholdingScenario;
   const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
   const subtotal      = lines.reduce((s, li) => s + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
@@ -144,8 +152,9 @@ export default function InvoicePage() {
   const discountedSub = subtotal - discountAmt;
   const tax           = canInvoiceTVA ? Math.round(discountedSub * 0.18) : 0;
   const total         = discountedSub + tax;
-  const isOverdue = invoice.status === 'overdue';
-  const timeline  = timelineForStatus(invoice.status, client.name);
+  const isOverdue       = invoice.status === 'overdue';
+  const invoicePayment  = payments.find(p => p.inv === invoice.id);
+  const timeline        = buildTimeline(invoice, client.name, invoicePayment);
 
   const handleSendReminder = () => showToast(`Relance envoyée à ${client.name}`);
   const handleDuplicate    = () => showToast('Facture dupliquée en brouillon');
@@ -166,14 +175,13 @@ export default function InvoicePage() {
     URL.revokeObjectURL(url);
     posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
   };
-  const handleDelete = async () => {
-    if (window.confirm(`Supprimer la facture #${invoice.id} ? Cette action est irréversible.`)) {
-      setInvoices(prev => prev.filter(i => i.id !== invoice.id));
-      await removeInvoice(invoice.id);
-      await deleteInvoiceEntries(orgId, invoice.id);
-      showToast('Facture supprimée');
-      navigate('/invoices');
-    }
+  const handleDelete = () => setDeleteDialog(true);
+  const handleConfirmDelete = async () => {
+    setInvoices(prev => prev.filter(i => i.id !== invoice.id));
+    await removeInvoice(invoice.id);
+    await deleteInvoiceEntries(orgId, invoice.id);
+    showToast('Facture supprimée');
+    navigate('/invoices');
   };
   const REF_PLACEHOLDER: Record<PayMethod, string> = {
     cash: 'Reçu #0212',
@@ -593,15 +601,46 @@ export default function InvoicePage() {
               </div>
             )}
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Retenue services opérée par le client (optionnel)</label>
-              <input
-                className="form-input"
-                type="number"
-                min={0}
-                value={serviceWithholding || ''}
-                placeholder="0 — ex. 20–25% pour prestataire non-résident"
-                onChange={e => setServiceWithholding(Math.max(0, Number(e.target.value) || 0))}
-              />
+              {(() => {
+                const suggested = clientWithholdingScenario
+                  ? calculateServiceWithholding(discountedSub, clientWithholdingScenario)
+                  : null;
+                const belowThreshold = discountedSub < SERVICE_WITHHOLDING_THRESHOLD;
+                const RATE_LABEL: Record<string, string> = {
+                  'resident-with-ifu':    '5 %',
+                  'resident-without-ifu': '25 %',
+                  'construction':         '1 %',
+                  'non-resident':         '20 %',
+                };
+                return (<>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Retenue à la source services (Art.207/212)</span>
+                    {suggested !== null && !belowThreshold && (
+                      <button
+                        type="button"
+                        style={{ fontSize: 11, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        onClick={() => setServiceWithholding(suggested)}
+                      >
+                        Appliquer {RATE_LABEL[clientWithholdingScenario!]} ({fmt(suggested)} F)
+                      </button>
+                    )}
+                  </label>
+                  {belowThreshold ? (
+                    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '6px 0' }}>
+                      Montant HT sous le seuil de {fmt(SERVICE_WITHHOLDING_THRESHOLD)} F — pas de retenue requise (Art.208.3)
+                    </div>
+                  ) : (
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      value={serviceWithholding || ''}
+                      placeholder={suggested !== null ? `Suggéré : ${fmt(suggested)} F` : '0'}
+                      onChange={e => setServiceWithholding(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  )}
+                </>);
+              })()}
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
               <div>Montant facturé : <b>{fmt(total)} F CFA</b></div>
@@ -755,6 +794,16 @@ export default function InvoicePage() {
           </button>
         </div>
       </div>
+
+      {deleteDialog && (
+        <ConfirmModal
+          title="Supprimer la facture"
+          body={`Supprimer la facture #${invoice.id} ? Cette action est irréversible et effacera également les écritures comptables associées.`}
+          confirmLabel="Supprimer la facture"
+          onConfirm={handleConfirmDelete}
+          onClose={() => setDeleteDialog(false)}
+        />
+      )}
     </>
   );
 }

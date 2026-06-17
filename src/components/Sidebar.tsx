@@ -151,7 +151,14 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="user-pill" onClick={onLogout} title="Se déconnecter" role="button">
+          <div
+            className="user-pill"
+            onClick={onLogout}
+            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onLogout()}
+            title="Se déconnecter"
+            role="button"
+            tabIndex={0}
+          >
             <div className="avatar">{userInitials}</div>
             <div>
               <div className="user-name">{userLabel || '…'}</div>

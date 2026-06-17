@@ -203,6 +203,35 @@ export function calculateIS(input: IsInput): number {
   return Math.max(iSDue, minimum);
 }
 
+// ─── Retenue à la source sur prestations de services (Arts. 206–214) ────────
+
+/**
+ * Withholding applied by the CLIENT on service invoices and remitted to DGI
+ * by the 15th of the following month (Art.208 / 214).
+ * Returns null when the invoice is below the 50,000 F threshold (Art.208.3).
+ */
+export type ServiceWithholdingScenario =
+  | 'resident-with-ifu'      // 5%  — Art.207
+  | 'resident-without-ifu'   // 25% — Art.207
+  | 'construction'           // 1%  — Art.207 (travaux, BTP)
+  | 'non-resident';          // 20% — Art.212
+
+export const SERVICE_WITHHOLDING_THRESHOLD = 50_000; // Art.208.3
+
+export function calculateServiceWithholding(
+  amountHT: number,
+  scenario: ServiceWithholdingScenario,
+): number | null {
+  if (amountHT < SERVICE_WITHHOLDING_THRESHOLD) return null;
+  const rates: Record<ServiceWithholdingScenario, number> = {
+    'resident-with-ifu':    0.05,
+    'resident-without-ifu': 0.25,
+    'construction':         0.01,
+    'non-resident':         0.20,
+  };
+  return Math.round(amountHT * rates[scenario]);
+}
+
 // ─── Soutien Patriotique (1% sur salaires nets — mesure exceptionnelle) ──────
 
 /** 1% levy on net salary withheld by employer alongside IUTS. */

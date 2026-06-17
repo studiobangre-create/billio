@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import posthog from 'posthog-js';
 import Icon from '../components/Icon';
+import ConfirmModal from '../components/ConfirmModal';
 import { EmptyState, EmptyInline } from '../components/EmptyState';
 import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
@@ -51,13 +52,13 @@ function fmtCompact(n: number) {
 export default function ClientsPage() {
   const { clients, setClients, invoices, orgId, showToast, loading } = useApp();
 
-  if (loading) return <PageSkeleton title="Clients" subtitle="Gérez vos clients" variant="table-only" rows={6} />;
   const [filter, setFilter]   = useState<FilterKey>('all');
   const [search, setSearch]   = useState('');
   const [panel, setPanel]     = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(null);
   const [form, setForm]       = useState<NewClientForm>(EMPTY_FORM);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
+  const [deleteTarget, setDeleteTarget] = useState<ClientRecord | null>(null);
 
   const totalBilled  = clients.reduce((s, c) => s + c.billed, 0);
   const outstanding  = clients.reduce((s, c) => s + c.balance, 0);
@@ -96,26 +97,31 @@ export default function ClientsPage() {
 
   function openDetailEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '' });
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', withholdingScenario: cl.withholdingScenario });
     setEditMode(true);
   }
 
   async function handleSaveEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime };
+    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, withholdingScenario: editForm.withholdingScenario };
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
     await updateClient(orgId, cl.code, patch);
     setEditMode(false);
     showToast('Client mis à jour');
   }
 
-  async function handleDeleteClient(cl: ClientRecord | null) {
+  function handleDeleteClient(cl: ClientRecord | null) {
     if (!cl) return;
-    if (!window.confirm(`Supprimer "${cl.name}" ? Cette action est irréversible.`)) return;
-    setClients(prev => prev.filter(c => c.code !== cl.code));
-    await removeClient(orgId, cl.code);
+    setDeleteTarget(cl);
+  }
+
+  async function handleConfirmDeleteClient() {
+    if (!deleteTarget) return;
+    const { code, name } = deleteTarget;
+    setClients(prev => prev.filter(c => c.code !== code));
+    await removeClient(orgId, code);
     closePanel();
-    showToast(`"${cl.name}" supprimé`);
+    showToast(`"${name}" supprimé`);
   }
 
   async function handleAddClient(e: React.FormEvent) {
@@ -129,6 +135,7 @@ export default function ClientsPage() {
       name: form.name, contact: form.contact || '—',
       email: form.email || '—', phone: form.phone || '—',
       city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime,
+      withholdingScenario: form.withholdingScenario,
       status: form.status,
     };
     const isFirstClient = clients.length === 0;
@@ -139,6 +146,8 @@ export default function ClientsPage() {
     setForm(EMPTY_FORM);
     closePanel();
   }
+
+  if (loading) return <PageSkeleton title="Clients" subtitle="Gérez vos clients" variant="table-only" rows={6} />;
 
   return (
     <>
@@ -247,7 +256,10 @@ export default function ClientsPage() {
                 <div
                   key={cl.code}
                   className="client-row client-grid-cols"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setPanel({ kind: 'detail', code: cl.code })}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setPanel({ kind: 'detail', code: cl.code })}
                 >
                   {/* Name */}
                   <div className="name-cell">
@@ -554,6 +566,19 @@ export default function ClientsPage() {
               <option value="CME">CME — Contribution des micro-entreprises (CA &lt; 15M F CFA)</option>
             </select>
           </div>
+          <div className="form-group">
+            <label className="form-label">
+              Retenue à la source <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel (Arts. 206–214 CGI)</span>
+            </label>
+            <select className="form-input" value={form.withholdingScenario ?? ''}
+              onChange={e => setForm(f => ({ ...f, withholdingScenario: e.target.value as NewClientForm['withholdingScenario'] || undefined }))}>
+              <option value="">— Pas de retenue —</option>
+              <option value="resident-with-ifu">5 % — Prestataire résident avec IFU (Art.207)</option>
+              <option value="resident-without-ifu">25 % — Prestataire résident sans IFU (Art.207)</option>
+              <option value="construction">1 % — Travaux / BTP (Art.207)</option>
+              <option value="non-resident">20 % — Prestataire non-résident (Art.212)</option>
+            </select>
+          </div>
         </form>
 
         <div className="panel-footer">
@@ -566,6 +591,16 @@ export default function ClientsPage() {
           </button>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Supprimer le client"
+          body={`Supprimer "${deleteTarget.name}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer le client"
+          onConfirm={handleConfirmDeleteClient}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
     </>
   );
 }
