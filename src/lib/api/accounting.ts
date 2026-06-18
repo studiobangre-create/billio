@@ -119,9 +119,10 @@ function toSupplierBill(row: Record<string, unknown>): SupplierBill {
     status:        row.status as SupplierBill['status'],
     paymentMethod: (row.payment_method as SupplierBill['paymentMethod']) ?? 'wire',
     acctLines,
-    ifu:       row.ifu ? String(row.ifu) : undefined,
-    rccm:      row.rccm ? String(row.rccm) : undefined,
-    taxRegime: row.tax_regime ? String(row.tax_regime) : undefined,
+    ifu:            row.ifu ? String(row.ifu) : undefined,
+    rccm:           row.rccm ? String(row.rccm) : undefined,
+    taxRegime:      row.tax_regime ? String(row.tax_regime) : undefined,
+    fiscalDivision: row.fiscal_division ? String(row.fiscal_division) : undefined,
   };
 }
 
@@ -707,9 +708,10 @@ export async function createSupplierBill(
     tva_amount:      bill.tvaAmount,
     payment_method:  bill.paymentMethod,
     status:          'open',
-    ifu:             bill.ifu ?? '',
-    rccm:            bill.rccm ?? '',
-    tax_regime:      bill.taxRegime ?? '',
+    ifu:              bill.ifu ?? '',
+    rccm:             bill.rccm ?? '',
+    tax_regime:       bill.taxRegime ?? '',
+    fiscal_division:  bill.fiscalDivision ?? '',
   });
   if (error) throw error;
 }

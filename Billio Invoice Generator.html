@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur de factures gratuit — Billio</title>
+<meta name="description" content="Créez une facture professionnelle conforme (TVA, IFU, RCCM) en quelques secondes. Gratuit, sans inscription. Modifiez directement la facture, téléchargez en PDF — puis passez en pilote automatique avec Billio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="billio-landing.css">
+<link rel="stylesheet" href="invoice-generator.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav tool-nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="Billio Landing.html">
+      <span class="brand-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fill-opacity="0.96"/>
+          <path d="M8 8.2h6M8 11.4h7M8 14.6h4" stroke="#185FA5" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Billio</span>
+    </a>
+    <nav class="nav-links">
+      <a href="Billio Landing.html#features">Pourquoi Billio</a>
+      <a href="Billio Landing.html#pricing">Tarifs</a>
+      <a href="Billio Landing.html#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="nav-signin" href="Billio Auth.html">Connexion</a>
+      <a class="btn btn-primary" href="Billio Onboarding.html">Commencer <i class="ti ti-arrow-right"></i></a>
+    </div>
+  </div>
+</header>
+
+<main class="tool-main">
+
+<!-- ============ COMPACT HERO ============ -->
+<section class="gen-hero">
+  <div class="wrap gen-hero-in">
+    <div>
+      <span class="eyebrow"><i class="ti ti-receipt"></i> Outil gratuit</span>
+      <h1>Générateur de <span class="hl">factures gratuit.</span></h1>
+      <p>Créez une facture professionnelle et conforme — TVA, IFU, RCCM — en moins d'une minute. Cliquez n'importe où sur la facture pour la modifier, puis téléchargez en PDF.</p>
+    </div>
+    <div class="gen-trust">
+      <span><i class="ti ti-circle-check-filled"></i> 100 % gratuit</span>
+      <span><i class="ti ti-circle-check-filled"></i> Sans inscription</span>
+      <span><i class="ti ti-circle-check-filled"></i> PDF prêt à envoyer</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYOUT ============ -->
+<div class="wrap gen-layout">
+
+  <!-- toolbar -->
+  <div class="gen-bar">
+    <div class="bar-left">
+      <span class="bar-hint"><i class="ti ti-click"></i> Modifiable — cliquez sur n'importe quel champ</span>
+    </div>
+    <div class="bar-right">
+      <label class="bar-cur">
+        <span>Devise</span>
+        <select id="invCurrency">
+          <option value="XOF" selected>XOF — Franc CFA (UEMOA)</option>
+          <option value="XAF">XAF — Franc CFA (CEMAC)</option>
+          <option value="GNF">GNF — Franc guinéen</option>
+          <option value="CDF">CDF — Franc congolais</option>
+          <option value="EUR">EUR — Euro</option>
+          <option value="USD">USD — Dollar US</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn-ghost" id="btnPrint"><i class="ti ti-printer"></i> Imprimer</button>
+      <button type="button" class="btn btn-primary" id="btnPdf"><i class="ti ti-download"></i> Télécharger en PDF</button>
+    </div>
+  </div>
+
+  <div class="gen-grid">
+
+    <!-- ---------- THE EDITABLE INVOICE ---------- -->
+    <div class="inv-col">
+      <div class="inv-wrap">
+        <div class="inv" id="invDoc">
+
+          <!-- header: logo + company  |  FACTURE + number -->
+          <div class="inv-top">
+            <div class="inv-brand">
+              <label class="inv-logo-zone" id="logoZone" for="logoInput" title="Ajouter votre logo">
+                <img id="logoImg" alt="" hidden>
+                <span id="logoFallback">SW</span>
+                <span class="logo-hint" id="logoHint"><i class="ti ti-camera"></i></span>
+              </label>
+              <input type="file" id="logoInput" accept="image/*" hidden>
+              <button type="button" class="logo-remove" id="logoRemove" title="Retirer le logo" hidden><i class="ti ti-x"></i></button>
+              <div class="inv-biz">
+                <input type="text" id="bizName" class="inv-ed biz-name" placeholder="Nom de l'entreprise" value="Studio Wend SARL">
+                <textarea id="bizAddr" class="inv-ed biz-addr" placeholder="Adresse">Secteur 15, Ouagadougou
+Burkina Faso</textarea>
+                <div class="biz-line">
+                  <span class="k">IFU</span><input type="text" id="bizIfu" class="inv-ed inv-mini" placeholder="00012345 A" value="00076214 B">
+                  <span class="dot">·</span>
+                  <span class="k">RCCM</span><input type="text" id="bizRccm" class="inv-ed inv-mini" placeholder="BF-OUA-…" value="BF-OUA-2023-B-0912">
+                </div>
+                <div class="biz-line">
+                  <input type="text" id="bizPhone" class="inv-ed inv-mini" placeholder="Téléphone" value="+226 70 12 34 56">
+                  <span class="dot">·</span>
+                  <input type="text" id="bizEmail" class="inv-ed inv-mini" placeholder="Email" value="hello@studiowend.bf">
+                </div>
+                <div class="biz-line">
+                  <span class="k">Division fiscale</span><input type="text" id="bizDivision" class="inv-ed inv-mini" placeholder="Centre des Impôts…" value="Centre des Impôts de Ouaga II">
+                </div>
+              </div>
+            </div>
+            <div class="inv-doc">
+              <div class="inv-doctitle">FACTURE</div>
+              <div class="inv-docnum">N°&nbsp;<input type="text" id="invNum" class="inv-ed inv-mini docnum-in" placeholder="INV-0042" value="INV-0042"></div>
+            </div>
+          </div>
+
+          <!-- bill to -->
+          <div class="inv-billto">
+            <div class="im-l">Facturé à</div>
+            <input type="text" id="cliName" class="inv-ed cli-name" placeholder="Nom du client" value="Sahel Banque">
+            <textarea id="cliAddr" class="inv-ed cli-addr" placeholder="Adresse">Avenue Kwame Nkrumah
+Ouagadougou, Burkina Faso</textarea>
+            <div class="biz-line">
+              <span class="k">IFU</span><input type="text" id="cliIfu" class="inv-ed inv-mini" placeholder="00012345 A" value="00031902 K">
+              <span class="dot">·</span>
+              <span class="k">RCCM</span><input type="text" id="cliRccm" class="inv-ed inv-mini" placeholder="BF-OUA-…" value="BF-OUA-2009-B-0233">
+            </div>
+            <div class="biz-line">
+              <input type="text" id="cliPhone" class="inv-ed inv-mini" placeholder="Téléphone" value="+226 25 30 60 00">
+              <span class="dot">·</span>
+              <input type="text" id="cliEmail" class="inv-ed inv-mini" placeholder="Email" value="compta@sahelbanque.bf">
+            </div>
+            <div class="biz-line">
+              <span class="k">Division fiscale</span><input type="text" id="cliDivision" class="inv-ed inv-mini" placeholder="Direction…" value="Direction des Grandes Entreprises">
+            </div>
+          </div>
+
+          <!-- meta strip: dates + terms on one line, above the table -->
+          <div class="inv-meta">
+            <div class="meta-cell">
+              <span class="meta-k">Date d'émission</span>
+              <span class="date-field">
+                <b class="meta-v" id="pvDate">—</b>
+                <input type="date" id="invDate" class="date-pick" aria-label="Date d'émission">
+              </span>
+            </div>
+            <div class="meta-cell">
+              <span class="meta-k">Date d'échéance</span>
+              <span class="date-field">
+                <b class="meta-v" id="pvDue">—</b>
+                <input type="date" id="invDue" class="date-pick" aria-label="Date d'échéance">
+              </span>
+            </div>
+            <div class="meta-cell">
+              <span class="meta-k">Conditions de paiement</span>
+              <input type="text" id="invTerms" class="inv-ed meta-terms" placeholder="Paiement à 14 jours" value="Paiement à 14 jours">
+            </div>
+          </div>
+
+          <!-- line items -->
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th class="col-h" id="colDesc" contenteditable="true" spellcheck="false">Description</th>
+                <th class="r col-h" id="colQty" contenteditable="true" spellcheck="false">Qté</th>
+                <th class="r col-h" id="colPrice" contenteditable="true" spellcheck="false">Prix unitaire</th>
+                <th class="r col-h" id="colAmt" contenteditable="true" spellcheck="false">Montant</th>
+                <th class="th-x"></th>
+              </tr>
+            </thead>
+            <tbody id="pvItems"></tbody>
+          </table>
+          <button type="button" class="ln-add" id="lnAdd"><i class="ti ti-plus"></i> Ajouter une ligne</button>
+
+          <!-- totals + notes -->
+          <div class="inv-bottom">
+            <div class="inv-notes">
+              <div class="nt">Notes</div>
+              <textarea id="invNotes" class="inv-ed notes-in" placeholder="Merci pour votre confiance. Paiement par Orange Money au +226…">Merci pour votre confiance.
+Orange Money / Wave : +226 70 12 34 56</textarea>
+            </div>
+            <div class="inv-tot">
+              <div class="tt-row"><span>Sous-total</span><span id="pvSub">—</span></div>
+              <div class="tt-row tva-row" id="pvTvaRow">
+                <span class="tva-ctl">
+                  <label class="mini-switch" title="Appliquer la TVA">
+                    <input type="checkbox" id="tvaToggle" checked>
+                    <span class="ms-track"></span>
+                  </label>
+                  TVA
+                  <input type="number" id="tvaRate" class="inv-ed tva-rate-in" value="18" min="0" max="100" step="0.5">%
+                </span>
+                <span id="pvTva">—</span>
+              </div>
+              <div class="tt-row grand"><span>Total dû</span><span id="pvTotal">—</span></div>
+            </div>
+          </div>
+
+          <!-- foot -->
+          <div class="inv-foot">
+            <div class="inv-credit">
+              <span class="bmark"><svg viewBox="0 0 24 24" fill="none"><path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fill-opacity="0.96"/></svg></span>
+              Créé avec Billio
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- RIGHT RAIL: funnel upsell ---------- -->
+    <aside class="rail">
+      <div class="tpl-card">
+        <div class="tpl-h"><i class="ti ti-template"></i> Modèle de facture</div>
+        <div class="tpl-opts" id="tplOpts">
+          <button type="button" class="tpl-opt active" data-tpl="classique"><span class="tpl-thumb"><span class="th-head"><span class="th-logo"></span><span class="th-title"></span></span><span class="th-rows"><i></i><i></i><i></i></span></span>Classique</button>
+          <button type="button" class="tpl-opt" data-tpl="bandeau"><span class="tpl-thumb"><span class="th-head"><span class="th-logo"></span><span class="th-title"></span></span><span class="th-rows"><i></i><i></i><i></i></span></span>Bandeau</button>
+          <button type="button" class="tpl-opt" data-tpl="epure"><span class="tpl-thumb"><span class="th-head"><span class="th-logo"></span><span class="th-title"></span></span><span class="th-rows"><i></i><i></i><i></i></span></span>Épuré</button>
+          <button type="button" class="tpl-opt" data-tpl="moderne"><span class="tpl-thumb"><span class="th-head"><span class="th-logo"></span><span class="th-title"></span></span><span class="th-rows"><i></i><i></i><i></i></span></span>Moderne</button>
+        </div>
+      </div>
+      <div class="upsell">
+        <div class="upsell-in">
+          <span class="uk"><i class="ti ti-sparkles"></i> Passez en pilote automatique</span>
+          <h3>Cette facture, mais vivante.</h3>
+          <ul>
+            <li><i class="ti ti-send"></i> Envoyez par WhatsApp ou email, avec lien de paiement Mobile Money</li>
+            <li><i class="ti ti-robot"></i> Relances automatiques jusqu'au paiement</li>
+            <li><i class="ti ti-shield-check"></i> Chaque encaissement comptabilisé — vos livres en règle avec la DGI</li>
+          </ul>
+          <a class="btn btn-white" href="Billio Onboarding.html">Créer mon compte gratuit <i class="ti ti-arrow-right"></i></a>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- ============ FOOTER BAND ============ -->
+<section class="section cta-final tool-foot">
+  <div class="wrap">
+    <div class="cta-card">
+      <h2>Facturer, c'est gratuit. Rester en règle, c'est Billio.</h2>
+      <p>Gardez ce générateur autant que vous voulez. Quand vous serez prêt à suivre vos paiements et tenir une compta conforme sans effort, Billio prend le relais.</p>
+      <div class="hero-cta">
+        <a class="btn btn-white btn-lg" href="Billio Onboarding.html">Commencer gratuitement <i class="ti ti-arrow-right"></i></a>
+        <a class="btn btn-light btn-lg" href="Billio Landing.html#pricing"><i class="ti ti-tag"></i> Voir les tarifs</a>
+      </div>
+      <div class="hero-trust">
+        <span><i class="ti ti-circle-check-filled"></i> Sans carte bancaire</span>
+        <span><i class="ti ti-circle-check-filled"></i> Conforme SYSCOHADA</span>
+        <span><i class="ti ti-circle-check-filled"></i> Prêt en 2 minutes</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ POST-PRINT MODAL ============ -->
+<div class="modal-scrim" id="doneModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="doneTitle">
+    <div class="modal-ico"><i class="ti ti-circle-check-filled"></i></div>
+    <h3 id="doneTitle">Votre facture est prête.</h3>
+    <p>Avec Billio, vous l'envoyez en un clic, suivez le paiement et votre comptabilité se met à jour toute seule — prête pour la DGI.</p>
+    <div class="modal-cta">
+      <a class="btn btn-primary btn-lg" href="Billio Onboarding.html">Suivre cette facture avec Billio <i class="ti ti-arrow-right"></i></a>
+      <button type="button" class="modal-dismiss" id="doneDismiss">Continuer sans compte</button>
+    </div>
+  </div>
+</div>
+
+<script src="icons.js"></script>
+<script src="invoice-generator.js"></script>
+</body>
+</html>

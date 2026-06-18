@@ -123,8 +123,8 @@ interface SupplierContact {
   overdueCount: number;
 }
 
-interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; paymentMethod: PaymentMethod; ifu: string; rccm: string; taxRegime: string }
-const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', paymentMethod: 'wire', ifu: '', rccm: '', taxRegime: '' };
+interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; paymentMethod: PaymentMethod; ifu: string; rccm: string; taxRegime: string; fiscalDivision: string }
+const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', paymentMethod: 'wire', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   wire:   'Virement',
@@ -342,11 +342,15 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
           <label className="form-label">RCCM</label>
           <input className="form-input" value={form.rccm} onChange={e => set('rccm', e.target.value)} placeholder="Registre de commerce" />
         </div>
-        <div style={{ gridColumn: '1/-1' }}>
+        <div>
           <label className="form-label">Régime fiscal</label>
           <select className="form-input" value={form.taxRegime} onChange={e => set('taxRegime', e.target.value)}>
             {TAX_REGIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="form-label">Division fiscale</label>
+          <FiscalDivisionSelect value={form.fiscalDivision} onChange={v => set('fiscalDivision', v)} />
         </div>
       </div>
 
@@ -665,7 +669,7 @@ export default function ContactsPage() {
 
   async function handleCreateBill(billForm: BillForm) {
     const ht = parseFloat(billForm.htAmount);
-    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * TVA_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined });
+    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * TVA_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined, fiscalDivision: billForm.fiscalDivision || undefined });
   }
 
   // ── Contextual KPIs ───────────────────────────────────────────────────────

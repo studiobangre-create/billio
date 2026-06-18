@@ -11,6 +11,7 @@ import AppShell from './components/AppShell';
 // when the user navigates to it. The PWA service worker caches chunks after
 // first visit, so subsequent navigations are instant.
 const LandingPage            = lazy(() => import('./pages/LandingPage'));
+const InvoiceGeneratorPage   = lazy(() => import('./pages/InvoiceGeneratorPage'));
 const AuthPage               = lazy(() => import('./pages/AuthPage'));
 const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
 const InvitePage             = lazy(() => import('./pages/InvitePage'));
@@ -55,8 +56,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  if (!MOCK && session === undefined) return null; // resolving auth state
-
+  const resolving = !MOCK && session === undefined;
   const authed   = MOCK ? mockAuthed : !!session;
   const onLogout = MOCK
     ? () => setMockAuthed(false)
@@ -67,11 +67,14 @@ export default function App() {
     <AppProvider>
       <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
-        {/* Landing */}
+        {/* Landing — visible immediately, no need to wait for session */}
         <Route
-          path="/"
+          path="/landing"
           element={authed ? <Navigate to="/dashboard" replace /> : <LandingPage />}
         />
+
+        {/* Public tools */}
+        <Route path="/invoice-generator" element={<InvoiceGeneratorPage />} />
 
         {/* Public */}
         <Route
@@ -90,16 +93,15 @@ export default function App() {
         />
         <Route path="/invite/:token" element={<InvitePage />} />
 
-        {/* Protected — AppShell is the layout, Outlet renders child routes */}
+        {/* Protected — wait for session to resolve before redirecting */}
         <Route
-          element={authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/login" replace />}
+          element={resolving ? null : authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/" replace />}
         >
           {/* Onboarding renders inside AppShell (gets the sidebar), not guarded */}
           <Route path="/onboarding" element={<OnboardingPage />} />
 
           {/* All other routes redirect to /onboarding when setup is missing */}
           <Route element={<OnboardingGuard />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/invoices/:id" element={<InvoicePage />} />

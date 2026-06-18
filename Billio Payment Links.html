@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billio — Liens de paiement : encaissez en un lien</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="billio-landing.css">
+<style>
+/* ---------- payment-link hero mock ---------- */
+.pl-hero { background:
+    radial-gradient(1100px 520px at 82% -10%, #E4EFFB 0%, rgba(228,239,251,0) 60%),
+    radial-gradient(820px 560px at -10% 10%, #EDF3FA 0%, rgba(237,243,250,0) 55%), #fff; }
+.pl-phone { position: relative; width: 320px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 26px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.pl-phone-top { background: linear-gradient(150deg, var(--brand-l), var(--brand-d)); color: #fff; padding: 22px 22px 20px; }
+.pl-phone-biz { display: flex; align-items: center; gap: 11px; }
+.pl-phone-logo { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; }
+.pl-phone-bizname { font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pl-phone-bizmeta { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 1px; white-space: nowrap; }
+.pl-phone-amtlbl { font-size: 11.5px; color: rgba(255,255,255,0.82); margin-top: 18px; font-weight: 600; }
+.pl-phone-amt { font-size: 30px; font-weight: 800; letter-spacing: -1px; margin-top: 3px; }
+.pl-phone-amt small { font-size: 15px; font-weight: 700; opacity: 0.85; }
+.pl-phone-doc { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pl-phone-body { padding: 18px; }
+.pl-phone-cap { font-size: 10.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--t3); margin-bottom: 11px; }
+.pl-pay { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 9px; transition: border-color .14s, background .14s; }
+.pl-pay.sel { border-color: var(--brand); background: var(--tint); }
+.pl-pay-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; color: #fff; flex-shrink: 0; }
+.pl-pay-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.pl-pay-sub { font-size: 11px; color: var(--t2); margin-top: 1px; white-space: nowrap; }
+.pl-pay-radio { margin-left: auto; width: 19px; height: 19px; border-radius: 50%; border: 2px solid var(--line2); flex-shrink: 0; }
+.pl-pay.sel .pl-pay-radio { border-color: var(--brand); background: radial-gradient(circle, var(--brand) 0 5px, transparent 6px); }
+.pl-phone-btn { margin-top: 6px; width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--brand); color: #fff; font-family: var(--font-sans); font-size: 14.5px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.pl-phone-secure { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; font-size: 10.5px; color: var(--t3); font-weight: 600; }
+.pl-phone-secure i { font-size: 13px; }
+.pl-float { position: absolute; z-index: 3; background: #fff; border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow-lg); padding: 12px 14px; display: flex; align-items: center; gap: 11px; animation: floaty 5.5s ease-in-out infinite; }
+.pl-float-ico { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.pl-float .ft { font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pl-float .fs { font-size: 10.5px; color: var(--t2); margin-top: 1px; white-space: nowrap; }
+.pl-float-paid { top: 30px; right: -26px; }
+.pl-float-paid .pl-float-ico { background: var(--green-l); color: var(--green); }
+.pl-float-book { bottom: 40px; left: -34px; animation-delay: -2.5s; }
+.pl-float-book .pl-float-ico { background: var(--tint); color: var(--brand); }
+@media (prefers-reduced-motion: reduce) { .pl-float { animation: none; } }
+
+/* ---------- methods ---------- */
+.pl-methods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 50px; }
+.pl-method { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 24px; text-align: center; }
+.pl-method-ico { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 25px; color: #fff; }
+.pl-method-name { font-size: 15px; font-weight: 800; margin-top: 14px; }
+.pl-method-sub { font-size: 12.5px; color: var(--t2); margin-top: 4px; }
+
+/* ---------- fee table ---------- */
+.fee-wrap { max-width: 760px; margin: 50px auto 0; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
+.fee-row { display: grid; grid-template-columns: 1fr 150px; align-items: center; padding: 18px 26px; }
+.fee-row + .fee-row { border-top: 1px solid var(--line); }
+.fee-row.head { background: var(--bg2); padding: 14px 26px; }
+.fee-row.head .fh { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--t3); }
+.fee-row.head .fh.r { text-align: right; }
+.fee-plan { font-size: 15.5px; font-weight: 800; }
+.fee-plan small { display: block; font-size: 12px; color: var(--t2); font-weight: 500; margin-top: 2px; }
+.fee-plan .pop-tag { display: inline-block; font-size: 9.5px; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase; color: var(--brand); background: var(--tint); padding: 2px 7px; border-radius: 20px; margin-left: 8px; vertical-align: middle; }
+.fee-pct { text-align: right; font-size: 22px; font-weight: 800; letter-spacing: -0.6px; color: var(--brand); font-variant-numeric: tabular-nums; }
+.fee-pct small { font-size: 12px; color: var(--t3); font-weight: 600; }
+.fee-note { display: flex; gap: 11px; align-items: flex-start; max-width: 760px; margin: 18px auto 0; padding: 16px 20px; background: var(--green-l); border-radius: 14px; font-size: 13px; color: #1c5e2a; line-height: 1.55; }
+.fee-note i { font-size: 18px; color: var(--green); flex-shrink: 0; margin-top: 1px; }
+.fee-note b { font-weight: 800; }
+
+.pl-backlink { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--t2); margin-bottom: 4px; }
+.pl-backlink:hover { color: var(--brand); }
+
+@media (max-width: 940px) {
+  .pl-methods { grid-template-columns: 1fr 1fr; }
+  .pl-float-paid { right: 0; }
+  .pl-float-book { left: 0; }
+}
+@media (max-width: 560px) {
+  .pl-methods { grid-template-columns: 1fr; }
+  .fee-row { grid-template-columns: 1fr auto; padding: 16px 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="Billio Landing.html">
+      <span class="brand-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fill-opacity="0.96"/>
+          <path d="M8 8.2h6M8 11.4h7M8 14.6h4" stroke="#185FA5" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Billio</span>
+    </a>
+    <nav class="nav-links">
+      <a href="Billio Landing.html#features">Pourquoi Billio</a>
+      <a href="Billio Landing.html#accounting">Conformité</a>
+      <a href="Billio Landing.html#pricing">Tarifs</a>
+      <a href="Billio Landing.html#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="nav-signin" href="Billio Auth.html">Connexion</a>
+      <a class="btn btn-primary" href="Billio Onboarding.html">Commencer <i class="ti ti-arrow-right"></i></a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero pl-hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <a class="pl-backlink" href="Billio Landing.html"><i class="ti ti-arrow-left"></i> Retour</a>
+      <span class="eyebrow"><i class="ti ti-link"></i> Liens de paiement</span>
+      <h1>Un lien. <span class="hl">Et vous êtes payé.</span></h1>
+      <p class="hero-sub">Créez un lien de paiement pour n'importe quelle facture et partagez-le par WhatsApp, SMS ou e-mail. Votre client paie par <b>Mobile Money ou carte</b> en quelques secondes — et l'encaissement se <b>comptabilise tout seul</b>.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="Billio Onboarding.html">Créer un lien gratuitement <i class="ti ti-arrow-right"></i></a>
+        <a class="btn btn-ghost btn-lg" href="#frais"><i class="ti ti-coins"></i> Voir les frais</a>
+      </div>
+      <div class="hero-trust">
+        <span><i class="ti ti-circle-check-filled"></i> Aucun frais d'installation</span>
+        <span><i class="ti ti-circle-check-filled"></i> Rapprochement automatique</span>
+        <span><i class="ti ti-circle-check-filled"></i> Disponible dès l'offre gratuite</span>
+      </div>
+    </div>
+
+    <div class="hero-vis" style="display:flex;align-items:center;">
+      <div class="pl-phone">
+        <div class="pl-phone-top">
+          <div class="pl-phone-biz">
+            <div class="pl-phone-logo">SW</div>
+            <div>
+              <div class="pl-phone-bizname">Studio Wend SARL</div>
+              <div class="pl-phone-bizmeta">Demande de paiement</div>
+            </div>
+          </div>
+          <div class="pl-phone-amtlbl">Montant à payer</div>
+          <div class="pl-phone-amt">908 600 <small>XOF</small></div>
+          <div class="pl-phone-doc">Facture INV-0042 · échéance 20 juin</div>
+        </div>
+        <div class="pl-phone-body">
+          <div class="pl-phone-cap">Choisir un moyen de paiement</div>
+          <div class="pl-pay sel">
+            <div class="pl-pay-ico" style="background:#FF6600;"><i class="ti ti-device-mobile"></i></div>
+            <div><div class="pl-pay-name">Orange Money</div><div class="pl-pay-sub">+226 •• •• •• 42</div></div>
+            <div class="pl-pay-radio"></div>
+          </div>
+          <div class="pl-pay">
+            <div class="pl-pay-ico" style="background:#FFCC00;color:#1a1a1a;"><i class="ti ti-device-mobile"></i></div>
+            <div><div class="pl-pay-name">MTN MoMo</div><div class="pl-pay-sub">Mobile Money</div></div>
+            <div class="pl-pay-radio"></div>
+          </div>
+          <div class="pl-pay">
+            <div class="pl-pay-ico" style="background:#1DC8CC;"><i class="ti ti-wave"></i></div>
+            <div><div class="pl-pay-name">Wave</div><div class="pl-pay-sub">Mobile Money</div></div>
+            <div class="pl-pay-radio"></div>
+          </div>
+          <div class="pl-pay">
+            <div class="pl-pay-ico" style="background:var(--brand);"><i class="ti ti-credit-card"></i></div>
+            <div><div class="pl-pay-name">Carte bancaire</div><div class="pl-pay-sub">Visa · Mastercard</div></div>
+            <div class="pl-pay-radio"></div>
+          </div>
+          <button class="pl-phone-btn"><i class="ti ti-lock"></i> Payer 908 600 XOF</button>
+          <div class="pl-phone-secure"><i class="ti ti-shield-check"></i> Paiement sécurisé par Billio</div>
+        </div>
+      </div>
+      <div class="pl-float pl-float-paid">
+        <div class="pl-float-ico"><i class="ti ti-circle-check-filled"></i></div>
+        <div><div class="ft">Paiement reçu</div><div class="fs">+908 600 XOF</div></div>
+      </div>
+      <div class="pl-float pl-float-book">
+        <div class="pl-float-ico"><i class="ti ti-book-2"></i></div>
+        <div><div class="ft">Écriture créée</div><div class="fs">Journal BQ · auto</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i class="ti ti-bolt"></i> Comment ça marche</span>
+      <h2>De la facture à l'encaissement, en trois gestes.</h2>
+      <p>Pas de terminal, pas de contrat bancaire compliqué. Vous générez le lien, le client paie, vos livres se mettent à jour.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <h3>Générez le lien</h3>
+        <p>Depuis n'importe quelle facture, créez un lien de paiement en un clic. Le montant et la référence sont déjà renseignés.</p>
+        <i class="ti ti-arrow-right step-arrow"></i>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <h3>Partagez-le</h3>
+        <p>Envoyez le lien par WhatsApp, SMS ou e-mail. Le client paie par Mobile Money ou carte, sans créer de compte.</p>
+        <i class="ti ti-arrow-right step-arrow"></i>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <h3>Encaissé &amp; comptabilisé</h3>
+        <p>Le paiement est rapproché de la facture et l'écriture passe automatiquement dans le bon journal. Rien à ressaisir.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ METHODS ============ -->
+<section class="section alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i class="ti ti-wallet"></i> Moyens de paiement</span>
+      <h2>Vos clients paient comme ils en ont l'habitude.</h2>
+      <p>Tous les principaux moyens de paiement de la zone UEMOA, réunis derrière un seul lien.</p>
+    </div>
+    <div class="pl-methods">
+      <div class="pl-method">
+        <div class="pl-method-ico" style="background:#FF6600;"><i class="ti ti-device-mobile"></i></div>
+        <div class="pl-method-name">Orange Money</div>
+        <div class="pl-method-sub">8 pays UEMOA</div>
+      </div>
+      <div class="pl-method">
+        <div class="pl-method-ico" style="background:#FFCC00;color:#1a1a1a;"><i class="ti ti-device-mobile"></i></div>
+        <div class="pl-method-name">MTN MoMo</div>
+        <div class="pl-method-sub">Mobile Money</div>
+      </div>
+      <div class="pl-method">
+        <div class="pl-method-ico" style="background:#1DC8CC;"><i class="ti ti-wave"></i></div>
+        <div class="pl-method-name">Wave</div>
+        <div class="pl-method-sub">Mobile Money</div>
+      </div>
+      <div class="pl-method">
+        <div class="pl-method-ico" style="background:var(--brand);"><i class="ti ti-credit-card"></i></div>
+        <div class="pl-method-name">Carte bancaire</div>
+        <div class="pl-method-sub">Visa · Mastercard</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEES ============ -->
+<section class="section" id="frais">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i class="ti ti-coins"></i> Frais d'encaissement</span>
+      <h2>Une commission simple, qui baisse quand vous grandissez.</h2>
+      <p>Aucun abonnement supplémentaire pour encaisser. Vous ne payez une commission que sur les paiements réellement reçus en ligne.</p>
+    </div>
+    <div class="fee-wrap">
+      <div class="fee-row head">
+        <div class="fh">Offre</div>
+        <div class="fh r">Par paiement encaissé</div>
+      </div>
+      <div class="fee-row">
+        <div class="fee-plan">Solo<small>Offre gratuite</small></div>
+        <div class="fee-pct">1,9&nbsp;<small>%</small></div>
+      </div>
+      <div class="fee-row">
+        <div class="fee-plan">Business <span class="pop-tag">Populaire</span><small>15 000 XOF / mois</small></div>
+        <div class="fee-pct">1,2&nbsp;<small>%</small></div>
+      </div>
+      <div class="fee-row">
+        <div class="fee-plan">Cabinet<small>45 000 XOF / mois</small></div>
+        <div class="fee-pct">0,9&nbsp;<small>%</small></div>
+      </div>
+      <div class="fee-row">
+        <div class="fee-plan">Enterprise<small>Sur devis</small></div>
+        <div class="fee-pct" style="font-size:16px;">Négocié</div>
+      </div>
+    </div>
+    <div class="fee-note">
+      <i class="ti ti-circle-check-filled"></i>
+      <div>La commission s'applique <b>uniquement</b> aux paiements encaissés en ligne (Mobile Money &amp; carte). Les factures réglées en espèces ou par virement direct restent <b>sans frais</b>. Pas d'abonnement, pas de frais cachés.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="section cta-final">
+  <div class="wrap">
+    <div class="cta-card">
+      <h2>Envoyez votre premier lien de paiement.</h2>
+      <p>Disponible dès l'offre gratuite. Vous n'êtes facturé que lorsque vous êtes payé.</p>
+      <div class="hero-cta">
+        <a class="btn btn-white btn-lg" href="Billio Onboarding.html">Commencer gratuitement <i class="ti ti-arrow-right"></i></a>
+        <a class="btn btn-light btn-lg" href="Billio Landing.html#pricing"><i class="ti ti-tag"></i> Voir les offres</a>
+      </div>
+      <div class="hero-trust">
+        <span><i class="ti ti-circle-check-filled"></i> Aucun frais d'installation</span>
+        <span><i class="ti ti-circle-check-filled"></i> Sans engagement</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-about">
+        <a class="brand" href="Billio Landing.html">
+          <span class="brand-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fill-opacity="0.96"/>
+              <path d="M8 8.2h6M8 11.4h7M8 14.6h4" stroke="#185FA5" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="brand-name">Billio</span>
+        </a>
+        <p>La conformité SYSCOHADA sans prise de tête, pour les entreprises de la zone UEMOA.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Produit</h4>
+        <a href="Billio Landing.html#features">Pourquoi Billio</a>
+        <a href="Billio Landing.html#accounting">Conformité</a>
+        <a href="Billio Payment Links.html">Liens de paiement</a>
+        <a href="Billio Landing.html#pricing">Tarifs</a>
+      </div>
+      <div class="foot-col">
+        <h4>Entreprise</h4>
+        <a href="#">À propos</a>
+        <a href="#">Clients</a>
+        <a href="#">Recrutement</a>
+        <a href="#">Blog</a>
+      </div>
+      <div class="foot-col">
+        <h4>Support</h4>
+        <a href="Billio Landing.html#faq">Centre d'aide</a>
+        <a href="Billio Auth.html">Connexion</a>
+        <a href="#">Contact</a>
+        <a href="#">Statut</a>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <p>© 2026 Billio SARL · Ouagadougou, Burkina Faso. Tous droits réservés.</p>
+      <div class="foot-social">
+        <a href="#" aria-label="WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>
+        <a href="#" aria-label="Email"><i class="ti ti-mail"></i></a>
+        <a href="#" aria-label="Phone"><i class="ti ti-phone"></i></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="icons.js"></script>
+<script>
+  (function () {
+    if (window.refreshIcons) refreshIcons();
+    var nav = document.getElementById("nav");
+    var onScroll = function () { nav.classList.toggle("scrolled", window.scrollY > 8); };
+    onScroll(); window.addEventListener("scroll", onScroll, { passive: true });
+  })();
+</script>
+</body>
+</html>

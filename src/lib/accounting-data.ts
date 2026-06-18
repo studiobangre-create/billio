@@ -66,6 +66,7 @@ export interface SupplierBill {
   ifu?: string;
   rccm?: string;
   taxRegime?: string;
+  fiscalDivision?: string;
 }
 
 export interface LedgerRow {

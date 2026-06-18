@@ -26,6 +26,9 @@ function Nav() {
           <a href="#accounting">Conformité</a>
           <a href="#pricing">Tarifs</a>
           <a href="#faq">FAQ</a>
+          <Link to="/invoice-generator" className="lp-nav-tool">
+            <i className="ti ti-receipt" /> Générateur de factures
+          </Link>
         </nav>
         <div className="lp-nav-cta">
           <Link to="/login" className="lp-nav-signin">Connexion</Link>
@@ -45,11 +48,9 @@ function Hero() {
       <div className="lp-wrap lp-hero-grid">
         <div className="lp-hero-copy">
           <div className="lp-eyebrow"><i className="ti ti-shield-check" /> En règle avec la DGI</div>
-          <h1>Votre entreprise en règle avec le fisc, <span className="lp-hl">sans même y penser.</span></h1>
+          <h1>Votre entreprise en règle avec la DGI, <span className="lp-hl">sans même y penser.</span></h1>
           <p className="lp-hero-sub">
-            Une comptabilité non conforme, ce sont des <b>pénalités</b> et un contrôle qui vous coûtent cher —
-            et les logiciels existants sont trop compliqués. Billio tient vos livres SYSCOHADA,
-            votre TVA et vos déclarations à jour <b>automatiquement</b>. Vous gérez votre activité, on s'occupe du reste.
+            Fini les pénalités et les logiciels compliqués.
           </p>
           <div className="lp-hero-cta">
             <Link to="/login" className="lp-btn lp-btn--primary lp-btn--lg">
@@ -58,11 +59,6 @@ function Hero() {
             <Link to="/dashboard" className="lp-btn lp-btn--ghost lp-btn--lg">
               <i className="ti ti-player-play" /> Voir la démo
             </Link>
-          </div>
-          <div className="lp-trust">
-            <span><i className="ti ti-circle-check-filled" /> Sans carte bancaire</span>
-            <span><i className="ti ti-circle-check-filled" /> Conforme SYSCOHADA révisé</span>
-            <span><i className="ti ti-circle-check-filled" /> Prêt en 2 minutes</span>
           </div>
         </div>
 
@@ -98,6 +94,10 @@ function Hero() {
               </div>
               <div className="lp-pi-row">
                 <div><div className="lp-pi-desc">Hébergement annuel</div><div className="lp-pi-qty">1 × 120 000</div></div>
+                <div className="lp-pi-amt">120 000</div>
+              </div>
+              <div className="lp-pi-row">
+                <div><div className="lp-pi-desc">Hébergement Trimestrielle</div><div className="lp-pi-qty">1 × 120 000</div></div>
                 <div className="lp-pi-amt">120 000</div>
               </div>
             </div>
@@ -155,8 +155,8 @@ function Logos() {
 /* ── Value ───────────────────────────────────────────────── */
 const VALUE_CARDS = [
   { icon: 'shield-check', color: undefined,  title: 'Toujours en règle', body: 'Chaque opération met à jour vos journaux SYSCOHADA et votre TVA. Vos livres sont prêts pour la DGI, à tout moment.' },
-  { icon: 'mood-smile',   color: '--lp-green',  title: 'Zéro pénalité',    body: 'Déclarations à jour, échéances suivies, écritures équilibrées. Plus de stress de dernière minute ni de risque de redressement.' },
-  { icon: 'robot',        color: '--lp-amber',  title: 'Sans être comptable', body: "Pas de jargon ni de double saisie. Vous gérez votre activité ; Billio s'occupe d'une comptabilité 100 % conforme à votre place." },
+  { icon: 'mood-smile',   color: '--lp-green',  title: 'Zéro pénalité',    body: 'Déclarations à jour, échéances suivies, écritures équilibrées. Plus de risque de redressement.' },
+  { icon: 'robot',        color: '--lp-amber',  title: 'Sans être comptable', body: "Pas de jargon ni de double saisie. Vous gérez votre activité ; Billio s'occupe d'une comptabilité 100 % conforme." },
 ];
 
 function ValueSection() {
@@ -197,7 +197,7 @@ function FeaturesSection() {
           <div className="lp-feat-copy">
             <div className="lp-feat-kick"><i className="ti ti-receipt" /> Facturation conforme</div>
             <h3>Facturez normalement. La conformité suit toute seule.</h3>
-            <p>Créez un devis, transformez-le en facture en un clic. TVA, IFU et RCCM sont déjà là — et chaque encaissement se comptabilise tout seul, dans le bon journal.</p>
+            <p>Du devis à la facture en un clic — TVA, IFU, RCCM inclus et comptabilité automatique.</p>
             <ul className="lp-feat-list">
               <li><i className="ti ti-circle-check-filled" /><span>TVA, IFU &amp; RCCM automatiques<small>Des factures conformes, sans y penser</small></span></li>
               <li><i className="ti ti-circle-check-filled" /><span>Mobile Money intégré<small>MTN · Orange · Wave — rapproché automatiquement</small></span></li>
@@ -222,9 +222,19 @@ function FeaturesSection() {
                   <div className="lp-tl-time">J+7</div>
                 </div>
                 <div className="lp-tl-item">
+                  <div className="lp-tl-dot" style={{ background: 'var(--lp-amber-l)', color: 'var(--lp-amber)' }}><i className="ti ti-robot" /></div>
+                  <div style={{ flex: 1 }}><div className="lp-tl-t">Relance automatique</div><div className="lp-tl-s">Relance amicale · Email</div></div>
+                  <div className="lp-tl-time">J+9</div>
+                </div>
+                <div className="lp-tl-item">
+                  <div className="lp-tl-dot" style={{ background: 'var(--lp-amber-l)', color: 'var(--lp-amber)' }}><i className="ti ti-robot" /></div>
+                  <div style={{ flex: 1 }}><div className="lp-tl-t">Relance automatique</div><div className="lp-tl-s">Relance amicale · Tel</div></div>
+                  <div className="lp-tl-time">J+12</div>
+                </div>
+                <div className="lp-tl-item">
                   <div className="lp-tl-dot" style={{ background: 'var(--lp-green-l)', color: 'var(--lp-green)' }}><i className="ti ti-circle-check-filled" /></div>
                   <div style={{ flex: 1 }}><div className="lp-tl-t">Paiement reçu</div><div className="lp-tl-s">Orange Money · +908 600 XOF</div></div>
-                  <div className="lp-tl-time">J+9</div>
+                  <div className="lp-tl-time">J+16</div>
                 </div>
               </div>
               <div className="lp-mtie"><i className="ti ti-circle-check-filled" /> Encaissement comptabilisé · journal BQ</div>
@@ -237,7 +247,7 @@ function FeaturesSection() {
           <div className="lp-feat-copy">
             <div className="lp-feat-kick"><i className="ti ti-shield-check" /> Conformité SYSCOHADA</div>
             <h3>Une comptabilité prête pour la DGI — sans la faire vous-même.</h3>
-            <p>Derrière des écrans simples tourne un vrai moteur SYSCOHADA. Journaux, grand livre, balance et états financiers restent justes toute l'année, prêts à présenter en cas de contrôle.</p>
+            <p>Un vrai moteur SYSCOHADA sous le capot — journaux, grand livre et états financiers toujours à jour, prêts pour un contrôle.</p>
             <ul className="lp-feat-list">
               <li><i className="ti ti-circle-check-filled" /><span>Écritures toujours équilibrées<small>Partie double : débit = crédit, à chaque fois</small></span></li>
               <li><i className="ti ti-circle-check-filled" /><span>Déclarations TVA prêtes<small>TVA à 18 % suivie et prête à déclarer</small></span></li>
@@ -271,6 +281,18 @@ function FeaturesSection() {
               <div className="lp-mtie"><i className="ti ti-scale" /> Totaux généraux équilibrés · 19 870 000 = 19 870 000</div>
             </div>
           </div>
+        </div>
+
+        {/* Free tool CTA */}
+        <div className="lp-tool-cta">
+          <div className="lp-tool-cta-copy">
+            <span className="lp-eyebrow"><i className="ti ti-receipt" /> Outil gratuit</span>
+            <h3>Pas encore prêt à vous lancer ? Commencez par une facture.</h3>
+            <p>Notre générateur de factures est 100 % gratuit et sans inscription — TVA, IFU, RCCM inclus. Téléchargez en PDF en un clic.</p>
+          </div>
+          <Link to="/invoice-generator" className="lp-btn lp-btn--primary lp-btn--lg">
+            Créer une facture gratuite <i className="ti ti-arrow-right" />
+          </Link>
         </div>
       </div>
     </section>
@@ -310,10 +332,55 @@ function HowItWorks() {
 /* ── Compliance band ─────────────────────────────────────── */
 function ComplianceBand() {
   const chips = [
-    { icon: 'book',          title: 'SYSCOHADA révisé',    sub: 'Plan comptable & journaux prêts à l\'emploi' },
-    { icon: 'building-bank', title: 'TVA & déclarations',  sub: 'TVA 18 % suivie, prête à déclarer' },
-    { icon: 'report-money',  title: 'États financiers',    sub: 'Bilan & compte de résultat à la demande' },
-    { icon: 'world',         title: '8 pays · XOF',        sub: 'Burkina, Mali, Sénégal, Côte d\'Ivoire & plus' },
+    {
+      svg: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          <line x1="9" y1="7" x2="15" y2="7" />
+          <line x1="9" y1="11" x2="15" y2="11" />
+        </svg>
+      ),
+      title: 'SYSCOHADA révisé',
+      sub: "Plan comptable & journaux prêts à l'emploi",
+    },
+    {
+      svg: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="9" y1="15" x2="15" y2="9" />
+          <circle cx="9.5" cy="9.5" r="1" fill="currentColor" stroke="none" />
+          <circle cx="14.5" cy="14.5" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      ),
+      title: 'TVA & déclarations',
+      sub: 'TVA 18 % suivie, prête à déclarer',
+    },
+    {
+      svg: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="2" y1="20" x2="22" y2="20" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+          <line x1="12" y1="20" x2="12" y2="6" />
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <polyline points="2 10 8 4 14 10 20 6" />
+        </svg>
+      ),
+      title: 'États financiers',
+      sub: 'Bilan & compte de résultat à la demande',
+    },
+    {
+      svg: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      ),
+      title: '8 pays · XOF',
+      sub: "Burkina, Mali, Sénégal, Côte d'Ivoire & plus",
+    },
   ];
   return (
     <section className="lp-section lp-section--alt">
@@ -323,12 +390,12 @@ function ComplianceBand() {
             <div>
               <div className="lp-eyebrow"><i className="ti ti-shield-check" /> La conformité par défaut</div>
               <h2>La conformité, dans l'ADN du produit.</h2>
-              <p>Billio parle SYSCOHADA nativement — le plan comptable, les journaux, la TVA, les états financiers attendus par l'administration. Aucun bricolage, aucune mauvaise surprise le jour d'un contrôle.</p>
+              <p>Plan comptable, journaux, TVA, états financiers — tout SYSCOHADA, sans bricolage.</p>
             </div>
             <div className="lp-band-chips">
               {chips.map(c => (
                 <div key={c.title} className="lp-bchip">
-                  <i className={`ti ti-${c.icon}`} />
+                  {c.svg}
                   <div className="lp-bt">{c.title}</div>
                   <div className="lp-bs">{c.sub}</div>
                 </div>
@@ -373,7 +440,6 @@ function PricingCard({ plan }: { plan: PlanDef }) {
       <div className="lp-plan-price">
         {isQuote ? (
           <>
-            <span className="lp-from">À partir de</span>
             <span className="lp-amt">Sur devis</span>
             <span className="lp-per">Contrat annuel</span>
           </>
@@ -514,6 +580,7 @@ function Footer() {
             <a href="#features">Pourquoi Billio</a>
             <a href="#accounting">Conformité</a>
             <a href="#pricing">Tarifs</a>
+            <Link to="/invoice-generator">Générateur de factures</Link>
           </div>
           <div className="lp-foot-col">
             <h4>Entreprise</h4>
