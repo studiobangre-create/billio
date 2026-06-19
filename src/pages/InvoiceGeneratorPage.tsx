@@ -5,7 +5,7 @@ import './InvoiceGeneratorPage.css';
 
 /* ── Types ───────────────────────────────────────────────── */
 type Currency = 'XOF' | 'XAF' | 'GNF' | 'CDF' | 'EUR' | 'USD';
-type Template = 'classique' | 'bandeau' | 'epure' | 'moderne';
+type Template = 'classique' | 'bandeau' | 'epure' | 'moderne' | 'encadre';
 
 interface LineItem {
   id: number;
@@ -104,6 +104,7 @@ export default function InvoiceGeneratorPage() {
 
   /* ── State ─────────────────────────────────────── */
   const [bizName,     setBizName]     = useState('Studio Wend SARL');
+  const [bizTagline,  setBizTagline]  = useState('Agence digitale & développement web');
   const [bizAddr,     setBizAddr]     = useState('Secteur 15, Ouagadougou\nBurkina Faso');
   const [bizIfu,      setBizIfu]      = useState('00076214 B');
   const [bizRccm,     setBizRccm]     = useState('BF-OUA-2023-B-0912');
@@ -119,11 +120,12 @@ export default function InvoiceGeneratorPage() {
   const [cliEmail,    setCliEmail]    = useState('compta@sahelbanque.bf');
   const [cliDivision, setCliDivision] = useState('Direction des Grandes Entreprises');
 
-  const [invNum,   setInvNum]   = useState('INV-0042');
-  const [invDate,  setInvDate]  = useState(t0);
-  const [invDue,   setInvDue]   = useState(addDays(t0, 14));
-  const [invTerms, setInvTerms] = useState('Paiement à 14 jours');
-  const [invNotes, setInvNotes] = useState('Merci pour votre confiance.\nOrange Money / Wave : +226 70 12 34 56');
+  const [invNum,       setInvNum]       = useState('INV-0042');
+  const [invDate,      setInvDate]      = useState(t0);
+  const [invDue,       setInvDue]       = useState(addDays(t0, 14));
+  const [invTerms,     setInvTerms]     = useState('Paiement à 14 jours');
+  const [invNotes,     setInvNotes]     = useState('Merci pour votre confiance.\nOrange Money / Wave : +226 70 12 34 56');
+  const [invTermsCond, setInvTermsCond] = useState('');
 
   const [currency, setCurrency] = useState<Currency>('XOF');
   const [tvaOn,    setTvaOn]    = useState(true);
@@ -141,7 +143,7 @@ export default function InvoiceGeneratorPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Persist to localStorage ────────────────── */
-  const state = { bizName, bizAddr, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, cliName, cliAddr, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, invNum, invDate, invDue, invTerms, invNotes, currency, tvaOn, tvaRate, template, items, logoData };
+  const state = { bizName, bizTagline, bizAddr, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, cliName, cliAddr, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, invNum, invDate, invDue, invTerms, invNotes, invTermsCond, currency, tvaOn, tvaRate, template, items, logoData };
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
@@ -153,6 +155,7 @@ export default function InvoiceGeneratorPage() {
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.bizName)     setBizName(d.bizName);
+      if (d.bizTagline)  setBizTagline(d.bizTagline);
       if (d.bizAddr)     setBizAddr(d.bizAddr);
       if (d.bizIfu)      setBizIfu(d.bizIfu);
       if (d.bizRccm)     setBizRccm(d.bizRccm);
@@ -170,7 +173,8 @@ export default function InvoiceGeneratorPage() {
       if (d.invDate)     setInvDate(d.invDate);
       if (d.invDue)      setInvDue(d.invDue);
       if (d.invTerms)    setInvTerms(d.invTerms);
-      if (d.invNotes)    setInvNotes(d.invNotes);
+      if (d.invNotes)     setInvNotes(d.invNotes);
+      if (d.invTermsCond) setInvTermsCond(d.invTermsCond);
       if (d.currency)    setCurrency(d.currency);
       if (typeof d.tvaOn === 'boolean') setTvaOn(d.tvaOn);
       if (d.tvaRate)     setTvaRate(d.tvaRate);
@@ -320,7 +324,7 @@ export default function InvoiceGeneratorPage() {
 
                       <div className="inv-biz">
                         <input type="text" className="inv-ed biz-name" placeholder="Nom de l'entreprise" value={bizName} onChange={e => setBizName(e.target.value)} />
-                        <AutoTextarea className="biz-addr" placeholder="Adresse" value={bizAddr} onChange={e => setBizAddr(e.target.value)} />
+                        <input type="text" className="inv-ed biz-tagline" placeholder="Slogan ou activité" value={bizTagline} onChange={e => setBizTagline(e.target.value)} />
                       </div>
                     </div>
 
@@ -447,6 +451,8 @@ export default function InvoiceGeneratorPage() {
                     <div className="inv-notes">
                       <div className="nt">Notes</div>
                       <AutoTextarea className="notes-in" placeholder="Merci pour votre confiance…" value={invNotes} onChange={e => setInvNotes(e.target.value)} />
+                      <div className="nt" style={{ marginTop: 12 }}>Conditions générales</div>
+                      <AutoTextarea className="notes-in" placeholder="Ex : Tout retard de paiement entraîne des pénalités de 1,5 % par mois…" value={invTermsCond} onChange={e => setInvTermsCond(e.target.value)} />
                     </div>
                     <div className="inv-tot">
                       <div className="tt-row">
@@ -482,12 +488,13 @@ export default function InvoiceGeneratorPage() {
                   {/* Invoice foot */}
                   <div className="inv-foot">
                     <div className="inv-credit">
-                      <span className="bmark">
-                        <svg viewBox="0 0 24 24" fill="none">
-                          <path d="M5.5 3.2h10.2c.6 0 1.1.2 1.5.6l3 3c.4.4.6.9.6 1.5v12c0 .7-.6 1.1-1.2.8l-1.6-.8-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.7.9c-.3.2-.7.2-1 0l-1.6-.9-1.6.8c-.6.3-1.3-.1-1.3-.8V4.7c0-.8.7-1.5 1.5-1.5z" fill="#fff" fillOpacity=".96" />
-                        </svg>
-                      </span>
-                      Créé avec Billio
+                      <div className="inv-credit-main">
+                        <span className="bmark"><BillioMark size={11} /></span>
+                        Facture créée avec Billio
+                      </div>
+                      <div className="inv-credit-sub">
+                        Visitez billio.app pour créer des factures professionnelles gratuitement.
+                      </div>
                     </div>
                   </div>
 
@@ -500,7 +507,7 @@ export default function InvoiceGeneratorPage() {
               <div className="tpl-card">
                 <div className="tpl-h"><i className="ti ti-template" /> Modèle de facture</div>
                 <div className="tpl-opts">
-                  {(['classique', 'bandeau', 'epure', 'moderne'] as Template[]).map(tpl => (
+                  {(['classique', 'bandeau', 'epure', 'moderne', 'encadre'] as Template[]).map(tpl => (
                     <button
                       key={tpl}
                       type="button"
@@ -523,9 +530,9 @@ export default function InvoiceGeneratorPage() {
                   <span className="ig-uk"><i className="ti ti-sparkles" /> Passez en pilote automatique</span>
                   <h3>Cette facture, mais vivante.</h3>
                   <ul>
-                    <li><i className="ti ti-send" /> Envoyez par WhatsApp ou email, avec lien de paiement Mobile Money</li>
-                    <li><i className="ti ti-robot" /> Relances automatiques jusqu'au paiement</li>
-                    <li><i className="ti ti-shield-check" /> Chaque encaissement comptabilisé — vos livres en règle avec la DGI</li>
+                    <li><i className="ti ti-send" /> Envoyez par WhatsApp ou email</li>
+                    <li><i className="ti ti-robot" /> Relances automatiques</li>
+                    <li><i className="ti ti-shield-check" /> Encaissement comptabilisé</li>
                   </ul>
                   <Link to="/login" className="ig-btn ig-btn--white" style={{ width: '100%', marginTop: 18 }}>
                     Créer mon compte gratuit <i className="ti ti-arrow-right" />

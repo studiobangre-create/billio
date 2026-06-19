@@ -67,7 +67,17 @@ export default function App() {
     <AppProvider>
       <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
-        {/* Landing — visible immediately, no need to wait for session */}
+        {/* Root / login — default landing */}
+        <Route
+          path="/"
+          element={authed && !isRecovery
+            ? <Navigate to="/dashboard" replace />
+            : <AuthPage onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
+          }
+        />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+
+        {/* Legacy landing page */}
         <Route
           path="/landing"
           element={authed ? <Navigate to="/dashboard" replace /> : <LandingPage />}
@@ -75,15 +85,6 @@ export default function App() {
 
         {/* Public tools */}
         <Route path="/invoice-generator" element={<InvoiceGeneratorPage />} />
-
-        {/* Public */}
-        <Route
-          path="/login"
-          element={authed && !isRecovery
-            ? <Navigate to="/dashboard" replace />
-            : <AuthPage onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
-          }
-        />
         <Route
           path="/reset-password"
           element={isRecovery

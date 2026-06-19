@@ -38,7 +38,7 @@ const s = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 40,
     paddingTop: 40,
-    paddingBottom: 60,
+    paddingBottom: 48,
   },
   header: {
     flexDirection: 'row',
@@ -215,18 +215,35 @@ const s = StyleSheet.create({
     color: '#666',
     lineHeight: 1.5,
   },
-  footer: {
+  fixedHeader: {
     position: 'absolute',
-    bottom: 28,
+    top: 16,
     left: 40,
     right: 40,
-    textAlign: 'center',
-    fontSize: 7,
-    color: '#aaa',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingBottom: 6,
+  },
+  fixedHeaderBiz: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#555' },
+  fixedHeaderRef: { fontSize: 7, color: '#888' },
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 8,
+    paddingTop: 6,
   },
+  footerLeft:   { fontSize: 7, color: '#aaa' },
+  footerCenter: { fontSize: 7, color: '#aaa' },
+  footerRight:  { fontSize: 7, color: '#aaa' },
 });
 
 interface Props {
@@ -413,10 +430,24 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
           </View>
         </View>
 
-        {/* ── Footer ── */}
-        <Text style={s.footer}>
-          {biz.name || 'Mon entreprise'} {'·'} Facture g{'é'}n{'é'}r{'é'}e via Billio {'·'} TVA applicable au taux en vigueur
-        </Text>
+        {/* ── Fixed header — repeats on pages 2+ ── */}
+        <View fixed style={s.fixedHeader} render={({ pageNumber }) =>
+          pageNumber === 1 ? null : (
+            <>
+              <Text style={s.fixedHeaderBiz}>{biz.name || 'Mon entreprise'}</Text>
+              <Text style={s.fixedHeaderRef}>{title} #{invoice.id}</Text>
+            </>
+          )
+        } />
+
+        {/* ── Fixed footer — repeats on every page ── */}
+        <View fixed style={s.footer}>
+          <Text style={s.footerLeft}>{biz.name || 'Mon entreprise'}</Text>
+          <Text style={s.footerCenter}>Facture g{'é'}n{'é'}r{'é'}e via Billio</Text>
+          <Text style={s.footerRight} render={({ pageNumber, totalPages }) =>
+            `Page ${pageNumber} / ${totalPages}`
+          } />
+        </View>
       </Page>
     </Document>
   );
