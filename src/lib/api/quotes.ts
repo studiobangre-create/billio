@@ -20,10 +20,10 @@ export function dbToQuote(row: Record<string, unknown>): Quote {
 }
 
 export async function nextQuoteId(orgId: string): Promise<string> {
-  if (MOCK) return 'DEV-' + String(Math.floor(Math.random() * 9000) + 1000);
+  if (MOCK) return 'QUO-' + String(Math.floor(Math.random() * 9000) + 1000);
   const { data, error } = await supabase.rpc('next_quote_number', { p_org_id: orgId });
   if (error) throw error;
-  return 'DEV-' + String(data as number).padStart(4, '0');
+  return 'QUO-' + String(data as number).padStart(4, '0');
 }
 
 export async function fetchQuotes(orgId: string): Promise<Quote[]> {
