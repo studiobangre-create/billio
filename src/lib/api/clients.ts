@@ -13,6 +13,7 @@ export function dbToClient(row: Record<string, unknown>): ClientRecord {
     email:    String(row.email ?? '—'),
     phone:    String(row.phone ?? '—'),
     city:     String(row.city ?? '—'),
+    country:        String(row.country ?? 'Burkina Faso'),
     ifu:            String(row.ifu ?? ''),
     rccm:           String(row.rccm ?? ''),
     taxRegime:           String(row.tax_regime ?? ''),
@@ -52,6 +53,7 @@ export async function createClient(
       email:          payload.email,
       phone:          payload.phone,
       city:           payload.city,
+      country:        payload.country ?? 'Burkina Faso',
       ifu:             payload.ifu ?? '',
       rccm:            payload.rccm ?? '',
       tax_regime:            payload.taxRegime ?? '',
@@ -77,6 +79,7 @@ export async function updateClient(orgId: string, code: string, patch: Partial<C
   if (patch.email     !== undefined) dbPatch.email          = patch.email;
   if (patch.phone     !== undefined) dbPatch.phone          = patch.phone;
   if (patch.city      !== undefined) dbPatch.city           = patch.city;
+  if (patch.country   !== undefined) dbPatch.country        = patch.country;
   if (patch.ifu       !== undefined) dbPatch.ifu            = patch.ifu;
   if (patch.rccm      !== undefined) dbPatch.rccm           = patch.rccm;
   if (patch.taxRegime            !== undefined) dbPatch.tax_regime            = patch.taxRegime;

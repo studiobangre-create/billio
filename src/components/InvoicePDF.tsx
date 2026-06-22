@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '../lib/tax-bf';
+import { getFiscalIdLabel } from '../lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '../lib/schemas';
 import type { BizInfo } from './InvoicePaper';
 
@@ -20,6 +21,7 @@ const pdfFmtDate = (iso: string): string => {
 type ClientInfo = {
   name: string;
   city: string;
+  country?: string;
   contact?: string;
   email?: string;
   phone?: string;
@@ -280,15 +282,18 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
 
   const bizAddr = [biz.address, biz.city, biz.country].filter(Boolean).join(', ');
   const bizContact = [biz.email, biz.phone].filter(Boolean).join(' · ');
+  const bizFiscalLabel    = getFiscalIdLabel(biz.country);
+  const clientFiscalLabel = getFiscalIdLabel(client.country);
+
   const bizCompliance = [
-    biz.ifu && `IFU ${biz.ifu}`,
+    biz.ifu && `${bizFiscalLabel} ${biz.ifu}`,
     biz.rccm && `RCCM ${biz.rccm}`,
     biz.taxRegime,
     biz.divisionFiscale,
   ].filter(Boolean).join(' · ');
 
   const clientCompliance = [
-    client.ifu && `IFU ${client.ifu}`,
+    client.ifu && `${clientFiscalLabel} ${client.ifu}`,
     client.rccm && `RCCM ${client.rccm}`,
     client.taxRegime,
     client.fiscalDivision,

@@ -12,6 +12,7 @@ import {
   fetchPaymentSettings, upsertPaymentSettings,
   DEFAULT_PAYMENT_SETTINGS, type PaymentSettings,
 } from '../lib/api/payment-settings';
+import { getFiscalIdLabel } from '../lib/ohada';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -156,7 +157,7 @@ function ProfileSection() {
   );
 }
 
-const COUNTRIES = ['Burkina Faso', "Côte d'Ivoire", 'Mali', 'Niger', 'Sénégal', 'Togo', 'Bénin', 'Guinée'];
+const COUNTRIES = ['Bénin', 'Burkina Faso', 'Cameroun', 'Centrafrique', 'Comores', 'Congo', "Côte d'Ivoire", 'Gabon', 'Guinée', 'Guinée-Bissau', 'Guinée équatoriale', 'Mali', 'Niger', 'République démocratique du Congo', 'Sénégal', 'Tchad', 'Togo', 'Ghana', 'Nigeria'];
 const CURRENCIES = [
   { value: 'F CFA', label: 'F CFA — Franc CFA' },
   { value: 'EUR', label: 'EUR — Euro' },
@@ -237,7 +238,7 @@ function BusinessSection() {
         </div>
         <div className="s-field-row">
           <div className="s-field">
-            <label className="s-label">IFU</label>
+            <label className="s-label">{getFiscalIdLabel(country)}</label>
             <input className="form-input" value={ifu} onChange={e => setIfu(e.target.value)} disabled={loading} placeholder="00012345 B" />
           </div>
           <div className="s-field">

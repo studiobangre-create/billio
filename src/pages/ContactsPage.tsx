@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext';
 import FiscalDivisionSelect, { fiscalDivisionLabel } from '../components/FiscalDivisionSelect';
 import { createClient, updateClient, removeClient } from '../lib/api/clients';
 import { fmt, fmtCompact } from '../data';
+import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '../lib/ohada';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '../lib/schemas';
 import type { SupplierBill, PaymentMethod } from '../lib/accounting-data';
 import { useSupplierBills } from '../lib/accounting-hooks';
@@ -102,7 +103,7 @@ type MiniInv = { id: string; sub: string; amt: number; status: InvoiceStatus };
 
 const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
 const INV_STATUS_LABEL: Record<MiniInv['status'], string> = { paid: 'Payée', pending: 'En attente', overdue: 'En retard', draft: 'Brouillon' };
-const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
+const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', country: 'Burkina Faso', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
 const CLIENT_FILTERS: { key: ClientFilterKey; label: string }[] = [
   { key: 'all', label: 'Tous' }, { key: 'active', label: 'Actifs' }, { key: 'lead', label: 'Prospects' }, { key: 'balance', label: 'Avec solde' },
 ];
@@ -595,12 +596,12 @@ export default function ContactsPage() {
   function closeClientPanel() { setClientPanel(null); setEditMode(false); }
   function openDetailEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '' });
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, country: cl.country ?? 'Burkina Faso', status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '' });
     setEditMode(true);
   }
   async function handleSaveEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, fiscalDivision: editForm.fiscalDivision };
+    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', country: editForm.country || 'Burkina Faso', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, fiscalDivision: editForm.fiscalDivision };
     const previous = clients.find(c => c.code === cl.code);
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
     try {
@@ -640,7 +641,7 @@ export default function ContactsPage() {
     const avs = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
     const words = form.name.trim().split(/\s+/);
     const code = ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || 'NC';
-    const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
+    const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', country: form.country || 'Burkina Faso', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
     const optimistic = { ...payload, invoices: 0, billed: 0, balance: 0 };
     setClients(prev => [optimistic, ...prev]);
     try {
@@ -949,7 +950,13 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
-                      <label className="form-label">IFU <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <label className="form-label">Pays</label>
+                      <select className="form-input" value={editForm.country} onChange={e => setEditForm(f => ({ ...f, country: e.target.value }))}>
+                        {OHADA_COUNTRY_NAMES.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">{getFiscalIdLabel(editForm.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
                       <input className="form-input" type="text" placeholder="00012345 B" value={editForm.ifu} onChange={e => setEditForm(f => ({ ...f, ifu: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
@@ -976,7 +983,7 @@ export default function ContactsPage() {
               {(detailClient.ifu || detailClient.rccm || detailClient.taxRegime || detailClient.fiscalDivision) && (
                 <div className="detail-block">
                   <div className="detail-block-title">Identifiants fiscaux</div>
-                  {detailClient.ifu && <div className="contact-line"><Icon name="file-text" size={16} /><span>IFU&nbsp;<strong>{detailClient.ifu}</strong></span></div>}
+                  {detailClient.ifu && <div className="contact-line"><Icon name="file-text" size={16} /><span>{getFiscalIdLabel(detailClient.country)}&nbsp;<strong>{detailClient.ifu}</strong></span></div>}
                   {detailClient.rccm && <div className="contact-line"><Icon name="building" size={16} /><span>RCCM&nbsp;<strong>{detailClient.rccm}</strong></span></div>}
                   {detailClient.taxRegime && <div className="contact-line"><Icon name="tag" size={16} /><span>Régime&nbsp;<strong>{detailClient.taxRegime}</strong></span></div>}
                   {detailClient.fiscalDivision && <div className="contact-line"><Icon name="sitemap" size={16} /><span>Division fiscale&nbsp;<strong>{fiscalDivisionLabel(detailClient.fiscalDivision)}</strong></span></div>}
@@ -1049,17 +1056,23 @@ export default function ContactsPage() {
               <input className="form-input" placeholder="Ouagadougou" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label className="form-label">Statut</label>
-              <select className="form-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ClientStatus }))}>
-                <option value="active">Actif</option>
-                <option value="lead">Prospect</option>
+              <label className="form-label">Pays</label>
+              <select className="form-input" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}>
+                {OHADA_COUNTRY_NAMES.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
           </div>
+          <div className="form-group">
+            <label className="form-label">Statut</label>
+            <select className="form-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ClientStatus }))}>
+              <option value="active">Actif</option>
+              <option value="lead">Prospect</option>
+            </select>
+          </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">IFU <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
-              <input className="form-input" placeholder="00012345 B" value={form.ifu} onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
+              <label className="form-label">{getFiscalIdLabel(form.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+              <input className="form-input" placeholder={form.country === 'Sénégal' ? '0123456789123' : form.country === 'Cameroun' ? 'M012345678901R' : '00012345 B'} value={form.ifu} onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
             </div>
             <div className="form-group">
               <label className="form-label">RCCM <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>

@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
 import { PageSkeleton } from '../components/SkeletonLoader';
 import { useApp } from '../context/AppContext';
-import { createQuote, updateQuote, removeQuote } from '../lib/api/quotes';
+import { createQuote, updateQuote, removeQuote, nextQuoteId } from '../lib/api/quotes';
 import { createInvoice, nextInvoiceId } from '../lib/api/invoices';
 import { fetchLineItems, saveLineItems } from '../lib/api/line-items';
 import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
@@ -35,11 +35,6 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'expired',  label: 'Expiré'    },
 ];
 
-function nextQuoteId(quotes: Quote[]): string {
-  const nums = quotes.map(q => parseInt(q.id.split('-')[1], 10)).filter(n => isFinite(n));
-  const next  = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-  return 'DEV-' + String(next).padStart(4, '0');
-}
 
 function fmtCompact(n: number) {
   const a = Math.abs(n);
@@ -146,7 +141,7 @@ export default function QuotesPage() {
   async function submitQuote(status: 'draft' | 'sent') {
     if (!fClient) { showToast('Sélectionnez un client', true); return; }
     if (subtotal <= 0) { showToast('Ajoutez au moins un article', true); return; }
-    const id      = nextQuoteId(quotes);
+    const id      = await nextQuoteId(orgId);
     const cName   = clientsMap[fClient]?.name ?? fClient;
     const payload = { id, subject: fSubject.trim() || 'Devis sans titre', client: fClient, issued: fDate, valid: fValid, amount: total, status };
     const newQuote: Quote = { ...payload, expSoon: status === 'sent' };
@@ -421,7 +416,7 @@ export default function QuotesPage() {
         <div className="panel-slide-head">
           <div>
             <div className="panel-slide-title">Nouveau devis</div>
-            <div className="panel-slide-sub">#{nextQuoteId(quotes)}</div>
+            <div className="panel-slide-sub">Nouveau devis</div>
           </div>
           <button className="icon-btn" onClick={closePanel} aria-label="Fermer">
             <Icon name="x" size={18} />

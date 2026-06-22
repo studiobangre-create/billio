@@ -1,4 +1,5 @@
 import { fmt } from '../data';
+import { getFiscalIdLabel } from '../lib/ohada';
 
 export type PaperLayout   = 'classic' | 'band' | 'minimal' | 'sidebar' | 'receipt';
 export type PaperDensity  = 'compact' | 'cozy' | 'spacious';
@@ -68,7 +69,8 @@ function bizInitials(name: string) {
 function BizMeta({ biz }: { biz: BizInfo }) {
   const addr = [biz.address, biz.city, biz.country].filter(Boolean).join(', ');
   const contact = [biz.email, biz.phone].filter(Boolean).join(' · ');
-  const compliance = [biz.ifu && `IFU ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`].filter(Boolean).join(' · ');
+  const fiscalLabel = getFiscalIdLabel(biz.country);
+  const compliance = [biz.ifu && `${fiscalLabel} ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`].filter(Boolean).join(' · ');
   const fiscal = [biz.taxRegime && `${biz.taxRegime}`, biz.divisionFiscale && `${biz.divisionFiscale}`].filter(Boolean).join(' · ');
   return (
     <>
@@ -227,8 +229,9 @@ function ClassicBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
 function BandBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
   const resolved = biz.name ? biz : MOCK_BIZ;
   const addr = [resolved.address, resolved.city].filter(Boolean).join(', ');
+  const bandFiscalLabel = getFiscalIdLabel(resolved.country);
   const compliance = [
-    resolved.ifu && `IFU ${resolved.ifu}`,
+    resolved.ifu && `${bandFiscalLabel} ${resolved.ifu}`,
     resolved.rccm && `RCCM ${resolved.rccm}`,
     resolved.taxRegime && `${resolved.taxRegime}`,
     resolved.divisionFiscale && `${resolved.divisionFiscale}`,
@@ -338,8 +341,9 @@ function SidebarBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
 function ReceiptBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
   const resolved = biz.name ? biz : MOCK_BIZ;
   const addr = [resolved.address, resolved.city].filter(Boolean).join(', ');
+  const rcptFiscalLabel = getFiscalIdLabel(resolved.country);
   const compliance = [
-    resolved.ifu && `IFU ${resolved.ifu}`,
+    resolved.ifu && `${rcptFiscalLabel} ${resolved.ifu}`,
     resolved.rccm && `RCCM ${resolved.rccm}`,
     resolved.taxRegime && `${resolved.taxRegime}`,
     resolved.divisionFiscale && `${resolved.divisionFiscale}`,

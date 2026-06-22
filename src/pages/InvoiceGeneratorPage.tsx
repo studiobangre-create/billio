@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback, useId } from 'react';
 import { Link } from 'react-router-dom';
 import BillioMark from '../components/BillioMark';
+import { getFiscalIdLabel, getFiscalIdPlaceholder, OHADA_COUNTRY_NAMES } from '../lib/ohada';
 import './InvoiceGeneratorPage.css';
 
 /* ── Types ───────────────────────────────────────────────── */
@@ -106,19 +107,23 @@ export default function InvoiceGeneratorPage() {
   const [bizName,     setBizName]     = useState('Studio Wend SARL');
   const [bizTagline,  setBizTagline]  = useState('Agence digitale & développement web');
   const [bizAddr,     setBizAddr]     = useState('Secteur 15, Ouagadougou\nBurkina Faso');
+  const [bizCountry,  setBizCountry]  = useState('Burkina Faso');
   const [bizIfu,      setBizIfu]      = useState('00076214 B');
   const [bizRccm,     setBizRccm]     = useState('BF-OUA-2023-B-0912');
   const [bizPhone,    setBizPhone]    = useState('+226 70 12 34 56');
   const [bizEmail,    setBizEmail]    = useState('hello@studiowend.bf');
   const [bizDivision, setBizDivision] = useState('Centre des Impôts de Ouaga II');
+  const [bizRegime,   setBizRegime]   = useState('RSI');
 
   const [cliName,     setCliName]     = useState('Sahel Banque');
   const [cliAddr,     setCliAddr]     = useState('Avenue Kwame Nkrumah\nOuagadougou, Burkina Faso');
+  const [cliCountry,  setCliCountry]  = useState('Burkina Faso');
   const [cliIfu,      setCliIfu]      = useState('00031902 K');
   const [cliRccm,     setCliRccm]     = useState('BF-OUA-2009-B-0233');
   const [cliPhone,    setCliPhone]    = useState('+226 25 30 60 00');
   const [cliEmail,    setCliEmail]    = useState('compta@sahelbanque.bf');
   const [cliDivision, setCliDivision] = useState('Direction des Grandes Entreprises');
+  const [cliRegime,   setCliRegime]   = useState('RNI');
 
   const [invNum,       setInvNum]       = useState('INV-0042');
   const [invDate,      setInvDate]      = useState(t0);
@@ -143,7 +148,7 @@ export default function InvoiceGeneratorPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Persist to localStorage ────────────────── */
-  const state = { bizName, bizTagline, bizAddr, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, cliName, cliAddr, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, invNum, invDate, invDue, invTerms, invNotes, invTermsCond, currency, tvaOn, tvaRate, template, items, logoData };
+  const state = { bizName, bizTagline, bizAddr, bizCountry, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, bizRegime, cliName, cliAddr, cliCountry, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, cliRegime, invNum, invDate, invDue, invTerms, invNotes, invTermsCond, currency, tvaOn, tvaRate, template, items, logoData };
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
@@ -157,18 +162,22 @@ export default function InvoiceGeneratorPage() {
       if (d.bizName)     setBizName(d.bizName);
       if (d.bizTagline)  setBizTagline(d.bizTagline);
       if (d.bizAddr)     setBizAddr(d.bizAddr);
+      if (d.bizCountry)  setBizCountry(d.bizCountry);
       if (d.bizIfu)      setBizIfu(d.bizIfu);
       if (d.bizRccm)     setBizRccm(d.bizRccm);
       if (d.bizPhone)    setBizPhone(d.bizPhone);
       if (d.bizEmail)    setBizEmail(d.bizEmail);
       if (d.bizDivision) setBizDivision(d.bizDivision);
+      if (d.bizRegime)   setBizRegime(d.bizRegime);
       if (d.cliName)     setCliName(d.cliName);
       if (d.cliAddr)     setCliAddr(d.cliAddr);
+      if (d.cliCountry)  setCliCountry(d.cliCountry);
       if (d.cliIfu)      setCliIfu(d.cliIfu);
       if (d.cliRccm)     setCliRccm(d.cliRccm);
       if (d.cliPhone)    setCliPhone(d.cliPhone);
       if (d.cliEmail)    setCliEmail(d.cliEmail);
       if (d.cliDivision) setCliDivision(d.cliDivision);
+      if (d.cliRegime)   setCliRegime(d.cliRegime);
       if (d.invNum)      setInvNum(d.invNum);
       if (d.invDate)     setInvDate(d.invDate);
       if (d.invDue)      setInvDue(d.invDue);
@@ -344,8 +353,14 @@ export default function InvoiceGeneratorPage() {
                       <input type="text" className="inv-ed cli-name" placeholder="Nom de l'entreprise" value={bizName} onChange={e => setBizName(e.target.value)} />
                       <AutoTextarea className="cli-addr" placeholder="Adresse" value={bizAddr} onChange={e => setBizAddr(e.target.value)} />
                       <div className="biz-line">
-                        <span className="k">IFU</span>
-                        <input type="text" className="inv-ed inv-mini" placeholder="00012345 A" value={bizIfu} onChange={e => setBizIfu(e.target.value)} />
+                        <span className="k">Pays</span>
+                        <select className="inv-ed inv-mini" value={bizCountry} onChange={e => setBizCountry(e.target.value)}>
+                          {OHADA_COUNTRY_NAMES.map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="biz-line">
+                        <span className="k">{getFiscalIdLabel(bizCountry)}</span>
+                        <input type="text" className="inv-ed inv-mini" placeholder={getFiscalIdPlaceholder(bizCountry)} value={bizIfu} onChange={e => setBizIfu(e.target.value)} />
                         <span className="dot">·</span>
                         <span className="k">RCCM</span>
                         <input type="text" className="inv-ed inv-mini" placeholder="BF-OUA-…" value={bizRccm} onChange={e => setBizRccm(e.target.value)} />
@@ -358,6 +373,9 @@ export default function InvoiceGeneratorPage() {
                       <div className="biz-line">
                         <span className="k">Division fiscale</span>
                         <input type="text" className="inv-ed inv-mini" placeholder="Centre des Impôts…" value={bizDivision} onChange={e => setBizDivision(e.target.value)} />
+                        <span className="dot">·</span>
+                        <span className="k">Régime</span>
+                        <input type="text" className="inv-ed inv-mini" placeholder="RSI, RNI, CME…" value={bizRegime} onChange={e => setBizRegime(e.target.value)} />
                       </div>
                     </div>
 
@@ -366,8 +384,14 @@ export default function InvoiceGeneratorPage() {
                       <input type="text" className="inv-ed cli-name" placeholder="Nom du client" value={cliName} onChange={e => setCliName(e.target.value)} />
                       <AutoTextarea className="cli-addr" placeholder="Adresse" value={cliAddr} onChange={e => setCliAddr(e.target.value)} />
                       <div className="biz-line">
-                        <span className="k">IFU</span>
-                        <input type="text" className="inv-ed inv-mini" placeholder="00012345 A" value={cliIfu} onChange={e => setCliIfu(e.target.value)} />
+                        <span className="k">Pays</span>
+                        <select className="inv-ed inv-mini" value={cliCountry} onChange={e => setCliCountry(e.target.value)}>
+                          {OHADA_COUNTRY_NAMES.map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="biz-line">
+                        <span className="k">{getFiscalIdLabel(cliCountry)}</span>
+                        <input type="text" className="inv-ed inv-mini" placeholder={getFiscalIdPlaceholder(cliCountry)} value={cliIfu} onChange={e => setCliIfu(e.target.value)} />
                         <span className="dot">·</span>
                         <span className="k">RCCM</span>
                         <input type="text" className="inv-ed inv-mini" placeholder="BF-OUA-…" value={cliRccm} onChange={e => setCliRccm(e.target.value)} />
@@ -380,6 +404,9 @@ export default function InvoiceGeneratorPage() {
                       <div className="biz-line">
                         <span className="k">Division fiscale</span>
                         <input type="text" className="inv-ed inv-mini" placeholder="Direction…" value={cliDivision} onChange={e => setCliDivision(e.target.value)} />
+                        <span className="dot">·</span>
+                        <span className="k">Régime</span>
+                        <input type="text" className="inv-ed inv-mini" placeholder="RSI, RNI, CME…" value={cliRegime} onChange={e => setCliRegime(e.target.value)} />
                       </div>
                     </div>
                   </div>

@@ -12,6 +12,7 @@ import { createPayment } from '../lib/api/payments';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '../lib/api/line-items';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '../data';
 import { InvoicePDFDocument } from '../components/InvoicePDF';
+import { getFiscalIdLabel } from '../lib/ohada';
 import type { Status } from '../data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '../lib/tax-bf';
 import type { LineItem, PayMethod, Payment, ServiceWithholdingScenario } from '../lib/schemas';
@@ -335,7 +336,7 @@ export default function InvoicePage() {
                   <div className="pp-biz-meta">
                     {[orgSettings.address, orgSettings.city, orgSettings.country].filter(Boolean).join(', ')}
                     {(orgSettings.ifu || orgSettings.rccm) && (
-                      <><br />{[orgSettings.ifu && `IFU ${orgSettings.ifu}`, orgSettings.rccm && `RCCM ${orgSettings.rccm}`].filter(Boolean).join(' · ')}</>
+                      <><br />{[orgSettings.ifu && `${getFiscalIdLabel(orgSettings.country)} ${orgSettings.ifu}`, orgSettings.rccm && `RCCM ${orgSettings.rccm}`].filter(Boolean).join(' · ')}</>
                     )}
                     {(orgSettings.taxRegime || orgSettings.divisionFiscale) && (
                       <><br />{[orgSettings.taxRegime && `${orgSettings.taxRegime}`, orgSettings.divisionFiscale && `${orgSettings.divisionFiscale}`].filter(Boolean).join(' · ')}</>
@@ -357,7 +358,7 @@ export default function InvoicePage() {
               <div>
                 <div className="pp-block-label">Facturé à</div>
                 <div className="pp-client-name">{client.name}</div>
-                <div className="pp-client-meta">{client.city}, Burkina Faso</div>
+                <div className="pp-client-meta">{[client.city, client.country].filter(Boolean).join(', ')}</div>
                 {(client.contact || client.email || client.phone) && (
                   <div className="pp-client-meta" style={{ marginTop: 2 }}>
                     {client.contact && <div>Contact : {client.contact}</div>}
@@ -367,7 +368,7 @@ export default function InvoicePage() {
                 )}
                 {(client.ifu || client.rccm || client.taxRegime || client.fiscalDivision) && (
                   <div className="pp-compliance-ids">
-                    {client.ifu            && <span>IFU {client.ifu}</span>}
+                    {client.ifu            && <span>{getFiscalIdLabel(client.country)} {client.ifu}</span>}
                     {client.rccm           && <span>RCCM {client.rccm}</span>}
                     {client.taxRegime      && <span>{client.taxRegime}</span>}
                     {client.fiscalDivision && <span>{client.fiscalDivision}</span>}
