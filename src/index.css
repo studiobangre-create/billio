@@ -611,6 +611,9 @@ select.form-input {
 .pp-meta-grid .v { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pp-meta-grid .v.due { color: #A32D2D; }
 
+.pp-subject { font-size: 13px; color: var(--color-text-primary); padding: 10px 0 10px; }
+.pp-subject-label { font-weight: 700; margin-right: 6px; }
+
 /* Line items table */
 .li-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .li-table thead th {

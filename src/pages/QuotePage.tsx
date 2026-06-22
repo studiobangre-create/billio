@@ -337,11 +337,11 @@ export default function QuotePage() {
                   <div className="v">{orgSettings.paymentTerms || 'Net 14 jours'}</div>
                   <div className="k">Livraison</div>
                   <div className="v">{orgSettings.deliveryTerms || 'À convenir'}</div>
-                  <div className="k">Référence</div>
-                  <div className="v">{quote.subject}</div>
                 </div>
               </div>
             </div>
+
+            <div className="pp-subject"><span className="pp-subject-label">Objet :</span>{quote.subject}</div>
 
             <table className="li-table">
               <thead>

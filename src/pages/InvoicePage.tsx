@@ -386,11 +386,11 @@ export default function InvoicePage() {
                   <div className="v">{orgSettings.paymentTerms || 'Net 14 jours'}</div>
                   <div className="k">Livraison</div>
                   <div className="v">{orgSettings.deliveryTerms || 'À convenir'}</div>
-                  <div className="k">Référence</div>
-                  <div className="v">{invoice.subject}</div>
                 </div>
               </div>
             </div>
+
+            <div className="pp-subject"><span className="pp-subject-label">Objet :</span>{invoice.subject}</div>
 
             <table className="li-table">
               <thead>
@@ -709,7 +709,7 @@ export default function InvoicePage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Référence / Objet</label>
+            <label className="form-label">Objet</label>
             <input type="text" className="form-input" placeholder="ex. Développement web — sprint 5"
               maxLength={255} value={eSubject} onChange={e => setESubject(e.target.value)} />
           </div>

@@ -106,7 +106,7 @@ function Parties() {
         <div className="tp-meta-grid">
           <div className="k">Émis le</div><div className="v">{INV.issued}</div>
           <div className="k">Échéance</div><div className="v due">{INV.due}</div>
-          <div className="k">Référence</div><div className="v">{INV.subject}</div>
+          <div className="k">Objet</div><div className="v">{INV.subject}</div>
         </div>
       </div>
     </div>

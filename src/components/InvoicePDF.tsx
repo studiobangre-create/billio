@@ -347,14 +347,15 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
               <Text style={s.metaKey}>Livraison</Text>
               <Text style={s.metaVal}>{deliveryTerms}</Text>
             </View>
-            {invoice.subject ? (
-              <View style={s.metaRow}>
-                <Text style={s.metaKey}>Référence</Text>
-                <Text style={s.metaVal}>{invoice.subject}</Text>
-              </View>
-            ) : null}
           </View>
         </View>
+
+        {invoice.subject ? (
+          <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginRight: 4 }}>Objet :</Text>
+            <Text style={{ fontSize: 9, color: '#1a1a1a' }}>{invoice.subject}</Text>
+          </View>
+        ) : null}
 
         {/* ── Line items table ── */}
         <View>

@@ -368,7 +368,7 @@ export default function InvoicesPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Référence / Objet</label>
+            <label className="form-label">Objet</label>
             <input type="text" className="form-input" placeholder="ex. Développement web — sprint 5"
               maxLength={255} value={fSubject} onChange={e => setFSubject(e.target.value)} />
           </div>
