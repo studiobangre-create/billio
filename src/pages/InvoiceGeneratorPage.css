@@ -281,6 +281,7 @@ textarea.inv-ed { resize: none; overflow: hidden; }
 .inv-doctitle { font-size: 26px; font-weight: 800; letter-spacing: 1px; color: var(--acc); }
 .inv-docnum { font-size: 13px; color: var(--t2); margin-top: 6px; font-weight: 600; display: inline-flex; align-items: center; }
 .docnum-in { font-variant-numeric: tabular-nums; text-align: right; max-width: 130px; }
+.docnum-locked { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 
 /* Bill from | Bill to — side by side */
 .inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; }

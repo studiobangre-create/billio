@@ -22,7 +22,14 @@ const CUR_CONFIG: Record<Currency, { dec: number; suffix: string }> = {
 };
 
 const LS_KEY = 'billio.invgen.v1';
+const SEQ_KEY = 'billio.invgen.seq';
 let nextId = 10;
+
+function nextLocalInvNum(): string {
+  const n = parseInt(localStorage.getItem(SEQ_KEY) ?? '0', 10) + 1;
+  localStorage.setItem(SEQ_KEY, String(n));
+  return 'FAC-' + String(n).padStart(4, '0');
+}
 
 /* ── Helpers ─────────────────────────────────────────────── */
 function toNum(v: string) {
@@ -125,7 +132,8 @@ export default function InvoiceGeneratorPage() {
   const [cliDivision, setCliDivision] = useState('Direction des Grandes Entreprises');
   const [cliRegime,   setCliRegime]   = useState('RNI');
 
-  const [invNum,       setInvNum]       = useState('INV-0042');
+  const [invNum,       setInvNum]       = useState('');
+  const [invNumLocked, setInvNumLocked] = useState(false);
   const [invDate,      setInvDate]      = useState(t0);
   const [invDue,       setInvDue]       = useState(addDays(t0, 14));
   const [invTerms,     setInvTerms]     = useState('Paiement à 14 jours');
@@ -148,49 +156,59 @@ export default function InvoiceGeneratorPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Persist to localStorage ────────────────── */
-  const state = { bizName, bizTagline, bizAddr, bizCountry, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, bizRegime, cliName, cliAddr, cliCountry, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, cliRegime, invNum, invDate, invDue, invTerms, invNotes, invTermsCond, currency, tvaOn, tvaRate, template, items, logoData };
+  const state = { bizName, bizTagline, bizAddr, bizCountry, bizIfu, bizRccm, bizPhone, bizEmail, bizDivision, bizRegime, cliName, cliAddr, cliCountry, cliIfu, cliRccm, cliPhone, cliEmail, cliDivision, cliRegime, invNum, invNumLocked, invDate, invDue, invTerms, invNotes, invTermsCond, currency, tvaOn, tvaRate, template, items, logoData };
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
   });
 
   useEffect(() => {
+    let hasLockedNum = false;
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      if (d.bizName)     setBizName(d.bizName);
-      if (d.bizTagline)  setBizTagline(d.bizTagline);
-      if (d.bizAddr)     setBizAddr(d.bizAddr);
-      if (d.bizCountry)  setBizCountry(d.bizCountry);
-      if (d.bizIfu)      setBizIfu(d.bizIfu);
-      if (d.bizRccm)     setBizRccm(d.bizRccm);
-      if (d.bizPhone)    setBizPhone(d.bizPhone);
-      if (d.bizEmail)    setBizEmail(d.bizEmail);
-      if (d.bizDivision) setBizDivision(d.bizDivision);
-      if (d.bizRegime)   setBizRegime(d.bizRegime);
-      if (d.cliName)     setCliName(d.cliName);
-      if (d.cliAddr)     setCliAddr(d.cliAddr);
-      if (d.cliCountry)  setCliCountry(d.cliCountry);
-      if (d.cliIfu)      setCliIfu(d.cliIfu);
-      if (d.cliRccm)     setCliRccm(d.cliRccm);
-      if (d.cliPhone)    setCliPhone(d.cliPhone);
-      if (d.cliEmail)    setCliEmail(d.cliEmail);
-      if (d.cliDivision) setCliDivision(d.cliDivision);
-      if (d.cliRegime)   setCliRegime(d.cliRegime);
-      if (d.invNum)      setInvNum(d.invNum);
-      if (d.invDate)     setInvDate(d.invDate);
-      if (d.invDue)      setInvDue(d.invDue);
-      if (d.invTerms)    setInvTerms(d.invTerms);
-      if (d.invNotes)     setInvNotes(d.invNotes);
-      if (d.invTermsCond) setInvTermsCond(d.invTermsCond);
-      if (d.currency)    setCurrency(d.currency);
-      if (typeof d.tvaOn === 'boolean') setTvaOn(d.tvaOn);
-      if (d.tvaRate)     setTvaRate(d.tvaRate);
-      if (d.template)    setTemplate(d.template);
-      if (Array.isArray(d.items) && d.items.length) setItems(d.items);
-      if (d.logoData)    setLogoData(d.logoData);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.bizName)     setBizName(d.bizName);
+        if (d.bizTagline)  setBizTagline(d.bizTagline);
+        if (d.bizAddr)     setBizAddr(d.bizAddr);
+        if (d.bizCountry)  setBizCountry(d.bizCountry);
+        if (d.bizIfu)      setBizIfu(d.bizIfu);
+        if (d.bizRccm)     setBizRccm(d.bizRccm);
+        if (d.bizPhone)    setBizPhone(d.bizPhone);
+        if (d.bizEmail)    setBizEmail(d.bizEmail);
+        if (d.bizDivision) setBizDivision(d.bizDivision);
+        if (d.bizRegime)   setBizRegime(d.bizRegime);
+        if (d.cliName)     setCliName(d.cliName);
+        if (d.cliAddr)     setCliAddr(d.cliAddr);
+        if (d.cliCountry)  setCliCountry(d.cliCountry);
+        if (d.cliIfu)      setCliIfu(d.cliIfu);
+        if (d.cliRccm)     setCliRccm(d.cliRccm);
+        if (d.cliPhone)    setCliPhone(d.cliPhone);
+        if (d.cliEmail)    setCliEmail(d.cliEmail);
+        if (d.cliDivision) setCliDivision(d.cliDivision);
+        if (d.cliRegime)   setCliRegime(d.cliRegime);
+        if (d.invDate)     setInvDate(d.invDate);
+        if (d.invDue)      setInvDue(d.invDue);
+        if (d.invTerms)    setInvTerms(d.invTerms);
+        if (d.invNotes)     setInvNotes(d.invNotes);
+        if (d.invTermsCond) setInvTermsCond(d.invTermsCond);
+        if (d.currency)    setCurrency(d.currency);
+        if (typeof d.tvaOn === 'boolean') setTvaOn(d.tvaOn);
+        if (d.tvaRate)     setTvaRate(d.tvaRate);
+        if (d.template)    setTemplate(d.template);
+        if (Array.isArray(d.items) && d.items.length) setItems(d.items);
+        if (d.logoData)    setLogoData(d.logoData);
+        if (d.invNumLocked && d.invNum) {
+          setInvNum(d.invNum);
+          setInvNumLocked(true);
+          hasLockedNum = true;
+        }
+      }
     } catch {}
+    if (!hasLockedNum) {
+      setInvNum(nextLocalInvNum());
+      setInvNumLocked(true);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -213,6 +231,26 @@ export default function InvoiceGeneratorPage() {
   }
   function addItem() {
     setItems(prev => [...prev, { id: ++nextId, desc: '', qty: '1', price: '' }]);
+  }
+
+  function newInvoice() {
+    const t = today();
+    setInvNum(nextLocalInvNum());
+    setInvNumLocked(true);
+    setInvDate(t);
+    setInvDue(addDays(t, 14));
+    setInvTerms('Paiement à 14 jours');
+    setInvNotes('');
+    setInvTermsCond('');
+    setCliName('');
+    setCliAddr('');
+    setCliIfu('');
+    setCliRccm('');
+    setCliPhone('');
+    setCliEmail('');
+    setCliDivision('');
+    setCliRegime('');
+    setItems([{ id: ++nextId, desc: '', qty: '1', price: '' }]);
   }
 
   /* ── Logo ───────────────────────────────────── */
@@ -277,6 +315,9 @@ export default function InvoiceGeneratorPage() {
                   <option value="USD">USD</option>
                 </select>
               </label>
+              <button className="ig-btn ig-btn--ghost" onClick={newInvoice}>
+                <i className="ti ti-plus" /> Nouvelle facture
+              </button>
               <button className="ig-btn ig-btn--ghost" onClick={() => window.print()}>
                 <i className="ti ti-printer" /> Imprimer
               </button>
@@ -341,7 +382,7 @@ export default function InvoiceGeneratorPage() {
                       <div className="inv-doctitle">FACTURE</div>
                       <div className="inv-docnum">
                         N°&nbsp;
-                        <input type="text" className="inv-ed inv-mini docnum-in" placeholder="INV-0042" value={invNum} onChange={e => setInvNum(e.target.value)} />
+                        <span className="docnum-locked" title="Numéro attribué automatiquement — conforme DGI">{invNum}</span>
                       </div>
                     </div>
                   </div>
