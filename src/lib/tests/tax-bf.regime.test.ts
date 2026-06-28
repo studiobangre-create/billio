@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { determineRegime, isRegimeCaducite } from '../tax-bf';
+import { determineRegime, isRegimeCaducite } from '@/lib/tax-bf';
 
 const BASE = {
   legalForm: 'individual' as const,

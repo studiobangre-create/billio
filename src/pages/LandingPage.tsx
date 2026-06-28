@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { PLANS, formatPrice, type PlanDef } from '../lib/plans';
-import BillioMark from '../components/BillioMark';
+import { PLANS, formatPrice, type PlanDef } from '@/lib/plans';
+import BillioMark from '@/components/BillioMark';
 import './LandingPage.css';
 
 /* ── Nav ─────────────────────────────────────────────────── */

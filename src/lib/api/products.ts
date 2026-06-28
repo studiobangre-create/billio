@@ -1,6 +1,6 @@
-import { supabase } from '../supabase';
-import { INITIAL_PRODUCTS } from '../../data';
-import type { Product } from '../schemas';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_PRODUCTS } from '@/data';
+import type { Product } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

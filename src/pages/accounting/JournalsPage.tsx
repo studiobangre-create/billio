@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import DrawerPanel from '../../components/accounting/DrawerPanel';
-import JournalBadge from '../../components/accounting/JournalBadge';
-import { EmptyState } from '../../components/EmptyState';
-import StatusPill from '../../components/accounting/StatusPill';
-import type { JournalEntry, Journal, Account } from '../../lib/accounting-data';
-import { fmt, fmtCompact, acctOf } from '../../lib/accounting-data';
-import { useJournalsData } from '../../lib/accounting-hooks';
-import { JournalsEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import JournalBadge from '@/components/accounting/JournalBadge';
+import { EmptyState } from '@/components/EmptyState';
+import StatusPill from '@/components/accounting/StatusPill';
+import type { JournalEntry, Journal, Account } from '@/lib/accounting-data';
+import { fmt, fmtCompact, acctOf } from '@/lib/accounting-data';
+import { useJournalsData } from '@/lib/accounting-hooks';
+import { JournalsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 
 function entryTotal(e: JournalEntry) {
   return e.lines.reduce((s, l) => s + l.d, 0);

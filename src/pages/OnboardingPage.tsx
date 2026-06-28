@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useApp } from '../context/AppContext';
+import { supabase } from '@/lib/supabase';
+import { useApp } from '@/context/AppContext';
 import './OnboardingPage.css';
 
 /* ── types ── */

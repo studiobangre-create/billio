@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import { EmptyState } from '../components/EmptyState';
-import { TemplatesEmptyIllustration } from '../components/PageEmptyIllustrations';
-import InvoicePaper from '../components/InvoicePaper';
-import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle, BizInfo } from '../components/InvoicePaper';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
+import Icon from '@/components/Icon';
+import { EmptyState } from '@/components/EmptyState';
+import { TemplatesEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import InvoicePaper from '@/components/InvoicePaper';
+import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle, BizInfo } from '@/components/InvoicePaper';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateIS } from '../tax-bf';
+import { calculateIS } from '@/lib/tax-bf';
 
 describe('calculateIS — rate', () => {
   it('is 27.5% of taxable profit rounded to nearest 1 000 F', () => {

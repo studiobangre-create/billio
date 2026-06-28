@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import DrawerPanel from '../../components/accounting/DrawerPanel';
-import StatusPill from '../../components/accounting/StatusPill';
-import { EmptyState } from '../../components/EmptyState';
-import type { SupplierBill } from '../../lib/accounting-data';
-import { fmt, fmtCompact } from '../../lib/accounting-data';
-import { useSupplierBills } from '../../lib/accounting-hooks';
-import { SuppliersEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import StatusPill from '@/components/accounting/StatusPill';
+import { EmptyState } from '@/components/EmptyState';
+import type { SupplierBill } from '@/lib/accounting-data';
+import { fmt, fmtCompact } from '@/lib/accounting-data';
+import { useSupplierBills } from '@/lib/accounting-hooks';
+import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 
 const AV_COLORS = [
   { bg: '#B5D4F4', color: '#0C447C' },

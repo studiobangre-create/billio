@@ -1,13 +1,13 @@
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import JournalBadge from '../../components/accounting/JournalBadge';
-import type { JournalEntry } from '../../lib/accounting-data';
-import { fmt, fmtCompact } from '../../lib/accounting-data';
-import { useTaxData } from '../../lib/accounting-hooks';
-import { useApp } from '../../context/AppContext';
-import { calculateTVA, calculateIS, isRegimeCaducite, isFirstFiscalYear } from '../../lib/tax-bf';
-import type { Regime } from '../../lib/tax-bf';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import JournalBadge from '@/components/accounting/JournalBadge';
+import type { JournalEntry } from '@/lib/accounting-data';
+import { fmt, fmtCompact } from '@/lib/accounting-data';
+import { useTaxData } from '@/lib/accounting-hooks';
+import { useApp } from '@/context/AppContext';
+import { calculateTVA, calculateIS, isRegimeCaducite, isFirstFiscalYear } from '@/lib/tax-bf';
+import type { Regime } from '@/lib/tax-bf';
 
 // ─── Regime metadata ─────────────────────────────────────────────────────────
 

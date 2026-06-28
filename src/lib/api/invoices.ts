@@ -1,6 +1,6 @@
-import { supabase } from '../supabase';
-import { INITIAL_INVOICES } from '../../data';
-import type { Invoice } from '../schemas';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_INVOICES } from '@/data';
+import type { Invoice } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

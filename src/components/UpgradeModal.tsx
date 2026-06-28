@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import posthog from 'posthog-js';
-import Icon from './Icon';
-import { PLANS, formatPrice, minPlanForFeature, type Feature, type PlanId } from '../lib/plans';
-import { useApp } from '../context/AppContext';
+import Icon from '@/components/Icon';
+import { PLANS, formatPrice, minPlanForFeature, type Feature, type PlanId } from '@/lib/plans';
+import { useApp } from '@/context/AppContext';
 
 // Re-export so consumers don't have to import plans separately
 export type { Feature };

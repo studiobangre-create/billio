@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../../components/Icon';
-import { useApp } from '../../context/AppContext';
-import { adoptOpeningBalances } from '../../lib/api/accounting';
+import Icon from '@/components/Icon';
+import { useApp } from '@/context/AppContext';
+import { adoptOpeningBalances } from '@/lib/api/accounting';
 import {
   ACCOUNTS, CLASSES, clsOf, acctOf, fmt,
-} from '../../lib/accounting-data';
+} from '@/lib/accounting-data';
 
 /* ─── types ──────────────────────────────────────────────────────────────── */
 interface OBLine { id: number; acct: string; d: number; c: number }

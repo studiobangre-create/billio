@@ -1,16 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import DrawerPanel from '../../components/accounting/DrawerPanel';
-import JournalBadge from '../../components/accounting/JournalBadge';
-import { EmptyState } from '../../components/EmptyState';
-import { AccountMovementsEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
-import type { Account, AccountClass, Journal, LedgerRow } from '../../lib/accounting-data';
-import { fmt, fmtCompact, clsOf, openingOf } from '../../lib/accounting-data';
-import { useTrialBalance, useBalanceFns } from '../../lib/accounting-hooks';
-import { useApp } from '../../context/AppContext';
-import { supabase } from '../../lib/supabase';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import JournalBadge from '@/components/accounting/JournalBadge';
+import { EmptyState } from '@/components/EmptyState';
+import { AccountMovementsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import type { Account, AccountClass, Journal, LedgerRow } from '@/lib/accounting-data';
+import { fmt, fmtCompact, clsOf, openingOf } from '@/lib/accounting-data';
+import { useTrialBalance, useBalanceFns } from '@/lib/accounting-hooks';
+import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 
 function LedgerDrawer({
   account, classes, journals, onClose,

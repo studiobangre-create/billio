@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback, useId } from 'react';
 import { Link } from 'react-router-dom';
-import BillioMark from '../components/BillioMark';
-import { getFiscalIdLabel, getFiscalIdPlaceholder, OHADA_COUNTRY_NAMES } from '../lib/ohada';
+import BillioMark from '@/components/BillioMark';
+import { getFiscalIdLabel, getFiscalIdPlaceholder, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
 import './InvoiceGeneratorPage.css';
 
 /* ── Types ───────────────────────────────────────────────── */

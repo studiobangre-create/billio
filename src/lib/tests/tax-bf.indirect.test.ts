@@ -6,7 +6,7 @@ import {
   calculateTVA,
   calculateTVANet,
   SERVICE_WITHHOLDING_THRESHOLD,
-} from '../tax-bf';
+} from '@/lib/tax-bf';
 
 // ─── TPA ──────────────────────────────────────────────────────────────────────
 

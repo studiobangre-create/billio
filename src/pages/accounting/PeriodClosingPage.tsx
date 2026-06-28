@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import { fmt } from '../../lib/accounting-data';
-import { usePeriodClosing, useBalanceFns } from '../../lib/accounting-hooks';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { fmt } from '@/lib/accounting-data';
+import { usePeriodClosing, useBalanceFns } from '@/lib/accounting-hooks';
 
 const MONTH_LABELS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
 

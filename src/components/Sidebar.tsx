@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useMemo } from 'react';
-import Icon from './Icon';
-import UpgradeModal from './UpgradeModal';
-import { useApp } from '../context/AppContext';
-import { PLAN_LABELS, minPlanForFeature, type Feature } from '../lib/plans';
-import BillioMark from './BillioMark';
+import Icon from '@/components/Icon';
+import UpgradeModal from '@/components/UpgradeModal';
+import { useApp } from '@/context/AppContext';
+import { PLAN_LABELS, minPlanForFeature, type Feature } from '@/lib/plans';
+import BillioMark from '@/components/BillioMark';
 
 type NavItem = { icon: string; label: string; to: string };
 

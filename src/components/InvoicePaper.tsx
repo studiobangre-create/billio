@@ -1,5 +1,5 @@
-import { fmt } from '../data';
-import { getFiscalIdLabel } from '../lib/ohada';
+import { fmt } from '@/data';
+import { getFiscalIdLabel } from '@/lib/ohada';
 
 export type PaperLayout   = 'classic' | 'band' | 'minimal' | 'sidebar' | 'receipt';
 export type PaperDensity  = 'compact' | 'cozy' | 'spacious';

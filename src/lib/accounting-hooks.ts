@@ -4,8 +4,8 @@
 // are limited to swapping imports + adding a loading guard.
 
 import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
-import { useApp } from '../context/AppContext';
-import { supabase } from './supabase';
+import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import {
   fetchAccountClasses,
   fetchAccounts,
@@ -26,16 +26,16 @@ import {
   closeFiscalPeriod as apiClosePeriod,
   recordSupplierBillEntry,
   recordSupplierBillPaymentEntry,
-} from './api/accounting';
-import type { FiscalPeriod, AccountBalance } from './api/accounting';
+} from '@/lib/api/accounting';
+import type { FiscalPeriod, AccountBalance } from '@/lib/api/accounting';
 import {
   movementsOf, closingSigned, ledgerOf, openingOf, allMovements,
   ACCOUNTS, CLASSES, JOURNALS, ENTRIES, OPENING,
   FIXED_ASSETS, SUPPLIER_BILLS,
-} from './accounting-data';
+} from '@/lib/accounting-data';
 import type {
   AccountClass, Account, Journal, JournalEntry, FixedAsset, SupplierBill,
-} from './accounting-data';
+} from '@/lib/accounting-data';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 const EXERCISE_YEAR = 2026;

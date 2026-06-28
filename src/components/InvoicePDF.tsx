@@ -1,8 +1,8 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
-import { calculateServiceWithholding } from '../lib/tax-bf';
-import { getFiscalIdLabel } from '../lib/ohada';
-import type { Invoice, LineItem, ServiceWithholdingScenario } from '../lib/schemas';
-import type { BizInfo } from './InvoicePaper';
+import { calculateServiceWithholding } from '@/lib/tax-bf';
+import { getFiscalIdLabel } from '@/lib/ohada';
+import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
+import type { BizInfo } from '@/components/InvoicePaper';
 
 // toLocaleString is unreliable in the react-pdf renderer environment
 const pdfFmt = (n: number): string =>

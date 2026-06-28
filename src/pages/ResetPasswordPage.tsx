@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../components/Icon';
-import { supabase } from '../lib/supabase';
-import BillioMark from '../components/BillioMark';
+import Icon from '@/components/Icon';
+import { supabase } from '@/lib/supabase';
+import BillioMark from '@/components/BillioMark';
 
 interface Props {
   onDone: () => void;

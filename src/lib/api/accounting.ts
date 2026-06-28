@@ -2,14 +2,14 @@
 // Each function is MOCK-aware: when VITE_MOCK_AUTH=true it returns the
 // same mock constants used by the static prototype pages.
 
-import { supabase } from '../supabase';
+import { supabase } from '@/lib/supabase';
 import {
   CLASSES, ACCOUNTS, JOURNALS, ENTRIES, OPENING,
   FIXED_ASSETS, SUPPLIER_BILLS,
-} from '../accounting-data';
+} from '@/lib/accounting-data';
 import type {
   AccountClass, Account, Journal, JournalEntry, FixedAsset, SupplierBill,
-} from '../accounting-data';
+} from '@/lib/accounting-data';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -681,6 +681,36 @@ export async function deleteInvoiceEntries(orgId: string, invoiceId: string): Pr
   await Promise.all(
     (data as Array<Record<string, unknown>>).map(r => deleteJournalEntry(String(r.id)))
   );
+}
+
+export async function recordCreditNoteEntry(
+  orgId: string,
+  opts: {
+    creditNoteId: string;
+    invoiceId: string;
+    htAmount: number;
+    tvaAmount: number;
+    date: string;
+    clientName: string;
+  },
+): Promise<void> {
+  if (MOCK) return;
+  const { journalId, periodId } = await resolveJournalAndPeriod(orgId, 'VE', opts.date);
+  const total = opts.htAmount + opts.tvaAmount;
+  // Mirror of recordInvoiceIssuanceEntry but with debits/credits swapped
+  const entryId = await createJournalEntry(orgId, {
+    journalId,
+    periodId,
+    date:  opts.date,
+    piece: `AV-${opts.creditNoteId}`,
+    label: `Avoir — ${opts.clientName} (réf. ${opts.invoiceId})`,
+    lines: [
+      { accountNum: '706', debit: opts.htAmount,  credit: 0     },
+      ...(opts.tvaAmount > 0 ? [{ accountNum: '443', debit: opts.tvaAmount, credit: 0 }] : []),
+      { accountNum: '411', debit: 0,               credit: total },
+    ],
+  });
+  await postJournalEntry(entryId);
 }
 
 export async function markBillPaid(billId: string): Promise<void> {

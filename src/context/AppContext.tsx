@@ -1,19 +1,19 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import posthog from 'posthog-js';
-import { useToast } from './ToastContext';
+import { useToast } from '@/context/ToastContext';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { INITIAL_INVOICES, INITIAL_ACTIVITY, INITIAL_CLIENTS, INITIAL_PAYMENTS, INITIAL_PRODUCTS, INITIAL_QUOTES } from '../data';
-import { fetchInvoices,  dbToInvoice  } from '../lib/api/invoices';
-import { fetchClients,   dbToClient   } from '../lib/api/clients';
-import { fetchPayments,  dbToPayment  } from '../lib/api/payments';
-import { fetchProducts,  dbToProduct  } from '../lib/api/products';
-import { fetchQuotes,    dbToQuote    } from '../lib/api/quotes';
-import { fetchActivities, dbToActivity } from '../lib/api/activities';
-import { fetchOpeningBalanceAdopted } from '../lib/api/accounting';
-import type { Invoice, Activity, ClientRecord, Payment, Product, Quote, Client } from '../lib/schemas';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_INVOICES, INITIAL_ACTIVITY, INITIAL_CLIENTS, INITIAL_PAYMENTS, INITIAL_PRODUCTS, INITIAL_QUOTES } from '@/data';
+import { fetchInvoices,  dbToInvoice  } from '@/lib/api/invoices';
+import { fetchClients,   dbToClient   } from '@/lib/api/clients';
+import { fetchPayments,  dbToPayment  } from '@/lib/api/payments';
+import { fetchProducts,  dbToProduct  } from '@/lib/api/products';
+import { fetchQuotes,    dbToQuote    } from '@/lib/api/quotes';
+import { fetchActivities, dbToActivity } from '@/lib/api/activities';
+import { fetchOpeningBalanceAdopted } from '@/lib/api/accounting';
+import type { Invoice, Activity, ClientRecord, Payment, Product, Quote, Client } from '@/lib/schemas';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { hasFeature as checkFeature, type PlanId, type PlanStatus, type Feature } from '../lib/plans';
+import { hasFeature as checkFeature, type PlanId, type PlanStatus, type Feature } from '@/lib/plans';
 
 export interface OrgSettings {
   name:                 string;

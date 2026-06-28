@@ -1,6 +1,6 @@
-import { supabase } from '../supabase';
-import { INITIAL_ACTIVITY } from '../../data';
-import type { Activity } from '../schemas';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_ACTIVITY } from '@/data';
+import type { Activity } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

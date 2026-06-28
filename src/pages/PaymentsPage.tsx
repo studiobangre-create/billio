@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import { EmptyState } from '../components/EmptyState';
-import { PaymentsEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { createPayment } from '../lib/api/payments';
-import { updateInvoice } from '../lib/api/invoices';
-import { recordInvoicePaymentEntry } from '../lib/api/accounting';
-import { fmt, fmtDate } from '../data';
-import type { PayMethod, PayStatus, Payment } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import { EmptyState } from '@/components/EmptyState';
+import { PaymentsEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { createPayment } from '@/lib/api/payments';
+import { updateInvoice } from '@/lib/api/invoices';
+import { recordInvoicePaymentEntry } from '@/lib/api/accounting';
+import { fmt, fmtDate } from '@/data';
+import type { PayMethod, PayStatus, Payment } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
 

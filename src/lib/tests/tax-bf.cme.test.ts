@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCME } from '../tax-bf';
+import { calculateCME } from '@/lib/tax-bf';
 
 describe('calculateCME — eligibility', () => {
   it('returns null for CA ≥ 15 000 000', () => {

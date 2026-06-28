@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import ConfirmModal from '../components/ConfirmModal';
-import { EmptyState } from '../components/EmptyState';
-import { ProductsEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { createProduct, updateProduct, removeProduct } from '../lib/api/products';
-import { fmt, fmtCompact } from '../data';
-import type { ProductType, Product } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import ConfirmModal from '@/components/ConfirmModal';
+import { EmptyState } from '@/components/EmptyState';
+import { ProductsEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { createProduct, updateProduct, removeProduct } from '@/lib/api/products';
+import { fmt, fmtCompact } from '@/data';
+import type { ProductType, Product } from '@/lib/schemas';
 
 type FilterKey = 'all' | ProductType;
 type ViewMode  = 'list' | 'grid';

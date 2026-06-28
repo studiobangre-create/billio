@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Icon from './Icon';
-import { useToast } from '../context/ToastContext';
+import Sidebar from '@/components/Sidebar';
+import Icon from '@/components/Icon';
+import { useToast } from '@/context/ToastContext';
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const { toastMsg, toastVisible, toastError } = useToast();

@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../components/Icon';
-import { QAIllustration } from '../components/QAIllustrations';
-import { EmptyState } from '../components/EmptyState';
-import { ActivityEmptyIllustration, InvoicesEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { fmt, fmtCompact, fmtDate, fmtDue } from '../data';
-import type { ActivityPart } from '../data';
+import Icon from '@/components/Icon';
+import { QAIllustration } from '@/components/QAIllustrations';
+import { EmptyState } from '@/components/EmptyState';
+import { ActivityEmptyIllustration, InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { fmt, fmtCompact, fmtDate, fmtDue } from '@/data';
+import type { ActivityPart } from '@/data';
 
 function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   return (

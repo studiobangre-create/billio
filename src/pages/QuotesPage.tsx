@@ -1,18 +1,18 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../components/Icon';
-import ConfirmModal from '../components/ConfirmModal';
-import { EmptyState } from '../components/EmptyState';
-import { QuotesEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { createQuote, updateQuote, removeQuote, nextQuoteId } from '../lib/api/quotes';
-import { createInvoice, nextInvoiceId } from '../lib/api/invoices';
-import { fetchLineItems, saveLineItems } from '../lib/api/line-items';
-import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
-import { fmt, fmtDate, newLineItem } from '../data';
-import type { LineItem, QuoteStatus, Quote } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import ConfirmModal from '@/components/ConfirmModal';
+import { EmptyState } from '@/components/EmptyState';
+import { QuotesEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { createQuote, updateQuote, removeQuote, nextQuoteId } from '@/lib/api/quotes';
+import { createInvoice, nextInvoiceId } from '@/lib/api/invoices';
+import { fetchLineItems, saveLineItems } from '@/lib/api/line-items';
+import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
+import { fmt, fmtDate, newLineItem } from '@/data';
+import type { LineItem, QuoteStatus, Quote } from '@/lib/schemas';
 
 type FilterKey = 'all' | QuoteStatus;
 

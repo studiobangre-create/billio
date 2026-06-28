@@ -1,15 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import DrawerPanel from '../../components/accounting/DrawerPanel';
-import type { Account, AccountClass, Journal, LedgerRow } from '../../lib/accounting-data';
-import { fmt, fmtCompact, clsOf, openingOf } from '../../lib/accounting-data';
-import { useChartOfAccounts, useBalanceFns } from '../../lib/accounting-hooks';
-import { useApp } from '../../context/AppContext';
-import { supabase } from '../../lib/supabase';
-import { EmptyState } from '../../components/EmptyState';
-import { ChartOfAccountsEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import type { Account, AccountClass, Journal, LedgerRow } from '@/lib/accounting-data';
+import { fmt, fmtCompact, clsOf, openingOf } from '@/lib/accounting-data';
+import { useChartOfAccounts, useBalanceFns } from '@/lib/accounting-hooks';
+import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
+import { EmptyState } from '@/components/EmptyState';
+import { ChartOfAccountsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 
 function SideTag({ signed }: { signed: number }) {
   if (Math.abs(signed) < 0.5) return null;

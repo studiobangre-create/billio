@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import ConfirmModal from '../components/ConfirmModal';
-import { EmptyState, EmptyInline } from '../components/EmptyState';
-import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { createClient, updateClient, removeClient } from '../lib/api/clients';
-import { fmt } from '../data';
-import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import ConfirmModal from '@/components/ConfirmModal';
+import { EmptyState, EmptyInline } from '@/components/EmptyState';
+import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { createClient, updateClient, removeClient } from '@/lib/api/clients';
+import { fmt } from '@/data';
+import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'active' | 'lead' | 'balance';
 

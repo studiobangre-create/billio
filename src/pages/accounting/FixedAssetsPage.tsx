@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import Icon from '../../components/Icon';
-import { PageSkeleton } from '../../components/SkeletonLoader';
-import KPIStrip from '../../components/accounting/KPIStrip';
-import DrawerPanel from '../../components/accounting/DrawerPanel';
-import { EmptyState } from '../../components/EmptyState';
-import type { FixedAsset } from '../../lib/accounting-data';
-import { fmt, fmtCompact, amortSchedule, netValueOf } from '../../lib/accounting-data';
-import { useFixedAssets } from '../../lib/accounting-hooks';
-import { FixedAssetsEmptyIllustration } from '../../components/accounting/EmptyIllustrations';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import KPIStrip from '@/components/accounting/KPIStrip';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import { EmptyState } from '@/components/EmptyState';
+import type { FixedAsset } from '@/lib/accounting-data';
+import { fmt, fmtCompact, amortSchedule, netValueOf } from '@/lib/accounting-data';
+import { useFixedAssets } from '@/lib/accounting-hooks';
+import { FixedAssetsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 
 const ASSET_METHODS = ['Linéaire', 'Dégressif'];
 const ASSET_ICONS = ['building-warehouse', 'device-laptop', 'car', 'tool', 'server', 'printer'] as const;

@@ -1,10 +1,10 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { supabase } from './lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
-import { AppProvider, useApp } from './context/AppContext';
-import { ToastProvider } from './context/ToastContext';
-import AppShell from './components/AppShell';
+import { AppProvider, useApp } from '@/context/AppContext';
+import { ToastProvider } from '@/context/ToastContext';
+import AppShell from '@/components/AppShell';
 
 // ── Lazy page chunks ────────────────────────────────────────────────────────
 // Each import() becomes its own JS chunk; the browser only downloads a page

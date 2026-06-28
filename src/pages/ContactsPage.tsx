@@ -1,21 +1,21 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Icon from '../components/Icon';
-import ConfirmModal from '../components/ConfirmModal';
-import { EmptyState, EmptyInline } from '../components/EmptyState';
-import { ClientsEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { SuppliersEmptyIllustration } from '../components/accounting/EmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import DrawerPanel from '../components/accounting/DrawerPanel';
-import StatusPill from '../components/accounting/StatusPill';
-import { useApp } from '../context/AppContext';
-import FiscalDivisionSelect, { fiscalDivisionLabel } from '../components/FiscalDivisionSelect';
-import { createClient, updateClient, removeClient } from '../lib/api/clients';
-import { fmt, fmtCompact } from '../data';
-import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '../lib/ohada';
-import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '../lib/schemas';
-import type { SupplierBill, PaymentMethod } from '../lib/accounting-data';
-import { useSupplierBills } from '../lib/accounting-hooks';
+import Icon from '@/components/Icon';
+import ConfirmModal from '@/components/ConfirmModal';
+import { EmptyState, EmptyInline } from '@/components/EmptyState';
+import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import DrawerPanel from '@/components/accounting/DrawerPanel';
+import StatusPill from '@/components/accounting/StatusPill';
+import { useApp } from '@/context/AppContext';
+import FiscalDivisionSelect, { fiscalDivisionLabel } from '@/components/FiscalDivisionSelect';
+import { createClient, updateClient, removeClient } from '@/lib/api/clients';
+import { fmt, fmtCompact } from '@/data';
+import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
+import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
+import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
+import { useSupplierBills } from '@/lib/accounting-hooks';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 

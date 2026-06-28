@@ -10,9 +10,9 @@ import type {
   Payment,
   Product,
   Quote,
-} from './lib/schemas';
+} from '@/lib/schemas';
 
-export type { InvoiceStatus as Status, Client, Invoice, ActivityKind, ActivityPart, Activity, LineItem } from './lib/schemas';
+export type { InvoiceStatus as Status, Client, Invoice, ActivityKind, ActivityPart, Activity, LineItem } from '@/lib/schemas';
 
 export type FilterKey = 'all' | InvoiceStatus;
 

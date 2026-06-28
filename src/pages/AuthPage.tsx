@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import { supabase } from '../lib/supabase';
-import BillioMark from '../components/BillioMark';
+import Icon from '@/components/Icon';
+import { supabase } from '@/lib/supabase';
+import BillioMark from '@/components/BillioMark';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

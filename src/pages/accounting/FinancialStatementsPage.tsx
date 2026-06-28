@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import Icon from '../../components/Icon';
-import { fmt } from '../../lib/accounting-data';
-import { useFinancialStatements, useBalanceFns } from '../../lib/accounting-hooks';
+import Icon from '@/components/Icon';
+import { fmt } from '@/lib/accounting-data';
+import { useFinancialStatements, useBalanceFns } from '@/lib/accounting-hooks';
 
 type Tab = 'bilan' | 'cr' | 'flux' | 'notes';
 

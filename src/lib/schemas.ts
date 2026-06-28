@@ -11,7 +11,7 @@ export const paySourceSchema     = z.enum(['online', 'manual']);
 export const payStatusSchema     = z.enum(['completed', 'pending', 'failed']);
 export const productTypeSchema   = z.enum(['service', 'product']);
 export const quoteStatusSchema   = z.enum(['draft', 'sent', 'accepted', 'declined', 'expired', 'invoiced']);
-export const activityKindSchema  = z.enum(['paid', 'sent', 'overdue', 'viewed']);
+export const activityKindSchema  = z.enum(['paid', 'sent', 'overdue', 'viewed', 'avoir']);
 
 // ---------------------------------------------------------------------------
 // Entity schemas
@@ -102,6 +102,16 @@ export const productSchema = z.object({
   used:  z.number().int().min(0),
   ico:   z.string(),
   color: z.string(),
+});
+
+export const creditNoteSchema = z.object({
+  id:        z.string(),
+  invoiceId: z.string(),
+  subject:   z.string(),
+  client:    z.string(),
+  issued:    z.string(),
+  amount:    z.number().min(0),
+  reason:    z.string(),
 });
 
 export const quoteSchema = z.object({
@@ -213,6 +223,7 @@ export type Client         = z.infer<typeof clientSchema>;
 export type ClientRecord   = z.infer<typeof clientRecordSchema>;
 export type Payment        = z.infer<typeof paymentSchema>;
 export type Product        = z.infer<typeof productSchema>;
+export type CreditNote     = z.infer<typeof creditNoteSchema>;
 export type Quote          = z.infer<typeof quoteSchema>;
 export type ActivityPart   = z.infer<typeof activityPartSchema>;
 export type Activity       = z.infer<typeof activitySchema>;

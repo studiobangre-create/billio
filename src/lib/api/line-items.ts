@@ -1,5 +1,5 @@
-import { supabase } from '../supabase';
-import type { LineItem } from '../schemas';
+import { supabase } from '@/lib/supabase';
+import type { LineItem } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

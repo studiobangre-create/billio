@@ -2,22 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
-import Icon from '../components/Icon';
-import ConfirmModal from '../components/ConfirmModal';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { removeInvoice, updateInvoice } from '../lib/api/invoices';
-import { recordInvoicePaymentEntry, deleteInvoiceEntries, updateInvoiceIssuanceEntry } from '../lib/api/accounting';
-import { createPayment } from '../lib/api/payments';
-import { fetchLineItems, saveLineItems, deleteLineItems } from '../lib/api/line-items';
-import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '../data';
-import { InvoicePDFDocument } from '../components/InvoicePDF';
-import { getFiscalIdLabel } from '../lib/ohada';
-import type { Status } from '../data';
-import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '../lib/tax-bf';
-import type { LineItem, PayMethod, Payment, ServiceWithholdingScenario } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import ConfirmModal from '@/components/ConfirmModal';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { removeInvoice, updateInvoice } from '@/lib/api/invoices';
+import { recordInvoicePaymentEntry, deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordCreditNoteEntry } from '@/lib/api/accounting';
+import { createPayment } from '@/lib/api/payments';
+import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
+import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
+import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
+import { InvoicePDFDocument } from '@/components/InvoicePDF';
+import { getFiscalIdLabel } from '@/lib/ohada';
+import type { Status } from '@/data';
+import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
+import type { CreditNote, LineItem, PayMethod, Payment, ServiceWithholdingScenario } from '@/lib/schemas';
 
-type DotKind = 'paid' | 'sent' | 'overdue' | '';
+type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
 
 function buildTimeline(
@@ -108,6 +109,11 @@ export default function InvoicePage() {
   const [showPicker,   setShowPicker]   = useState(false);
   const [pickerQuery,  setPickerQuery]  = useState('');
   const [deleteDialog, setDeleteDialog] = useState(false);
+  const [avoirDialog,  setAvoirDialog]  = useState(false);
+  const [avoirReason,  setAvoirReason]  = useState('');
+  const [avoirAmount,  setAvoirAmount]  = useState(0);
+  const [avoirSaving,  setAvoirSaving]  = useState(false);
+  const [creditNotes,  setCreditNotes]  = useState<CreditNote[]>([]);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,6 +128,10 @@ export default function InvoicePage() {
   useEffect(() => {
     if (id) fetchLineItems(id).then(setLines).catch(() => setLines([]));
   }, [id]);
+
+  useEffect(() => {
+    if (id && orgId) fetchCreditNotes(orgId, id).then(setCreditNotes).catch(() => setCreditNotes([]));
+  }, [id, orgId]);
 
   if (loading) return <PageSkeleton title="Facture" variant="table-only" metrics={0} rows={4} />;
 
@@ -185,6 +195,50 @@ export default function InvoicePage() {
     await deleteInvoiceEntries(orgId, invoice.id);
     showToast('Facture supprimée');
     navigate('/invoices');
+  };
+
+  const openAvoir = () => {
+    setAvoirReason('');
+    setAvoirAmount(total);
+    setAvoirDialog(true);
+  };
+
+  const handleConfirmAvoir = async () => {
+    if (!avoirReason.trim()) { showToast('Saisissez le motif de l\'avoir.', true); return; }
+    if (avoirAmount <= 0 || avoirAmount > total) { showToast('Montant invalide.', true); return; }
+    setAvoirSaving(true);
+    try {
+      const avId = await nextCreditNoteId(orgId);
+      const today = new Date().toISOString().slice(0, 10);
+      const cn = await createCreditNote(orgId, {
+        id:        avId,
+        invoiceId: invoice.id,
+        subject:   `Avoir sur ${invoice.id}`,
+        client:    invoice.client,
+        issued:    today,
+        amount:    avoirAmount,
+        reason:    avoirReason.trim(),
+      });
+      setCreditNotes(prev => [cn, ...prev]);
+      // Accounting: back-calculate HT/TVA from TTC amount
+      const tvaAmount = canInvoiceTVA ? Math.round(avoirAmount - avoirAmount / 1.18) : 0;
+      const htAmount  = avoirAmount - tvaAmount;
+      recordCreditNoteEntry(orgId, {
+        creditNoteId: avId,
+        invoiceId:    invoice.id,
+        htAmount,
+        tvaAmount,
+        date:         today,
+        clientName:   client.name,
+      }).catch(err => console.error('Credit note accounting failed:', err));
+      setAvoirDialog(false);
+      showToast(`Avoir ${avId} émis`);
+    } catch (err) {
+      console.error('Create credit note failed:', err);
+      showToast('Erreur lors de l\'émission de l\'avoir', true);
+    } finally {
+      setAvoirSaving(false);
+    }
   };
   const REF_PLACEHOLDER: Record<PayMethod, string> = {
     cash: 'Reçu #0212',
@@ -528,14 +582,29 @@ export default function InvoicePage() {
                 <button className="btn btn-block" onClick={handleDuplicate}>
                   <Icon name="copy" ariaHidden /> Dupliquer
                 </button>
-                <button className="btn btn-block btn-ghost btn-danger" onClick={handleDelete}>
-                  <Icon name="trash" ariaHidden /> Supprimer la facture
-                </button>
+                {invoice.status === 'draft' ? (
+                  <button className="btn btn-block btn-ghost btn-danger" onClick={handleDelete}>
+                    <Icon name="trash" ariaHidden /> Supprimer la facture
+                  </button>
+                ) : (
+                  <button className="btn btn-block btn-ghost btn-danger" onClick={openAvoir}>
+                    <Icon name="file-minus" ariaHidden /> Émettre un avoir
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="rail-card">
               <div className="rail-title">Activité</div>
+              {creditNotes.map(cn => (
+                <div key={cn.id} className="tl-item">
+                  <div className="tl-dot avoir" />
+                  <div>
+                    <div className="tl-text">Avoir {cn.id} — {fmt(cn.amount)} F CFA</div>
+                    <div className="tl-time">{fmtDateLong(cn.issued)} · {cn.reason}</div>
+                  </div>
+                </div>
+              ))}
               {timeline.map((entry, i) => (
                 <div key={i} className="tl-item">
                   <div className={`tl-dot${entry.dot ? ` ${entry.dot}` : ''}`} />
@@ -820,6 +889,52 @@ export default function InvoicePage() {
           onConfirm={handleConfirmDelete}
           onClose={() => setDeleteDialog(false)}
         />
+      )}
+
+      {avoirDialog && (
+        <div className="inv-overlay" onClick={() => !avoirSaving && setAvoirDialog(false)}>
+          <div className="inv-modal" onClick={e => e.stopPropagation()}>
+            <div className="inv-modal-head">
+              <div className="inv-modal-title">
+                <Icon name="file-minus" size={16} ariaHidden />
+                Émettre un avoir
+              </div>
+              <button className="btn btn-icon" onClick={() => setAvoirDialog(false)} aria-label="Fermer" disabled={avoirSaving}>
+                <Icon name="x" size={16} ariaHidden />
+              </button>
+            </div>
+            <div className="inv-modal-body">
+              <div className="form-label">Motif de l'avoir <span style={{ color: 'var(--color-danger)' }}>*</span></div>
+              <input
+                className="form-input"
+                placeholder="Ex : erreur de tarif, annulation partielle…"
+                value={avoirReason}
+                onChange={e => setAvoirReason(e.target.value)}
+              />
+              <div className="form-label" style={{ marginTop: 12 }}>Montant TTC à annuler (max {fmt(total)} F CFA)</div>
+              <input
+                className="form-input"
+                type="number"
+                min={1}
+                max={total}
+                step={1}
+                value={avoirAmount}
+                onChange={e => setAvoirAmount(Number(e.target.value))}
+              />
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+                Conforme SYSCOHADA — un avoir génère une écriture comptable de contre-passation (AV-) dans le journal des ventes. La facture originale reste dans l'historique.
+              </p>
+            </div>
+            <div className="inv-modal-foot">
+              <button className="btn" onClick={() => setAvoirDialog(false)} disabled={avoirSaving}>
+                Annuler
+              </button>
+              <button className="btn btn-primary" onClick={handleConfirmAvoir} disabled={avoirSaving}>
+                {avoirSaving ? 'Émission…' : 'Émettre l\'avoir'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

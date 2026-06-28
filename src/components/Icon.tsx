@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import { ICONS } from '../icons';
+import { ICONS } from '@/icons';
 
 interface IconProps {
   name: string;

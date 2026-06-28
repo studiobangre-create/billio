@@ -2,16 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
-import Icon from '../components/Icon';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { updateQuote } from '../lib/api/quotes';
-import { createInvoice, nextInvoiceId, removeInvoice } from '../lib/api/invoices';
-import { fetchLineItems, saveLineItems, deleteLineItems } from '../lib/api/line-items';
-import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
-import { InvoicePDFDocument } from '../components/InvoicePDF';
-import { fmt, fmtDateLong, newLineItem } from '../data';
-import type { LineItem } from '../lib/schemas';
+import Icon from '@/components/Icon';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { updateQuote } from '@/lib/api/quotes';
+import { createInvoice, nextInvoiceId, removeInvoice } from '@/lib/api/invoices';
+import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
+import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
+import { InvoicePDFDocument } from '@/components/InvoicePDF';
+import { fmt, fmtDateLong, newLineItem } from '@/data';
+import type { LineItem } from '@/lib/schemas';
 
 const STATUS_LABEL: Record<string, string> = {
   draft:    'Brouillon',

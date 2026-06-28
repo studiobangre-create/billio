@@ -1,20 +1,20 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../components/Icon';
-import { EmptyState } from '../components/EmptyState';
-import { InvoicesEmptyIllustration } from '../components/PageEmptyIllustrations';
-import { PageSkeleton } from '../components/SkeletonLoader';
-import { useApp } from '../context/AppContext';
-import { createInvoice, nextInvoiceId } from '../lib/api/invoices';
-import { recordInvoiceIssuanceEntry } from '../lib/api/accounting';
-import { saveLineItems } from '../lib/api/line-items';
-import { createActivity } from '../lib/api/activities';
+import Icon from '@/components/Icon';
+import { EmptyState } from '@/components/EmptyState';
+import { InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { PageSkeleton } from '@/components/SkeletonLoader';
+import { useApp } from '@/context/AppContext';
+import { createInvoice, nextInvoiceId } from '@/lib/api/invoices';
+import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
+import { saveLineItems } from '@/lib/api/line-items';
+import { createActivity } from '@/lib/api/activities';
 import {
   STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem,
-} from '../data';
-import type { FilterKey, Status, LineItem } from '../data';
-import type { Activity } from '../lib/schemas';
+} from '@/data';
+import type { FilterKey, Status, LineItem } from '@/data';
+import type { Activity } from '@/lib/schemas';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },

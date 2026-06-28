@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { yearFractionFromStart, effectiveThreshold, isFirstFiscalYear } from '../tax-bf';
+import { yearFractionFromStart, effectiveThreshold, isFirstFiscalYear } from '@/lib/tax-bf';
 
 describe('yearFractionFromStart', () => {
   it('returns 1 when the business started before the tax year', () => {

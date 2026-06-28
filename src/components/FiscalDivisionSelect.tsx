@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import Icon from './Icon';
+import Icon from '@/components/Icon';
 
 interface Option { value: string; label: string }
 interface Group  { label: string; options: Option[] }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import Icon from '../components/Icon';
-import BillioMark from '../components/BillioMark';
+import { supabase } from '@/lib/supabase';
+import Icon from '@/components/Icon';
+import BillioMark from '@/components/BillioMark';
 
 interface InviteDetails {
   org_name:   string;

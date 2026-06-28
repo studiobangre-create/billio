@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import posthog from 'posthog-js';
-import Icon from '../components/Icon';
-import { useApp } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import Icon from '@/components/Icon';
+import { useApp } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 import {
   PLANS, PLAN_LABELS, PLAN_ORDER, formatPrice,
   SOLO_INVOICE_LIMIT,
   type PlanStatus,
-} from '../lib/plans';
+} from '@/lib/plans';
 import {
   fetchPaymentSettings, upsertPaymentSettings,
   DEFAULT_PAYMENT_SETTINGS, type PaymentSettings,
-} from '../lib/api/payment-settings';
-import { getFiscalIdLabel } from '../lib/ohada';
+} from '@/lib/api/payment-settings';
+import { getFiscalIdLabel } from '@/lib/ohada';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePatente } from '../tax-bf';
+import { calculatePatente } from '@/lib/tax-bf';
 
 describe('calculatePatente — table A', () => {
   it('turnover 20M → droit fixe 60 000', () => {

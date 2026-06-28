@@ -1,6 +1,6 @@
-import { supabase } from '../supabase';
-import { INITIAL_QUOTES } from '../../data';
-import type { Quote } from '../schemas';
+import { supabase } from '@/lib/supabase';
+import { INITIAL_QUOTES } from '@/data';
+import type { Quote } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 

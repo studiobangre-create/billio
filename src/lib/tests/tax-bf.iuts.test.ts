@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateIUTS } from '../tax-bf';
+import { calculateIUTS } from '@/lib/tax-bf';
 
 const BASE_INPUT = {
   monthlySalaireBase:  150_000,

@@ -1,4 +1,4 @@
-import type { Journal } from '../../lib/accounting-data';
+import type { Journal } from '@/lib/accounting-data';
 
 export default function JournalBadge({ journal }: { journal: Journal }) {
   return (
