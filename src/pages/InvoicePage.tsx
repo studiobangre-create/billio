@@ -7,16 +7,18 @@ import ConfirmModal from '@/components/ConfirmModal';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { removeInvoice, updateInvoice } from '@/lib/api/invoices';
-import { recordInvoicePaymentEntry, deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordCreditNoteEntry } from '@/lib/api/accounting';
-import { createPayment } from '@/lib/api/payments';
+import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordCreditNoteEntry } from '@/lib/api/accounting';
+import { settleInvoicePayment } from '@/lib/api/payments';
+import { invoiceBalance, daysOverdue } from '@/lib/invoice-status';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { InvoicePDFDocument } from '@/components/InvoicePDF';
+import { downloadBlob } from '@/lib/download';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Status } from '@/data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
-import type { CreditNote, LineItem, PayMethod, Payment, ServiceWithholdingScenario } from '@/lib/schemas';
+import type { CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
 
 type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
@@ -96,6 +98,9 @@ export default function InvoicePage() {
   const [payRef, setPayRef] = useState('');
   const [tvaRetenue, setTvaRetenue] = useState(0);
   const [serviceWithholding, setServiceWithholding] = useState(0);
+  const [payAmount, setPayAmount] = useState(0);
+  const [paySaving, setPaySaving] = useState(false);
+  const [linesError, setLinesError] = useState(false);
 
   // Edit panel state
   const [editOpen,   setEditOpen]   = useState(false);
@@ -126,8 +131,12 @@ export default function InvoicePage() {
   }, [showPicker]);
 
   useEffect(() => {
-    if (id) fetchLineItems(id).then(setLines).catch(() => setLines([]));
-  }, [id]);
+    if (!id || !orgId) return;
+    setLinesError(false);
+    fetchLineItems(orgId, { invoiceId: id })
+      .then(setLines)
+      .catch(err => { console.error('[fetchLineItems]', err); setLines([]); setLinesError(true); });
+  }, [id, orgId]);
 
   useEffect(() => {
     if (id && orgId) fetchCreditNotes(orgId, id).then(setCreditNotes).catch(() => setCreditNotes([]));
@@ -164,48 +173,60 @@ export default function InvoicePage() {
   const tax           = canInvoiceTVA ? Math.round(discountedSub * 0.18) : 0;
   const total         = discountedSub + tax;
   const isOverdue       = invoice.status === 'overdue';
+  const { paid, credited, balance } = invoiceBalance(invoice, payments, creditNotes);
+  // Invoices marked paid before payments were tracked per invoice have no payment rows
+  const amountDue       = invoice.status === 'paid' ? 0 : balance;
+  const creditable      = Math.max(0, invoice.amount - credited);
   const invoicePayment  = payments.find(p => p.inv === invoice.id);
   const timeline        = buildTimeline(invoice, client.name, invoicePayment);
 
   const handleSendReminder = () => showToast(`Relance envoyée à ${client.name}`);
   const handleDuplicate    = () => showToast('Facture dupliquée en brouillon');
   const handleDownloadPDF = async () => {
-    const blob = await pdf(
-      <InvoicePDFDocument
-        invoice={invoice}
-        lines={lines}
-        client={client}
-        biz={orgSettings}
-        paymentTerms={orgSettings.paymentTerms || 'Net 14 jours'}
-        deliveryTerms={orgSettings.deliveryTerms || 'À convenir'}
-      />
-    ).toBlob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `facture-${invoice.id.toLowerCase()}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-    posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
+    if (linesError) { showToast('Les lignes de la facture n\'ont pas pu être chargées — rechargez la page avant de télécharger le PDF.', true); return; }
+    try {
+      const blob = await pdf(
+        <InvoicePDFDocument
+          invoice={invoice}
+          lines={lines}
+          client={client}
+          biz={orgSettings}
+          paymentTerms={orgSettings.paymentTerms || 'Net 14 jours'}
+          deliveryTerms={orgSettings.deliveryTerms || 'À convenir'}
+        />
+      ).toBlob();
+      downloadBlob(blob, `facture-${invoice.id.toLowerCase()}.pdf`);
+      posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
+    } catch (err) {
+      console.error('[handleDownloadPDF] failed:', err);
+      showToast('Impossible de générer le PDF. Veuillez réessayer.', true);
+    }
   };
   const handleDelete = () => setDeleteDialog(true);
   const handleConfirmDelete = async () => {
+    try {
+      await removeInvoice(orgId, invoice.id);
+    } catch (err) {
+      console.error('[removeInvoice] failed:', err);
+      setDeleteDialog(false);
+      showToast('Erreur lors de la suppression de la facture. Veuillez réessayer.', true);
+      return;
+    }
+    deleteInvoiceEntries(orgId, invoice.id).catch(err => console.error('[deleteInvoiceEntries] failed:', err));
     setInvoices(prev => prev.filter(i => i.id !== invoice.id));
-    await removeInvoice(invoice.id);
-    await deleteInvoiceEntries(orgId, invoice.id);
     showToast('Facture supprimée');
     navigate('/invoices');
   };
 
   const openAvoir = () => {
     setAvoirReason('');
-    setAvoirAmount(total);
+    setAvoirAmount(creditable);
     setAvoirDialog(true);
   };
 
   const handleConfirmAvoir = async () => {
     if (!avoirReason.trim()) { showToast('Saisissez le motif de l\'avoir.', true); return; }
-    if (avoirAmount <= 0 || avoirAmount > total) { showToast('Montant invalide.', true); return; }
+    if (avoirAmount <= 0 || avoirAmount > creditable) { showToast(`Montant invalide (maximum ${fmt(creditable)} F CFA).`, true); return; }
     setAvoirSaving(true);
     try {
       const avId = await nextCreditNoteId(orgId);
@@ -220,6 +241,10 @@ export default function InvoicePage() {
         reason:    avoirReason.trim(),
       });
       setCreditNotes(prev => [cn, ...prev]);
+      // The database marks the invoice paid once nothing is left to collect
+      if ((invoice.status === 'pending' || invoice.status === 'overdue') && balance - avoirAmount <= 0) {
+        setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' as const } : i));
+      }
       // Accounting: back-calculate HT/TVA from TTC amount
       const tvaAmount = canInvoiceTVA ? Math.round(avoirAmount - avoirAmount / 1.18) : 0;
       const htAmount  = avoirAmount - tvaAmount;
@@ -253,7 +278,7 @@ export default function InvoicePage() {
     cheque: 'Chèque',
   };
 
-  const canEdit = invoice.status === 'draft' || invoice.status === 'pending';
+  const canEdit = invoice.status === 'draft' || invoice.status === 'pending' || invoice.status === 'overdue';
 
   const openEdit = () => {
     setEClient(invoice.client);
@@ -281,8 +306,8 @@ export default function InvoicePage() {
     if (eSubtotal <= 0) { showToast('Ajoutez au moins une ligne de facturation.', true); return; }
     setSaving(true);
     try {
-      await updateInvoice(invoice.id, { subject: eSubject.trim() || 'Facture sans titre', client: eClient, issued: eDate, due: eDue, amount: eTotal, discountPct: eDiscount });
-      await deleteLineItems({ invoiceId: invoice.id });
+      await updateInvoice(orgId, invoice.id, { subject: eSubject.trim() || 'Facture sans titre', client: eClient, issued: eDate, due: eDue, amount: eTotal, discountPct: eDiscount });
+      await deleteLineItems(orgId, { invoiceId: invoice.id });
       await saveLineItems(orgId, eLines, { invoiceId: invoice.id });
       const editedClientName = (clientsMap[eClient] ?? { name: eClient }).name;
       updateInvoiceIssuanceEntry(orgId, {
@@ -307,42 +332,40 @@ export default function InvoicePage() {
   };
 
   const handleConfirmPayment = async () => {
+    if (paySaving) return;
+    if (payAmount <= 0 || payAmount > balance) {
+      showToast(`Saisissez un montant entre 1 et ${fmt(balance)} F CFA.`, true);
+      return;
+    }
+    if (tvaRetenue + serviceWithholding > payAmount) {
+      showToast('Les retenues dépassent le montant réglé.', true);
+      return;
+    }
     const today = new Date().toISOString().slice(0, 10);
-    const maxNum = payments.length
-      ? Math.max(...payments.map(p => parseInt(p.id.split('-')[1], 10)))
-      : 2052;
-    const newPayment: Payment = {
-      id:     `PAI-${maxNum + 1}`,
-      date:   today,
-      client: invoice.client,
-      inv:    invoice.id,
-      method: payMethod,
-      ref:    payRef.trim() || METHOD_LABEL[payMethod],
-      amount: total,
-      status: 'completed',
-      source: 'manual',
-    };
+    setPaySaving(true);
     try {
-      await createPayment(orgId, newPayment);
-      await updateInvoice(invoice.id, { status: 'paid' });
-      setPayments(prev => [newPayment, ...prev]);
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' as const } : i));
-      setPayDialog(false);
-      showToast(`Paiement ${METHOD_LABEL[payMethod]} de ${fmt(total)} F CFA enregistré`);
-      recordInvoicePaymentEntry(orgId, {
-        invoiceId:  invoice.id,
-        total,
-        date:       today,
-        clientName: client.name,
-        tvaRetenue:         tvaRetenue       > 0 ? tvaRetenue       : undefined,
-        serviceWithholding: serviceWithholding > 0 ? serviceWithholding : undefined,
-      }).catch(err => {
-        console.error('[recordInvoicePaymentEntry] failed:', err);
-        showToast('Écriture comptable non enregistrée. Vérifiez la comptabilité.', true);
+      const res = await settleInvoicePayment(orgId, {
+        invoiceId:          invoice.id,
+        date:               today,
+        method:             payMethod,
+        ref:                payRef.trim() || METHOD_LABEL[payMethod],
+        amount:             payAmount,
+        clientName:         client.name,
+        tvaRetenue,
+        serviceWithholding,
       });
+      setPayments(prev => prev.some(p => p.id === res.payment.id) ? prev : [{ ...res.payment, client: res.payment.client || invoice.client }, ...prev]);
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: res.invoiceStatus } : i));
+      setPayDialog(false);
+      showToast(res.balance > 0
+        ? `Paiement de ${fmt(payAmount)} F CFA enregistré — reste ${fmt(res.balance)} F CFA`
+        : `Paiement ${METHOD_LABEL[payMethod]} de ${fmt(payAmount)} F CFA enregistré — facture soldée`);
+      if (!res.accountingOk) showToast('Paiement enregistré, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
     } catch (err) {
       console.error('Payment recording failed:', err);
-      showToast('Erreur lors de l\'enregistrement du paiement', true);
+      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement du paiement', true);
+    } finally {
+      setPaySaving(false);
     }
   };
 
@@ -446,6 +469,11 @@ export default function InvoicePage() {
 
             <div className="pp-subject"><span className="pp-subject-label">Objet :</span>{invoice.subject}</div>
 
+            {linesError && (
+              <div role="alert" style={{ margin: '0 0 12px', padding: '10px 12px', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontSize: 13 }}>
+                Impossible de charger les lignes de cette facture. Le détail et les totaux ci-dessous sont incomplets — rechargez la page.
+              </div>
+            )}
             <table className="li-table">
               <thead>
                 <tr>
@@ -478,10 +506,13 @@ export default function InvoicePage() {
                   <div className="tot-row"><span>Remise ({discountPct}%)</span><span className="tv" style={{ color: 'var(--color-text-secondary)' }}>−{fmt(discountAmt)} F CFA</span></div>
                 )}
                 {canInvoiceTVA && <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>}
-                {invoice.status === 'paid' && (
-                  <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(total)} F CFA</span></div>
+                {paid > 0 && (
+                  <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(paid)} F CFA</span></div>
                 )}
-                <div className="tot-row grand"><span>Total dû</span><span className="tv">{invoice.status === 'paid' ? '0' : fmt(total)} F CFA</span></div>
+                {credited > 0 && (
+                  <div className="tot-row"><span>Avoirs</span><span className="tv paid-amt">−{fmt(credited)} F CFA</span></div>
+                )}
+                <div className="tot-row grand"><span>Total dû</span><span className="tv">{invoice.status === 'draft' ? fmt(total) : fmt(amountDue)} F CFA</span></div>
               </div>
             </div>
 
@@ -548,12 +579,12 @@ export default function InvoicePage() {
               {isOverdue && (
                 <div className="rail-due-sub">
                   <Icon name="alert-triangle" ariaHidden />
-                  5 jours de retard · éch. {fmtDate(invoice.due)}
+                  {daysOverdue(invoice.due)} jour{daysOverdue(invoice.due) > 1 ? 's' : ''} de retard · éch. {fmtDate(invoice.due)}
                 </div>
               )}
               <div className="rail-actions">
                 {(isOverdue || invoice.status === 'pending') && (<>
-                  <button className="btn btn-primary btn-block" onClick={() => { setPayRef(''); setPayMethod('cash'); setTvaRetenue(0); setServiceWithholding(0); setPayDialog(true); }}>
+                  <button className="btn btn-primary btn-block" onClick={() => { setPayRef(''); setPayMethod('cash'); setTvaRetenue(0); setServiceWithholding(0); setPayAmount(balance); setPayDialog(true); }}>
                     <Icon name="cash" ariaHidden /> Enregistrer un paiement
                   </button>
                   <button
@@ -650,6 +681,18 @@ export default function InvoicePage() {
               </div>
             </div>
             <div className="form-group">
+              <label className="form-label">Montant réglé (reste à payer : {fmt(balance)} F CFA)</label>
+              <input
+                className="form-input"
+                type="number"
+                min={1}
+                max={balance}
+                value={payAmount || ''}
+                placeholder="0"
+                onChange={e => setPayAmount(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </div>
+            <div className="form-group">
               <label className="form-label">Référence (optionnel)</label>
               <input
                 className="form-input"
@@ -725,18 +768,18 @@ export default function InvoicePage() {
               })()}
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <div>Montant facturé : <b>{fmt(total)} F CFA</b></div>
+              <div>Montant réglé : <b>{fmt(payAmount)} F CFA</b>{payAmount < balance && <> · reste ensuite {fmt(balance - payAmount)} F CFA</>}</div>
               {(tvaRetenue > 0 || serviceWithholding > 0) && (<>
                 {tvaRetenue > 0       && <div style={{ color: '#2E7D32' }}>TVA retenue (4449) : −{fmt(tvaRetenue)} F</div>}
                 {serviceWithholding > 0 && <div style={{ color: '#B26A09' }}>Ret. services (4091) : −{fmt(serviceWithholding)} F</div>}
-                <div style={{ fontWeight: 700 }}>Vous recevrez : {fmt(total - tvaRetenue - serviceWithholding)} F CFA</div>
+                <div style={{ fontWeight: 700 }}>Vous recevrez : {fmt(payAmount - tvaRetenue - serviceWithholding)} F CFA</div>
               </>)}
             </div>
           </div>
           <div className="inv-modal-foot">
             <button className="btn" onClick={() => setPayDialog(false)}>Annuler</button>
-            <button className="btn btn-primary" onClick={handleConfirmPayment}>
-              <Icon name="check" size={14} ariaHidden /> Confirmer
+            <button className="btn btn-primary" onClick={handleConfirmPayment} disabled={paySaving}>
+              <Icon name="check" size={14} ariaHidden /> {paySaving ? 'Enregistrement…' : 'Confirmer'}
             </button>
           </div>
         </div>
@@ -911,12 +954,12 @@ export default function InvoicePage() {
                 value={avoirReason}
                 onChange={e => setAvoirReason(e.target.value)}
               />
-              <div className="form-label" style={{ marginTop: 12 }}>Montant TTC à annuler (max {fmt(total)} F CFA)</div>
+              <div className="form-label" style={{ marginTop: 12 }}>Montant TTC à annuler (max {fmt(creditable)} F CFA)</div>
               <input
                 className="form-input"
                 type="number"
                 min={1}
-                max={total}
+                max={creditable}
                 step={1}
                 value={avoirAmount}
                 onChange={e => setAvoirAmount(Number(e.target.value))}

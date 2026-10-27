@@ -6,12 +6,12 @@ import { EmptyState } from '@/components/EmptyState';
 import { InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { createInvoice, nextInvoiceId } from '@/lib/api/invoices';
+import { createInvoice, nextInvoiceId, removeInvoice } from '@/lib/api/invoices';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import { saveLineItems } from '@/lib/api/line-items';
 import { createActivity } from '@/lib/api/activities';
 import {
-  STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem,
+  STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem, clientInitials,
 } from '@/data';
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
@@ -127,13 +127,23 @@ export default function InvoicesPage() {
     setSubmitting(true);
 
     const isFirstInvoice = invoices.length === 0;
-    const id    = await nextInvoiceId(orgId);
     const cName = clientsMap[fClient]?.name ?? fClient;
-    const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status, discountPct: fDiscount };
+    let invoiceCreated = false;
+    let id = '';
 
     try {
+      id = await nextInvoiceId(orgId);
+      const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status, discountPct: fDiscount };
       await createInvoice(orgId, newInv);
-      await saveLineItems(orgId, lineItems, { invoiceId: id });
+      invoiceCreated = true;
+      // Don't leave an invoice without lines behind if saving them fails
+      try {
+        await saveLineItems(orgId, lineItems, { invoiceId: id });
+      } catch (lineErr) {
+        await removeInvoice(orgId, id).catch(e => console.error('[rollback] removeInvoice failed:', e));
+        invoiceCreated = false;
+        throw lineErr;
+      }
 
       posthog.capture('invoice_created', { invoice_type: status, item_count: lineItems.length, total_amount: total, currency: 'XOF' });
       if (status === 'pending') posthog.capture('invoice_sent', { invoice_id: id, delivery_method: fPay });
@@ -146,7 +156,8 @@ export default function InvoicesPage() {
         : { kind: 'viewed' as const, parts: [{ text: 'Brouillon ' }, { text: `#${id}`, bold: true as const }, { text: ' enregistré pour ' }, { text: cName, bold: true as const }] };
       const actEntry: Activity = { ...actPayload, time: "À l'instant" };
       setActivity((prev: Activity[]) => [actEntry, ...prev]);
-      await createActivity(orgId, actPayload);
+      // The invoice is saved at this point; a failed activity log must not make it look unsaved
+      createActivity(orgId, actPayload).catch(err => console.error('[createActivity] failed:', err));
 
       closePanel();
       showToast(status === 'pending' ? `Facture #${id} envoyée à ${cName}` : `Brouillon #${id} enregistré`);
@@ -162,7 +173,9 @@ export default function InvoicesPage() {
       }
     } catch (err) {
       console.error('[submitInvoice] error:', err);
-      showToast('Une erreur est survenue. Veuillez réessayer.', true);
+      showToast(invoiceCreated
+        ? `La facture #${id} a été créée, mais une erreur est survenue ensuite. Vérifiez-la avant de réessayer.`
+        : 'Une erreur est survenue. La facture n\'a pas été enregistrée — veuillez réessayer.', true);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -289,7 +302,7 @@ export default function InvoicesPage() {
                     <div className="inv-subject">{inv.subject}</div>
                   </div>
                   <div className="client-cell">
-                    <div className={`client-av ${c.av}`}>{inv.client}</div>
+                    <div className={`client-av ${c.av}`}>{clientInitials(c.name)}</div>
                     <div>
                       <div className="cell-text">{c.name}</div>
                       <div className="cell-sub">{c.city}</div>

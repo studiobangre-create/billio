@@ -7,12 +7,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { QuotesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { createQuote, updateQuote, removeQuote, nextQuoteId } from '@/lib/api/quotes';
-import { createInvoice, nextInvoiceId } from '@/lib/api/invoices';
-import { fetchLineItems, saveLineItems } from '@/lib/api/line-items';
-import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
-import { fmt, fmtDate, newLineItem } from '@/data';
-import type { LineItem, QuoteStatus, Quote } from '@/lib/schemas';
+import { createQuote, removeQuote, nextQuoteId } from '@/lib/api/quotes';
+import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
+import { saveLineItems, deleteLineItems } from '@/lib/api/line-items';
+import { fmt, fmtDate, newLineItem, clientInitials } from '@/data';
+import type { LineItem, QuoteStatus } from '@/lib/schemas';
 
 type FilterKey = 'all' | QuoteStatus;
 
@@ -67,6 +66,7 @@ export default function QuotesPage() {
   const [showPicker, setShowPicker]   = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const convertingRef = useRef<Set<string>>(new Set());
+  const submittingRef = useRef(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -139,18 +139,34 @@ export default function QuotesPage() {
   }
 
   async function submitQuote(status: 'draft' | 'sent') {
+    if (submittingRef.current) return;
     if (!fClient) { showToast('Sélectionnez un client', true); return; }
     if (subtotal <= 0) { showToast('Ajoutez au moins un article', true); return; }
-    const id      = await nextQuoteId(orgId);
-    const cName   = clientsMap[fClient]?.name ?? fClient;
-    const payload = { id, subject: fSubject.trim() || 'Devis sans titre', client: fClient, issued: fDate, valid: fValid, amount: total, status };
-    const newQuote: Quote = { ...payload, expSoon: status === 'sent' };
-    setQuotes(prev => [newQuote, ...prev]);
-    await createQuote(orgId, payload);
-    await saveLineItems(orgId, lines, { quoteId: id });
-    posthog.capture('quote_created', { item_count: lines.length, total_amount: total, status });
-    closePanel();
-    showToast(status === 'sent' ? `Devis ${id} envoyé à ${cName}` : `Brouillon ${id} enregistré`);
+    submittingRef.current = true;
+    const cName = clientsMap[fClient]?.name ?? fClient;
+    let id = '';
+    let quoteCreated = false;
+    try {
+      id = await nextQuoteId(orgId);
+      const payload = { id, subject: fSubject.trim() || 'Devis sans titre', client: fClient, issued: fDate, valid: fValid, amount: total, status };
+      const created = await createQuote(orgId, payload);
+      quoteCreated = true;
+      await saveLineItems(orgId, lines, { quoteId: id });
+      setQuotes(prev => prev.some(q => q.id === id) ? prev : [created, ...prev]);
+      posthog.capture('quote_created', { item_count: lines.length, total_amount: total, status });
+      closePanel();
+      showToast(status === 'sent' ? `Devis ${id} envoyé à ${cName}` : `Brouillon ${id} enregistré`);
+    } catch (err) {
+      console.error('[submitQuote] failed:', err);
+      if (quoteCreated) {
+        // Don't leave a quote without lines behind
+        await deleteLineItems(orgId, { quoteId: id }).catch(() => {});
+        await removeQuote(orgId, id).catch(e => console.error('[rollback] removeQuote failed:', e));
+      }
+      showToast('Erreur lors de l\'enregistrement du devis. Veuillez réessayer.', true);
+    } finally {
+      submittingRef.current = false;
+    }
   }
 
   async function convertToInvoice(id: string, e: React.MouseEvent) {
@@ -161,42 +177,18 @@ export default function QuotesPage() {
     convertingRef.current.add(id);
 
     try {
-      const today   = new Date().toISOString().slice(0, 10);
-      const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-      const invId   = await nextInvoiceId(orgId);
-      const cName   = clientsMap[quote.client]?.name ?? quote.client;
-      const htAmount  = canInvoiceTVA ? Math.round(quote.amount / 1.18) : quote.amount;
-      const tvaAmount = canInvoiceTVA ? quote.amount - htAmount : 0;
-
-      const newInv = {
-        id:          invId,
-        subject:     quote.subject,
-        client:      quote.client,
-        issued:      today,
-        due:         dueDate,
-        amount:      quote.amount,
-        status:      'pending' as const,
-        discountPct: 0,
-      };
-
-      const quoteLines = await fetchLineItems(undefined, id);
-      await createInvoice(orgId, newInv);
-      await saveLineItems(orgId, quoteLines.map(l => ({ ...l })), { invoiceId: invId });
-      await updateQuote(id, { status: 'invoiced' });
-
-      setInvoices(prev => [newInv, ...prev]);
+      const { invoice, accountingOk } = await convertQuoteToInvoice(orgId, quote, {
+        canInvoiceTVA,
+        clientName: clientsMap[quote.client]?.name ?? quote.client,
+      });
+      setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
       setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
-
-      posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invId });
-      showToast(`Devis ${id} → Facture #${invId} créée`);
-
-      recordInvoiceIssuanceEntry(orgId, {
-        invoiceId:  invId,
-        htAmount,
-        tvaAmount,
-        date:       today,
-        clientName: cName,
-      }).catch(err => console.error('[recordInvoiceIssuanceEntry] failed:', err));
+      posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invoice.id });
+      showToast(`Devis ${id} → Facture #${invoice.id} créée`);
+      if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
+    } catch (err) {
+      console.error('[convertToInvoice] failed:', err);
+      showToast('Erreur lors de la conversion. Aucune facture n\'a été créée — veuillez réessayer.', true);
     } finally {
       convertingRef.current.delete(id);
     }
@@ -216,9 +208,16 @@ export default function QuotesPage() {
     if (!deleteId) return;
     const id = deleteId;
     setDeleteId(null);
+    const previous = quotes;
     setQuotes(prev => prev.filter(q => q.id !== id));
-    await removeQuote(id);
-    showToast(`Devis ${id} supprimé`);
+    try {
+      await removeQuote(orgId, id);
+      showToast(`Devis ${id} supprimé`);
+    } catch (err) {
+      console.error('[removeQuote] failed:', err);
+      setQuotes(previous);
+      showToast('Erreur lors de la suppression du devis. Veuillez réessayer.', true);
+    }
   }
 
   return (
@@ -338,7 +337,7 @@ export default function QuotesPage() {
 
                     {/* Client */}
                     <div className="client-cell">
-                      {cl && <div className={`client-av ${cl.av}`}>{q.client}</div>}
+                      {cl && <div className={`client-av ${cl.av}`}>{clientInitials(cl.name)}</div>}
                       <div>
                         <div className="cell-text">{cl?.name ?? q.client}</div>
                         <div className="cell-sub">{cl?.city}</div>

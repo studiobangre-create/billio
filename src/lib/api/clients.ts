@@ -37,16 +37,26 @@ export async function fetchClients(orgId: string): Promise<ClientRecord[]> {
   return (data ?? []).map(dbToClient);
 }
 
+export async function nextClientCode(orgId: string): Promise<string> {
+  if (MOCK) return 'CLI-' + String(Math.floor(Math.random() * 9000) + 1000);
+  // Atomic per-org sequence — see next_client_number(). Codes must be unique:
+  // invoices, quotes and payments reference clients by code.
+  const { data, error } = await supabase.rpc('next_client_number', { p_org_id: orgId });
+  if (error) throw error;
+  return 'CLI-' + String(data as number).padStart(4, '0');
+}
+
 export async function createClient(
   orgId: string,
-  payload: Omit<ClientRecord, 'invoices' | 'billed' | 'balance'>,
+  payload: Omit<ClientRecord, 'code' | 'invoices' | 'billed' | 'balance'>,
 ): Promise<ClientRecord> {
-  if (MOCK) return { ...payload, invoices: 0, billed: 0, balance: 0 };
+  const code = await nextClientCode(orgId);
+  if (MOCK) return { ...payload, code, invoices: 0, billed: 0, balance: 0 };
   const { data, error } = await supabase
     .from('clients')
     .insert({
       org_id:         orgId,
-      code:           payload.code,
+      code,
       av:             payload.av,
       name:           payload.name,
       contact:        payload.contact,

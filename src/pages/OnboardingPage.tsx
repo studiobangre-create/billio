@@ -3,6 +3,7 @@ import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
+import { nextClientCode } from '@/lib/api/clients';
 import './OnboardingPage.css';
 
 /* ── types ── */
@@ -106,7 +107,7 @@ function Ico({ name, style }: { name: IcoName; style?: React.CSSProperties }) {
 /* ═══════════════════════════════════════════════════════════════ */
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { orgId, userId, completeOnboarding } = useApp();
+  const { orgId, userId, completeOnboarding, showToast } = useApp();
 
   /* ── navigation ── */
   const [step, setStep] = useState(0);
@@ -234,14 +235,24 @@ export default function OnboardingPage() {
 
   /* ── finish: save to Supabase ── */
   async function handleFinish() {
-    if (!orgId) return;
+    if (saving) return;
     setSaving(true);
+    const orgName = bizName.trim() || 'Mon entreprise';
     try {
+      // Users whose signup trigger didn't create an org have none yet —
+      // bootstrap it (idempotent: returns the existing org if there is one).
+      let targetOrgId = orgId;
+      if (!targetOrgId) {
+        const { data: newOrgId, error: createErr } = await supabase.rpc('create_initial_org', { p_name: orgName });
+        if (createErr) throw createErr;
+        targetOrgId = newOrgId as string;
+      }
+
       // Step 1 + Step 2 — org details and invoice defaults
       const { error: orgErr } = await supabase
         .from('organizations')
         .update({
-          name:                  bizName.trim() || 'Mon entreprise',
+          name:                  orgName,
           ifu:                   taxId.trim(),
           rccm:                  rccm.trim(),
           address:               address.trim(),
@@ -256,7 +267,7 @@ export default function OnboardingPage() {
           invoice_footer:        footer,
           onboarding_completed_at: new Date().toISOString(),
         })
-        .eq('id', orgId);
+        .eq('id', targetOrgId);
       if (orgErr) throw orgErr;
 
       // Step 3 — team invitations
@@ -273,23 +284,29 @@ export default function OnboardingPage() {
             teamInvites.map(t => ({
               id:         t.id,
               token:      t.id,
-              org_id:     orgId,
+              org_id:     targetOrgId,
               email:      t.email.toLowerCase().trim(),
               role:       ROLE_MAP[t.role] ?? 'member',
               invited_by: userId || undefined,
             })),
             { onConflict: 'org_id,email', ignoreDuplicates: true }
           );
-        if (invErr) console.warn('Invitation insert error:', invErr.message);
+        if (invErr) {
+          console.warn('Invitation insert error:', invErr.message);
+          showToast('Les invitations n\'ont pas pu être enregistrées. Réessayez depuis Paramètres → Équipe.', true);
+        }
       }
 
       // Step 4 — clients
       if (clients.length > 0) {
+        // Codes come from the per-org sequence so they never collide with existing clients
+        const codes: string[] = [];
+        for (let i = 0; i < clients.length; i++) codes.push(await nextClientCode(targetOrgId));
         const { error: cliErr } = await supabase.from('clients').insert(
           clients.map((c, i) => ({
-            org_id:     orgId,
+            org_id:     targetOrgId,
             created_by: userId || undefined,
-            code:       `CLI-${String(i + 1).padStart(4, '0')}`,
+            code:       codes[i],
             name:       c.name,
             email:      c.email || '—',
             av:         c.av,
@@ -304,15 +321,16 @@ export default function OnboardingPage() {
       }
 
       posthog.capture('onboarding_completed', {
-        org_name:              bizName.trim() || 'Mon entreprise',
+        org_name:              orgName,
         clients_added:         clients.length,
         team_invites:          teamInvites.length,
         time_to_complete_seconds: Math.round((Date.now() - startTimeRef.current) / 1000),
       });
-      completeOnboarding(bizName.trim() || 'Mon entreprise');
+      await completeOnboarding();
       navigate('/dashboard');
     } catch (err) {
       console.error('Onboarding save error:', err);
+      showToast('Impossible d\'enregistrer votre configuration. Vérifiez votre connexion et réessayez.', true);
       setSaving(false);
     }
   }

@@ -7,7 +7,7 @@ import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
-import { fmt } from '@/data';
+import { fmt, clientInitials } from '@/data';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'active' | 'lead' | 'balance';
@@ -128,10 +128,8 @@ export default function ClientsPage() {
     e.preventDefault();
     if (!form.name.trim()) return;
     const avs   = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
-    const words = form.name.trim().split(/\s+/);
-    const code  = ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || 'NC';
     const payload = {
-      code, av: avs[clients.length % avs.length],
+      av: avs[clients.length % avs.length],
       name: form.name, contact: form.contact || '—',
       email: form.email || '—', phone: form.phone || '—',
       city: form.city || '—', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime,
@@ -139,8 +137,15 @@ export default function ClientsPage() {
       status: form.status,
     };
     const isFirstClient = clients.length === 0;
-    setClients(prev => [{ ...payload, invoices: 0, billed: 0, balance: 0 }, ...prev]);
-    await createClient(orgId, payload);
+    let created: ClientRecord;
+    try {
+      created = await createClient(orgId, payload);
+    } catch (err) {
+      console.error('[createClient]', err);
+      showToast('Erreur lors de l\'enregistrement du client. Veuillez réessayer.', true);
+      return;
+    }
+    setClients(prev => prev.some(c => c.code === created.code) ? prev : [created, ...prev]);
     posthog.capture('client_created');
     if (isFirstClient) posthog.capture('first_client_added');
     setForm(EMPTY_FORM);
@@ -264,7 +269,7 @@ export default function ClientsPage() {
                 >
                   {/* Name */}
                   <div className="name-cell">
-                    <div className={`cl-av ${cl.av}`}>{cl.code}</div>
+                    <div className={`cl-av ${cl.av}`}>{clientInitials(cl.name)}</div>
                     <div style={{ minWidth: 0 }}>
                       <div className="cl-name">{cl.name}</div>
                       <div className="cl-contact">{cl.contact}</div>
@@ -333,7 +338,7 @@ export default function ClientsPage() {
             <div className="panel-body">
               {/* Hero */}
               <div className="detail-hero">
-                <div className={`detail-av ${detailClient.av}`}>{detailClient.code}</div>
+                <div className={`detail-av ${detailClient.av}`}>{clientInitials(detailClient.name)}</div>
                 <div>
                   <div className="detail-name">{detailClient.name}</div>
                   <div className="detail-meta">{detailClient.contact} · {detailClient.city}</div>

@@ -159,6 +159,12 @@ export function nextId(invoices: Invoice[]): string {
   return 'INV-' + String(max + 1).padStart(4, '0');
 }
 
+/** Two-letter avatar text from a client name ("Sahel Banque" → "SB"). */
+export function clientInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || '?';
+}
+
 export function newLineItem(desc = '', qty = 1, price = 0, unit = 'unité', productId?: string): LineItem {
   return { id: crypto.randomUUID(), desc, unit, qty, price, ...(productId ? { productId } : {}) };
 }

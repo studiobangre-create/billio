@@ -64,7 +64,7 @@ export async function createInvoice(
   return dbToInvoice(data as Record<string, unknown>);
 }
 
-export async function updateInvoice(id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<void> {
+export async function updateInvoice(orgId: string, id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<void> {
   if (MOCK) return;
   const dbPatch: Record<string, unknown> = {};
   if (patch.status      !== undefined) dbPatch.status       = patch.status;
@@ -74,12 +74,12 @@ export async function updateInvoice(id: string, patch: Partial<Pick<Invoice, 'st
   if (patch.due         !== undefined) dbPatch.due_at       = patch.due;
   if (patch.amount      !== undefined) dbPatch.amount       = patch.amount;
   if (patch.discountPct !== undefined) dbPatch.discount_pct = patch.discountPct;
-  const { error } = await supabase.from('invoices').update(dbPatch).eq('id', id);
+  const { error } = await supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id);
   if (error) throw error;
 }
 
-export async function removeInvoice(id: string): Promise<void> {
+export async function removeInvoice(orgId: string, id: string): Promise<void> {
   if (MOCK) return;
-  const { error } = await supabase.from('invoices').delete().eq('id', id);
+  const { error } = await supabase.from('invoices').delete().eq('org_id', orgId).eq('id', id);
   if (error) throw error;
 }

@@ -91,16 +91,30 @@ export default function ProductsPage() {
     const p = deleteProduct;
     setDeleteProduct(null);
     setProducts(prev => prev.filter(x => x.id !== p.id));
-    await removeProduct(p.id);
-    showToast(`"${p.name}" supprimé`);
+    try {
+      await removeProduct(p.id);
+      showToast(`"${p.name}" supprimé`);
+    } catch (err) {
+      console.error('[removeProduct] failed:', err);
+      setProducts(prev => prev.some(x => x.id === p.id) ? prev : [p, ...prev]);
+      showToast('Erreur lors de la suppression. Veuillez réessayer.', true);
+    }
   };
 
   const submitItem = async () => {
     if (!fName.trim()) { showToast('Donnez un nom à cet article.', true); return; }
     if (editId) {
       const patch = { name: fName.trim(), sku: fSku.trim() || '—', type: fType, unit: fUnit, price: fPrice, tax: fTax, ico: fType === 'service' ? 'briefcase' : 'tag', color: fType === 'service' ? 'ico-blue' : 'ico-green' };
+      const previous = products.find(p => p.id === editId);
       setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...patch } : p));
-      await updateProduct(editId, patch);
+      try {
+        await updateProduct(editId, patch);
+      } catch (err) {
+        console.error('[updateProduct] failed:', err);
+        if (previous) setProducts(prev => prev.map(p => p.id === editId ? previous : p));
+        showToast('Erreur lors de la mise à jour. Veuillez réessayer.', true);
+        return;
+      }
       setPanelOpen(false);
       setEditId(null);
       showToast(`"${patch.name}" mis à jour`);
@@ -118,7 +132,14 @@ export default function ProductsPage() {
         color: fType === 'service' ? 'ico-blue' : 'ico-green',
       };
       setProducts(prev => [item, ...prev]);
-      await createProduct(orgId, item);
+      try {
+        await createProduct(orgId, item);
+      } catch (err) {
+        console.error('[createProduct] failed:', err);
+        setProducts(prev => prev.filter(p => p.id !== item.id));
+        showToast('Erreur lors de l\'enregistrement de l\'article. Veuillez réessayer.', true);
+        return;
+      }
       posthog.capture('product_created', { type: fType, unit: fUnit });
       setPanelOpen(false);
       showToast(`"${item.name}" ajouté au catalogue`);

@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ActivityEmptyIllustration, InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { fmt, fmtCompact, fmtDate, fmtDue } from '@/data';
+import { fmt, fmtCompact, fmtDate, fmtDue, clientInitials } from '@/data';
 import type { ActivityPart } from '@/data';
 
 function ActivityLine({ parts }: { parts: ActivityPart[] }) {
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                   <div className="inv-subject">{inv.subject}</div>
                 </div>
                 <div className="client-cell">
-                  <div className={`client-av ${c.av}`}>{inv.client}</div>
+                  <div className={`client-av ${c.av}`}>{clientInitials(c.name)}</div>
                   <div>
                     <div className="cell-text">{c.name}</div>
                     <div className="cell-sub">{c.city}</div>

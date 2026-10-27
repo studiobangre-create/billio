@@ -65,6 +65,7 @@ export async function createQuote(
 }
 
 export async function updateQuote(
+  orgId: string,
   id: string,
   patch: Partial<Pick<Quote, 'status' | 'subject' | 'client' | 'issued' | 'valid' | 'amount'>>,
 ): Promise<void> {
@@ -76,12 +77,12 @@ export async function updateQuote(
   if (patch.issued  !== undefined) dbPatch.issued_at    = patch.issued;
   if (patch.valid   !== undefined) dbPatch.valid_until  = patch.valid;
   if (patch.amount  !== undefined) dbPatch.amount       = patch.amount;
-  const { error } = await supabase.from('quotes').update(dbPatch).eq('id', id);
+  const { error } = await supabase.from('quotes').update(dbPatch).eq('org_id', orgId).eq('id', id);
   if (error) throw error;
 }
 
-export async function removeQuote(id: string): Promise<void> {
+export async function removeQuote(orgId: string, id: string): Promise<void> {
   if (MOCK) return;
-  const { error } = await supabase.from('quotes').delete().eq('id', id);
+  const { error } = await supabase.from('quotes').delete().eq('org_id', orgId).eq('id', id);
   if (error) throw error;
 }

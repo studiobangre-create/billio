@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
 import { PaymentsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { createPayment } from '@/lib/api/payments';
-import { updateInvoice } from '@/lib/api/invoices';
-import { recordInvoicePaymentEntry } from '@/lib/api/accounting';
-import { fmt, fmtDate } from '@/data';
-import type { PayMethod, PayStatus, Payment } from '@/lib/schemas';
+import { settleInvoicePayment } from '@/lib/api/payments';
+import { fetchCreditNotes } from '@/lib/api/credit-notes';
+import { invoiceBalance } from '@/lib/invoice-status';
+import { fmt, fmtDate, clientInitials } from '@/data';
+import type { PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
 
@@ -53,7 +53,6 @@ function fmtCompact(n: number) {
 export default function PaymentsPage() {
   const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading } = useApp();
 
-  if (loading) return <PageSkeleton title="Paiements" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
   const [filter, setFilter]     = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -63,8 +62,18 @@ export default function PaymentsPage() {
   const [amount, setAmount] = useState('');
   const [ref, setRef]       = useState('');
   const [date, setDate]     = useState(new Date().toISOString().split('T')[0]);
+  const [submitting, setSubmitting]   = useState(false);
+  const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
+
+  useEffect(() => {
+    if (orgId) fetchCreditNotes(orgId).then(setCreditNotes).catch(err => console.error('[fetchCreditNotes]', err));
+  }, [orgId]);
 
   const openInvoices = invoices.filter(i => i.status === 'pending' || i.status === 'overdue');
+  const balanceOf    = (id: string) => {
+    const inv = invoices.find(i => i.id === id);
+    return inv ? invoiceBalance(inv, payments, creditNotes).balance : 0;
+  };
 
   // Metrics
   const completed = payments.filter(p => p.status === 'completed');
@@ -102,57 +111,47 @@ export default function PaymentsPage() {
 
   function handlePickInvoice(id: string) {
     setInvId(id);
-    const inv = invoices.find(i => i.id === id);
-    if (inv) setAmount(String(inv.amount));
+    setAmount(id ? String(balanceOf(id)) : '');
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     if (!invId) { showToast('Sélectionnez une facture', true); return; }
     const amt = parseFloat(amount) || 0;
     if (amt <= 0) { showToast('Saisissez un montant', true); return; }
+    const balance = balanceOf(invId);
+    if (amt > balance) { showToast(`Le montant dépasse le reste à payer (${fmt(balance)} F CFA).`, true); return; }
 
-    const maxNum = payments.length
-      ? Math.max(...payments.map(p => parseInt(p.id.split('-')[1], 10)))
-      : 2052;
     const inv = invoices.find(i => i.id === invId);
     const m   = METHOD_META[method];
-    const newPayment: Payment = {
-      id:     `PAI-${maxNum + 1}`,
-      date,
-      client: inv?.client ?? '?',
-      inv:    invId,
-      method,
-      ref:    ref.trim() || m.sub,
-      amount: amt,
-      status: 'completed',
-      source: 'manual',
-    };
-
+    setSubmitting(true);
     try {
-      await createPayment(orgId, newPayment);
-      await updateInvoice(invId, { status: 'paid' });
+      const res = await settleInvoicePayment(orgId, {
+        invoiceId:  invId,
+        date,
+        method,
+        ref:        ref.trim() || m.sub,
+        amount:     amt,
+        clientName: clientsMap[inv?.client ?? '']?.name ?? (inv?.client ?? '?'),
+      });
+      setPayments(prev => prev.some(p => p.id === res.payment.id) ? prev : [{ ...res.payment, client: res.payment.client || (inv?.client ?? '') }, ...prev]);
+      setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: res.invoiceStatus } : i));
+      posthog.capture('payment_recorded', { amount: amt, method, invoice_id: invId });
+      closePanel();
+      showToast(res.balance > 0
+        ? `Paiement de ${fmt(amt)} F CFA enregistré — reste ${fmt(res.balance)} F CFA`
+        : `Paiement ${m.label} de ${fmt(amt)} F CFA enregistré — facture soldée`);
+      if (!res.accountingOk) showToast('Paiement enregistré, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
     } catch (err) {
       console.error('Payment failed:', err);
-      showToast('Erreur lors de l\'enregistrement du paiement', true);
-      return;
+      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement du paiement', true);
+    } finally {
+      setSubmitting(false);
     }
-    setPayments(prev => [newPayment, ...prev]);
-    setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: 'paid' as const } : i));
-    const clientName = clientsMap[inv?.client ?? '']?.name ?? (inv?.client ?? '?');
-    recordInvoicePaymentEntry(orgId, {
-      invoiceId:  invId,
-      total:      amt,
-      date,
-      clientName,
-    }).catch(err => {
-      console.error('[recordInvoicePaymentEntry] failed:', err);
-      showToast('Écriture comptable non enregistrée. Vérifiez la comptabilité.', true);
-    });
-    posthog.capture('payment_recorded', { amount: amt, method, invoice_id: invId });
-    closePanel();
-    showToast(`Paiement ${m.label} de ${fmt(amt)} F CFA enregistré`);
   }
+
+  if (loading) return <PageSkeleton title="Paiements" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
 
   return (
     <>
@@ -297,7 +296,7 @@ export default function PaymentsPage() {
 
                     {/* Client & invoice */}
                     <div className="client-cell">
-                      {cl && <div className={`client-av ${cl.av}`}>{p.client}</div>}
+                      {cl && <div className={`client-av ${cl.av}`}>{clientInitials(cl.name)}</div>}
                       <div>
                         <div className="cell-text">{cl?.name ?? p.client}</div>
                         <div className="cell-sub">
@@ -397,7 +396,7 @@ export default function PaymentsPage() {
               <option value="">Sélectionner une facture ouverte…</option>
               {openInvoices.map(inv => (
                 <option key={inv.id} value={inv.id}>
-                  #{inv.id} — {clientsMap[inv.client]?.name ?? inv.client} ({fmt(inv.amount)} F CFA)
+                  #{inv.id} — {clientsMap[inv.client]?.name ?? inv.client} (reste {fmt(balanceOf(inv.id))} F CFA)
                 </option>
               ))}
             </select>
@@ -405,11 +404,12 @@ export default function PaymentsPage() {
 
           {/* Amount */}
           <div className="form-group">
-            <label className="form-label">Montant reçu</label>
+            <label className="form-label">Montant reçu{invId ? ` (reste à payer : ${fmt(balanceOf(invId))} F CFA)` : ''}</label>
             <div className="input-affix">
               <input
                 type="number"
                 min="0"
+                max={invId ? balanceOf(invId) : undefined}
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
@@ -431,6 +431,10 @@ export default function PaymentsPage() {
             />
           </div>
 
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: -6, marginBottom: 12 }}>
+            Le client a appliqué une retenue à la source ? Enregistrez le paiement depuis la facture pour la comptabiliser.
+          </div>
+
           {/* Date */}
           <div className="form-group">
             <label className="form-label">Date de réception</label>
@@ -447,9 +451,9 @@ export default function PaymentsPage() {
           <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={closePanel}>
             Annuler
           </button>
-          <button type="submit" form="pay-form" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+          <button type="submit" form="pay-form" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting}>
             <Icon name="check" size={15} />
-            Enregistrer
+            {submitting ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </div>

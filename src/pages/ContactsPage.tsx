@@ -11,7 +11,7 @@ import StatusPill from '@/components/accounting/StatusPill';
 import { useApp } from '@/context/AppContext';
 import FiscalDivisionSelect, { fiscalDivisionLabel } from '@/components/FiscalDivisionSelect';
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
-import { fmt, fmtCompact } from '@/data';
+import { fmt, fmtCompact, clientInitials } from '@/data';
 import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
@@ -504,7 +504,7 @@ export default function ContactsPage() {
   }, [tab]);
 
   // Clients data
-  const { clients, setClients, invoices, orgId, showToast, loading: clientsLoading } = useApp();
+  const { clients, setClients, invoices, quotes, payments, orgId, showToast, loading: clientsLoading } = useApp();
   const [clientFilter, setClientFilter] = useState<ClientFilterKey>('all');
   const [clientSearch, setClientSearch] = useState('');
   const [clientPanel, setClientPanel] = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(null);
@@ -619,9 +619,30 @@ export default function ContactsPage() {
     setDeleteClient(cl);
   }
 
+  // Invoices, quotes and payments reference clients by code; deleting a client
+  // that has any would leave those documents without a client.
+  function documentCount(code: string) {
+    return invoices.filter(i => i.client === code).length
+      + quotes.filter(q => q.client === code).length
+      + payments.filter(p => p.client === code).length;
+  }
+
+  async function archiveClient(cl: ClientRecord) {
+    setDeleteClient(null);
+    try {
+      await updateClient(orgId, cl.code, { status: 'inactive' });
+      setClients(prev => prev.map(c => c.code === cl.code ? { ...c, status: 'inactive' } : c));
+      showToast(`"${cl.name}" est maintenant inactif`);
+    } catch (err) {
+      console.error('[archiveClient]', err);
+      showToast('Erreur lors de la mise à jour. Veuillez réessayer.', true);
+    }
+  }
+
   async function confirmDeleteClient() {
     const cl = deleteClient;
     if (!cl) return;
+    if (documentCount(cl.code) > 0) { await archiveClient(cl); return; }
     setDeleteClient(null);
     setClients(prev => prev.filter(c => c.code !== cl.code));
     try {
@@ -639,17 +660,15 @@ export default function ContactsPage() {
     if (!form.name.trim()) return;
     if (!orgId) { showToast('Impossible de sauvegarder : organisation introuvable.', true); return; }
     const avs = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
-    const words = form.name.trim().split(/\s+/);
-    const code = ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || 'NC';
-    const payload = { code, av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', country: form.country || 'Burkina Faso', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
-    const optimistic = { ...payload, invoices: 0, billed: 0, balance: 0 };
-    setClients(prev => [optimistic, ...prev]);
+    const payload = { av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', country: form.country || 'Burkina Faso', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
     try {
-      await createClient(orgId, payload);
+      // The code comes from the server sequence, so the client is added once it exists
+      const created = await createClient(orgId, payload);
+      setClients(prev => prev.some(c => c.code === created.code) ? prev : [created, ...prev]);
       setForm(EMPTY_FORM);
       closeClientPanel();
+      showToast(`"${created.name}" ajouté`);
     } catch (err) {
-      setClients(prev => prev.filter(c => c.code !== payload.code || c.name !== payload.name));
       showToast('Erreur lors de l\'enregistrement du client. Veuillez réessayer.', true);
       console.error('[createClient]', err);
     }
@@ -773,7 +792,7 @@ export default function ContactsPage() {
                     return (
                       <div key={cl.code} className="client-row client-grid-cols" onClick={() => setClientPanel({ kind: 'detail', code: cl.code })}>
                         <div className="name-cell">
-                          <div className={`cl-av ${cl.av}`}>{cl.code}</div>
+                          <div className={`cl-av ${cl.av}`}>{clientInitials(cl.name)}</div>
                           <div style={{ minWidth: 0 }}>
                             <div className="cl-name">{cl.name}</div>
                             <div className="cl-contact">{cl.contact}</div>
@@ -903,7 +922,7 @@ export default function ContactsPage() {
           <>
             <div className="panel-slide-head">
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className={`cl-av ${detailClient.av}`} style={{ width: 44, height: 44, borderRadius: 11, fontSize: 14 }}>{detailClient.code}</div>
+                <div className={`cl-av ${detailClient.av}`} style={{ width: 44, height: 44, borderRadius: 11, fontSize: 14 }}>{clientInitials(detailClient.name)}</div>
                 <div>
                   <div className="panel-slide-title">{detailClient.name}</div>
                   <div className="panel-slide-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1109,7 +1128,15 @@ export default function ContactsPage() {
         />
       )}
       {showBillForm && <NewBillDrawer initialSupplier={billInitialSupplier} onSave={handleCreateBill} onClose={() => setShowBillForm(false)} />}
-      {deleteClient && (
+      {deleteClient && (documentCount(deleteClient.code) > 0 ? (
+        <ConfirmModal
+          title="Ce client ne peut pas être supprimé"
+          body={`"${deleteClient.name}" a ${documentCount(deleteClient.code)} document(s) (factures, devis ou paiements). Pour le retirer de vos listes sans perdre l'historique, passez-le en Inactif.`}
+          confirmLabel="Passer en Inactif"
+          onConfirm={confirmDeleteClient}
+          onClose={() => setDeleteClient(null)}
+        />
+      ) : (
         <ConfirmModal
           title="Supprimer le client"
           body={`Supprimer "${deleteClient.name}" ? Cette action est irréversible.`}
@@ -1117,7 +1144,7 @@ export default function ContactsPage() {
           onConfirm={confirmDeleteClient}
           onClose={() => setDeleteClient(null)}
         />
-      )}
+      ))}
     </>
   );
 }
