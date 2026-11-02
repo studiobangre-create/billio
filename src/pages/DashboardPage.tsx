@@ -8,6 +8,7 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue, clientInitials } from '@/data';
 import type { ActivityPart } from '@/data';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   return (
@@ -42,7 +43,7 @@ interface QATile {
 const ROLE_ACTIONS: Record<Role, QATile[]> = {
   admin: [
     { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
-    { icon: 'user-plus', label: 'Ajouter un client', sub: 'Carnet d\'adresses', path: '/clients' },
+    { icon: 'user-plus', label: 'Ajouter un client', sub: 'Carnet d\'adresses', path: '/contacts' },
     { icon: 'chart-bar', label: 'Rapports', sub: 'Analyse des performances', path: '/reports' },
     { icon: 'credit-card', label: 'Paiements', sub: 'Suivi des encaissements', path: '/payments' },
   ],
@@ -55,8 +56,8 @@ const ROLE_ACTIONS: Record<Role, QATile[]> = {
   member: [
     { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
     { icon: 'file-text', label: 'Nouveau devis', sub: 'Transformer en facture', path: '/invoices?tab=quotes' },
-    { icon: 'users', label: 'Mes clients', sub: 'Carnet d\'adresses', path: '/clients' },
-    { icon: 'bell', label: 'Rappels', sub: 'Suivi automatique', path: '/reminders' },
+    { icon: 'users', label: 'Mes clients', sub: 'Carnet d\'adresses', path: '/contacts' },
+    { icon: 'bell', label: 'Relances', sub: 'Factures à relancer', path: '/invoices' },
   ],
 };
 
@@ -64,6 +65,8 @@ export default function DashboardPage() {
   const { invoices, activity, clientsMap, loading, userRole } = useApp();
   const navigate = useNavigate();
   const role = userRole as Role;
+  // Accountants get the billing shortcuts while the accounting pages are switched off
+  const actionsRole: Role = role === 'accountant' && !ACCOUNTING_ENABLED ? 'member' : role;
 
   if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
 
@@ -230,12 +233,12 @@ export default function DashboardPage() {
               </div>
               <div className="qa-role-note">
                 <Icon name={role === 'admin' ? 'shield-check' : role === 'accountant' ? 'book' : 'user'} size={13} ariaHidden />
-                {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[role]}
+                {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[actionsRole]}
               </div>
             </div>
             <div style={{ padding: '14px 17px', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div className="qa-grid">
-                {ROLE_ACTIONS[role].map((tile, i) => (
+                {ROLE_ACTIONS[actionsRole].map((tile, i) => (
                   <button
                     key={i}
                     className={`qa-tile${tile.primary ? ' primary' : ''}`}

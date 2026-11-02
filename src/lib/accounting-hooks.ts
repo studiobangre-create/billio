@@ -260,12 +260,13 @@ export function useFixedAssets() {
 
 // ─── Suppliers ────────────────────────────────────────────────────────────────
 
-export function useSupplierBills() {
+/** `enabled: false` skips the query (e.g. while the accounting module is switched off). */
+export function useSupplierBills(enabled = true) {
   const { orgId } = useApp();
   const result = useAsyncData<SupplierBill[]>(
-    `supplier-bills:${orgId}`,
-    () => fetchSupplierBills(orgId),
-    [orgId],
+    enabled ? `supplier-bills:${orgId}` : 'supplier-bills:disabled',
+    () => enabled ? fetchSupplierBills(orgId) : Promise.resolve([]),
+    [orgId, enabled],
   );
 
   const markPaid = useCallback(async (billId: string) => {
