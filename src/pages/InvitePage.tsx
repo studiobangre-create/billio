@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { authErrorMessage } from '@/lib/auth-errors';
 import Icon from '@/components/Icon';
 import BillioMark from '@/components/BillioMark';
 
@@ -99,7 +100,8 @@ export default function InvitePage() {
 
       navigate('/dashboard');
     } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : 'Une erreur est survenue.');
+      // Messages thrown by this page are already in French; Supabase ones get translated
+      setAuthError(authErrorMessage(err, err instanceof Error ? err.message : undefined));
       setSubmitting(false);
     }
   }

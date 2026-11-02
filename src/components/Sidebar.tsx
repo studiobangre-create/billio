@@ -20,7 +20,6 @@ const NAV_WORKSPACE: NavItem[] = [
 
 const NAV_FINANCE: NavItem[] = [
   { icon: 'chart-bar',   label: 'Rapports',  to: '/reports'  },
-  { icon: 'credit-card', label: 'Paiements', to: '/payments' },
 ];
 
 const NAV_ACCOUNTING: NavItem[] = [
@@ -48,7 +47,6 @@ const NAV_ACCOUNT: NavItem[] = [
 const ROUTE_FEATURE: Record<string, Feature> = {
   // Business+
   '/reports':                            'reports',
-  '/payments':                           'payments_mobilemoney',
   '/accounting/opening-balances':        'accounting_syscohada',
   '/accounting/chart-of-accounts':       'accounting_syscohada',
   '/accounting/journals':                'accounting_syscohada',

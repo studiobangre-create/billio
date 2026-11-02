@@ -20,6 +20,26 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Third-party libraries every page needs go in their own chunks: none
+        // passes the 500 kB warning, and they stay cached across app deploys.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'vendor-react';
+          if (id.includes('node_modules/@supabase/')) return 'vendor-supabase';
+          if (/node_modules\/@sentry(-internal)?\//.test(id)) return 'vendor-sentry';
+          if (id.includes('node_modules/posthog-js/')) return 'vendor-posthog';
+          // The PDF engine (~1.5 MB) is only loaded when a PDF is generated
+          // (src/lib/render-pdf.tsx). Split along its dependency order
+          // (fonts & compression ← pdfkit ← React renderer) so no file passes
+          // 500 kB and the chunks don't import each other in a cycle.
+          if (/node_modules\/(fontkit|restructure|unicode-[a-z-]+|hyphen|linebreak|dfa|clone|pako|brotli|tiny-inflate|png-js|jay-peg)\//.test(id)) return 'pdf-fonts';
+          if (/node_modules\/(@react-pdf\/pdfkit|@noble|crypto-js)\//.test(id)) return 'pdf-kit';
+          if (id.includes('node_modules/@react-pdf/reconciler/')) return 'pdf-reconciler';
+        },
+      },
+    },
   },
   plugins: [react(), sentryVitePlugin({
     org: process.env.VITE_SENTRY_ORG,

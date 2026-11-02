@@ -22,7 +22,6 @@ const SalesPage              = lazy(() => import('./pages/SalesPage'));
 const InvoicePage            = lazy(() => import('./pages/InvoicePage'));
 const ContactsPage           = lazy(() => import('./pages/ContactsPage'));
 const ProductsPage           = lazy(() => import('./pages/ProductsPage'));
-const PaymentsPage           = lazy(() => import('./pages/PaymentsPage'));
 const QuotePage              = lazy(() => import('./pages/QuotePage'));
 const TemplatesPage          = lazy(() => import('./pages/TemplatesPage'));
 const SettingsPage           = lazy(() => import('./pages/SettingsPage'));
@@ -123,7 +122,7 @@ export default function App() {
               <Route path="/accounting/*" element={<Navigate to="/dashboard" replace />} />
             )}
             <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
-            <Route path="/payments" element={<PaymentsPage />} />
+            <Route path="/payments" element={<Navigate to="/invoices?tab=payments" replace />} />
             <Route path="/quotes"     element={<Navigate to="/invoices?tab=quotes" replace />} />
             <Route path="/quotes/:id" element={<QuotePage />} />
             <Route path="/templates" element={<TemplatesPage />} />

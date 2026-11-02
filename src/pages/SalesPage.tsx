@@ -3,44 +3,61 @@ import { useSearchParams } from 'react-router-dom';
 import PageTabs from '@/components/PageTabs';
 import UpgradeModal from '@/components/UpgradeModal';
 import { useApp } from '@/context/AppContext';
-import { PLAN_LABELS, minPlanForFeature } from '@/lib/plans';
+import { PLAN_LABELS, minPlanForFeature, type Feature } from '@/lib/plans';
 import InvoicesPage from '@/pages/InvoicesPage';
 import QuotesPage from '@/pages/QuotesPage';
+import PaymentsPage from '@/pages/PaymentsPage';
 
-type Tab = 'invoices' | 'quotes';
+type Tab = 'invoices' | 'quotes' | 'payments';
 
-/** Facturation: one page with a tab per document type (?tab=quotes). */
+// Tabs that need a higher plan; Factures is available on every plan
+const TAB_FEATURE: Partial<Record<Tab, Feature>> = {
+  quotes:   'quotes',
+  payments: 'payments_mobilemoney',
+};
+
+function parseTab(value: string | null): Tab {
+  return value === 'quotes' || value === 'payments' ? value : 'invoices';
+}
+
+/** Facturation: one page with a tab per document type (?tab=quotes|payments). */
 export default function SalesPage() {
-  const { invoices, quotes, hasFeature } = useApp();
+  const { invoices, quotes, payments, hasFeature } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
 
-  // Quotes need a higher plan; a locked tab opens the upgrade modal instead
-  const canQuotes       = hasFeature('quotes');
-  const requestedQuotes = searchParams.get('tab') === 'quotes';
-  const tab: Tab = requestedQuotes && canQuotes ? 'quotes' : 'invoices';
+  const canUse    = (t: Tab) => { const f = TAB_FEATURE[t]; return !f || hasFeature(f); };
+  const requested = parseTab(searchParams.get('tab'));
+  const tab: Tab  = canUse(requested) ? requested : 'invoices';
 
-  // A link to the locked quotes tab (e.g. the dashboard's "Nouveau devis")
-  // explains why the user lands on invoices instead
+  // A link to a locked tab (e.g. the dashboard's "Nouveau devis") explains
+  // why the user lands on invoices instead
+  const requestedLocked = !canUse(requested);
   useEffect(() => {
-    if (requestedQuotes && !canQuotes) {
-      setShowUpgrade(true);
+    if (requestedLocked) {
+      setLockedFeature(TAB_FEATURE[requested] ?? null);
       setSearchParams({}, { replace: true });
     }
-  }, [requestedQuotes, canQuotes, setSearchParams]);
+  }, [requestedLocked, requested, setSearchParams]);
 
   function selectTab(next: Tab) {
-    if (next === 'quotes' && !canQuotes) { setShowUpgrade(true); return; }
-    setSearchParams(next === 'quotes' ? { tab: 'quotes' } : {}, { replace: true });
+    if (!canUse(next)) { setLockedFeature(TAB_FEATURE[next] ?? null); return; }
+    setSearchParams(next === 'invoices' ? {} : { tab: next }, { replace: true });
   }
 
-  const quotesPlan = minPlanForFeature('quotes');
+  const lockBadge = (t: Tab) => {
+    const f = TAB_FEATURE[t];
+    if (!f || hasFeature(f)) return undefined;
+    const plan = minPlanForFeature(f);
+    return <span className={`nav-plan-badge nav-plan-badge--${plan}`}>{PLAN_LABELS[plan]}</span>;
+  };
+
   const tabs = (
     <PageTabs<Tab>
       tabs={[
-        { key: 'invoices', label: 'Factures', icon: 'receipt',   count: invoices.length },
-        { key: 'quotes',   label: 'Devis',    icon: 'file-text', count: quotes.length,
-          badge: canQuotes ? undefined : <span className={`nav-plan-badge nav-plan-badge--${quotesPlan}`}>{PLAN_LABELS[quotesPlan]}</span> },
+        { key: 'invoices', label: 'Factures',  icon: 'receipt',     count: invoices.length },
+        { key: 'quotes',   label: 'Devis',     icon: 'file-text',   count: quotes.length,   badge: lockBadge('quotes') },
+        { key: 'payments', label: 'Paiements', icon: 'credit-card', count: payments.length, badge: lockBadge('payments') },
       ]}
       active={tab}
       onChange={selectTab}
@@ -50,8 +67,10 @@ export default function SalesPage() {
 
   return (
     <>
-      {showUpgrade && <UpgradeModal feature="quotes" onClose={() => setShowUpgrade(false)} />}
-      {tab === 'quotes' ? <QuotesPage tabs={tabs} /> : <InvoicesPage tabs={tabs} />}
+      {lockedFeature && <UpgradeModal feature={lockedFeature} onClose={() => setLockedFeature(null)} />}
+      {tab === 'quotes'   ? <QuotesPage tabs={tabs} />
+     : tab === 'payments' ? <PaymentsPage tabs={tabs} />
+     :                      <InvoicesPage tabs={tabs} />}
     </>
   );
 }

@@ -3,6 +3,7 @@ import { calculateServiceWithholding } from '@/lib/tax-bf';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
 import type { BizInfo } from '@/components/InvoicePaper';
+import type { PaymentMethodLine } from '@/lib/payment-methods';
 
 // toLocaleString is unreliable in the react-pdf renderer environment
 const pdfFmt = (n: number): string =>
@@ -248,7 +249,7 @@ const s = StyleSheet.create({
   footerRight:  { fontSize: 7, color: '#aaa' },
 });
 
-interface Props {
+export interface InvoicePDFProps {
   invoice: Invoice;
   lines: LineItem[];
   client: ClientInfo;
@@ -258,9 +259,11 @@ interface Props {
   clientLabel?: string;
   paymentTerms?: string;
   deliveryTerms?: string;
+  /** From the organisation's payment settings; see paymentMethodLines(). */
+  paymentMethods?: PaymentMethodLine[];
 }
 
-export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5', title = 'Facture', clientLabel = 'Facturé à', paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir' }: Props) {
+export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = '#185FA5', title = 'Facture', clientLabel = 'Facturé à', paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [] }: InvoicePDFProps) {
   const subtotal      = lines.reduce((sum, li) => sum + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
   const discountAmt   = Math.round(subtotal * (discountPct / 100));
@@ -423,15 +426,14 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
         <View style={s.paySection}>
           <View style={s.payCol}>
             <Text style={s.blockLabel}>Modes de paiement</Text>
-            <Text style={s.payMethod}>Mobile Money {'—'} MTN 70 12 34 56 {'·'} Orange 76 98 76 54</Text>
-            <Text style={s.payMethod}>Wave {'—'} billio.app/pay/{invoice.id.toLowerCase()}</Text>
-            <Text style={s.payMethod}>Ecobank {'—'} BF76 0001 2345 6789</Text>
+            {paymentMethods.length > 0
+              ? paymentMethods.map(m => <Text key={m.label} style={s.payMethod}>{m.label} {'—'} {m.value}</Text>)
+              : <Text style={s.payMethod}>Contactez-nous pour les modalit{'é'}s de paiement.</Text>}
           </View>
           <View style={s.payCol}>
             <Text style={s.blockLabel}>Notes</Text>
             <Text style={s.notesText}>
-              Merci pour votre confiance. Paiement {'à'} r{'é'}gler sous 14 jours.
-              Tout retard entra{'î'}ne une p{'é'}nalit{'é'} de 2 % par mois.
+              Merci pour votre confiance. Conditions de paiement : {paymentTerms}.
             </Text>
           </View>
         </View>

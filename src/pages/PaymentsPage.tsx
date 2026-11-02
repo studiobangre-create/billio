@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
 import { PaymentsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { useApp } from '@/context/AppContext';
 import { settleInvoicePayment } from '@/lib/api/payments';
 import { fetchCreditNotes } from '@/lib/api/credit-notes';
@@ -50,7 +51,8 @@ function fmtCompact(n: number) {
   return Math.round(n).toLocaleString('fr-FR');
 }
 
-export default function PaymentsPage() {
+/** Rendered by SalesPage, which passes the Factures | Devis | Paiements tab switcher. */
+export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading } = useApp();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
@@ -151,7 +153,7 @@ export default function PaymentsPage() {
     }
   }
 
-  if (loading) return <PageSkeleton title="Paiements" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
 
   return (
     <>
@@ -159,7 +161,7 @@ export default function PaymentsPage() {
         {/* Topbar */}
         <div className="topbar">
           <div>
-            <div className="page-title">Paiements</div>
+            <div className="page-title">Facturation</div>
             <div className="page-sub">Argent reçu sur vos factures</div>
           </div>
           <div className="topbar-actions">
@@ -239,7 +241,7 @@ export default function PaymentsPage() {
 
           {/* Section header + filters */}
           <div className="section-header">
-            <div className="section-title">Transactions</div>
+            {tabs ?? <div className="section-title">Transactions</div>}
             <div className="filters">
               {FILTERS.map(f => (
                 <button
@@ -265,7 +267,7 @@ export default function PaymentsPage() {
           )}
 
           {/* Payments table */}
-          <div className="pay-table">
+          <div className="pay-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'payments') } : {})}>
             <div className="table-head pay-grid-cols">
               <div className="th">Paiement</div>
               <div className="th">Client &amp; facture</div>

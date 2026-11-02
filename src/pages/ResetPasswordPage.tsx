@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { supabase } from '@/lib/supabase';
+import { authErrorMessage } from '@/lib/auth-errors';
 import BillioMark from '@/components/BillioMark';
 
 interface Props {
@@ -31,7 +32,7 @@ export default function ResetPasswordPage({ onDone }: Props) {
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
 
-    if (error) { setApiError(error.message); return; }
+    if (error) { setApiError(authErrorMessage(error)); return; }
 
     setDone(true);
     setTimeout(() => { onDone(); navigate('/dashboard'); }, 2000);

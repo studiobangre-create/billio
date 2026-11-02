@@ -164,7 +164,7 @@ function PayNotes({ cfg }: { cfg: PaperConfig }) {
         <div className="tp-block-label">Modes de paiement</div>
         <div className="tp-pm-list">
           <div className="tp-pm">Mobile Money — MTN / Orange</div>
-          <div className="tp-pm">Wave · billio.app/pay</div>
+          <div className="tp-pm">Wave</div>
         </div>
       </div>
       <div>
@@ -314,7 +314,7 @@ function SidebarBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
         <div className="tp-aside-sep" />
         <div className="tp-aside-label">Paiement</div>
         <div className="tp-aside-pm">Mobile Money</div>
-        <div className="tp-aside-pm">Wave · billio.app/pay</div>
+        <div className="tp-aside-pm">Wave</div>
       </div>
       <div className="tp-side-main">
         <div className="tp-side-head">

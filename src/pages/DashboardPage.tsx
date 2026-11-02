@@ -45,7 +45,7 @@ const ROLE_ACTIONS: Record<Role, QATile[]> = {
     { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
     { icon: 'user-plus', label: 'Ajouter un client', sub: 'Carnet d\'adresses', path: '/contacts' },
     { icon: 'chart-bar', label: 'Rapports', sub: 'Analyse des performances', path: '/reports' },
-    { icon: 'credit-card', label: 'Paiements', sub: 'Suivi des encaissements', path: '/payments' },
+    { icon: 'credit-card', label: 'Paiements', sub: 'Suivi des encaissements', path: '/invoices?tab=payments' },
   ],
   accountant: [
     { icon: 'notebook', label: 'Saisir une écriture', sub: 'Journal comptable', primary: true, path: '/accounting/journals' },

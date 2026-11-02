@@ -3,16 +3,21 @@ import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
+import SendDocumentDialog from '@/components/SendDocumentDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { QuotesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createQuote, removeQuote, nextQuoteId } from '@/lib/api/quotes';
+import { quoteMessage } from '@/lib/document-messages';
+import { createActivity } from '@/lib/api/activities';
+import { filledLines, lineItemsError } from '@/lib/line-validation';
+import { contactValue } from '@/lib/share-links';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
-import { saveLineItems, deleteLineItems } from '@/lib/api/line-items';
+import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
 import { fmt, fmtDate, newLineItem, clientInitials } from '@/data';
-import type { LineItem, QuoteStatus } from '@/lib/schemas';
+import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
 
 type FilterKey = 'all' | QuoteStatus;
 
@@ -46,10 +51,11 @@ const TVA = 0.18;
 
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
-  const { showToast, quotes, setQuotes, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const { showToast, quotes, setQuotes, setInvoices, setActivity, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const [sendQuote, setSendQuote] = useState<{ id: string; kind: 'send' | 'reminder' } | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -143,9 +149,10 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
   async function submitQuote(status: 'draft' | 'sent') {
     if (submittingRef.current) return;
     if (!fClient) { showToast('Sélectionnez un client', true); return; }
-    if (subtotal <= 0) { showToast('Ajoutez au moins un article', true); return; }
+    const linesErr = lineItemsError(lines);
+    if (linesErr) { showToast(linesErr, true); return; }
+    if (fValid < fDate) { showToast('La date de validité doit être postérieure à la date d\'émission.', true); return; }
     submittingRef.current = true;
-    const cName = clientsMap[fClient]?.name ?? fClient;
     let id = '';
     let quoteCreated = false;
     try {
@@ -153,11 +160,13 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
       const payload = { id, subject: fSubject.trim() || 'Devis sans titre', client: fClient, issued: fDate, valid: fValid, amount: total, status };
       const created = await createQuote(orgId, payload);
       quoteCreated = true;
-      await saveLineItems(orgId, lines, { quoteId: id });
+      await saveLineItems(orgId, filledLines(lines), { quoteId: id });
       setQuotes(prev => prev.some(q => q.id === id) ? prev : [created, ...prev]);
       posthog.capture('quote_created', { item_count: lines.length, total_amount: total, status });
       closePanel();
-      showToast(status === 'sent' ? `Devis ${id} envoyé à ${cName}` : `Brouillon ${id} enregistré`);
+      showToast(status === 'sent' ? `Devis ${id} enregistré` : `Brouillon ${id} enregistré`);
+      // The quote is marked sent; hand the message to the user's email / WhatsApp
+      if (status === 'sent') setSendQuote({ id, kind: 'send' });
     } catch (err) {
       console.error('[submitQuote] failed:', err);
       if (quoteCreated) {
@@ -198,7 +207,37 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
 
   function sendReminder(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    showToast(`Relance envoyée pour ${id}`);
+    setSendQuote({ id, kind: 'reminder' });
+  }
+
+  // A new draft with the same client, subject and lines, dated today
+  async function duplicateQuote(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const quote = quotes.find(q => q.id === id);
+    if (!quote || duplicating) return;
+    setDuplicating(id);
+    try {
+      const lines = await fetchLineItems(orgId, { quoteId: id });
+      const validDays = Math.max(1, Math.round((Date.parse(quote.valid) - Date.parse(quote.issued)) / 86_400_000)) || 14;
+      const issued = new Date().toISOString().slice(0, 10);
+      const valid = new Date(Date.now() + validDays * 86_400_000).toISOString().slice(0, 10);
+      const newId = await nextQuoteId(orgId);
+      const created = await createQuote(orgId, { id: newId, subject: quote.subject, client: quote.client, issued, valid, amount: quote.amount, status: 'draft' });
+      try {
+        await saveLineItems(orgId, lines, { quoteId: newId });
+      } catch (err) {
+        await removeQuote(orgId, newId).catch(e2 => console.error('[rollback] removeQuote failed:', e2));
+        throw err;
+      }
+      setQuotes(prev => prev.some(q => q.id === newId) ? prev : [created, ...prev]);
+      showToast(`Brouillon ${newId} créé à partir de ${id}`);
+      navigate(`/quotes/${newId}`);
+    } catch (err) {
+      console.error('[duplicateQuote] failed:', err);
+      showToast('Impossible de dupliquer le devis. Veuillez réessayer.', true);
+    } finally {
+      setDuplicating(null);
+    }
   }
 
   function handleDelete(id: string, e: React.MouseEvent) {
@@ -221,6 +260,8 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
       showToast('Erreur lors de la suppression du devis. Veuillez réessayer.', true);
     }
   }
+
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez vos devis" metrics={0} rows={6} />;
 
   return (
     <>
@@ -388,12 +429,12 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                         </button>
                       )}
                       {q.status === 'draft' && (
-                        <button className="icon-btn" title="Modifier" onClick={e => e.stopPropagation()}>
+                        <button className="icon-btn" title="Modifier" onClick={e => { e.stopPropagation(); navigate(`/quotes/${q.id}`); }}>
                           <Icon name="edit" size={14} />
                         </button>
                       )}
                       {!['accepted', 'sent', 'draft'].includes(q.status) && (
-                        <button className="icon-btn" title="Dupliquer" onClick={e => e.stopPropagation()}>
+                        <button className="icon-btn" title="Dupliquer" disabled={duplicating !== null} onClick={e => duplicateQuote(q.id, e)}>
                           <Icon name="copy" size={14} />
                         </button>
                       )}
@@ -579,7 +620,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
             onClick={() => submitQuote('sent')}
           >
             <Icon name="send" size={15} />
-            Envoyer le devis
+            Enregistrer et envoyer
           </button>
         </div>
       </div>
@@ -592,6 +633,40 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           onClose={() => setDeleteId(null)}
         />
       )}
+      {sendQuote && (() => {
+        const q = quotes.find(x => x.id === sendQuote.id);
+        if (!q) return null;
+        const cl = clientsMap[q.client];
+        const clientName = cl?.name ?? q.client;
+        const msg = quoteMessage(sendQuote.kind, { quoteId: q.id, clientName, orgName: orgSettings.name, amount: q.amount, validUntil: q.valid });
+        return (
+          <SendDocumentDialog
+            title={sendQuote.kind === 'reminder' ? `Relancer ${clientName}` : `Envoyer le devis ${q.id}`}
+            recipientName={clientName}
+            email={contactValue(cl?.email)}
+            phone={contactValue(cl?.phone)}
+            subject={msg.subject}
+            message={msg.message}
+            onSent={channel => {
+              if (channel === 'copy') return;
+              // Opening the email app or WhatsApp doesn't mean the message went out
+              const via = channel === 'email' ? 'par email' : 'par WhatsApp';
+              const parts = sendQuote.kind === 'reminder'
+                ? [{ text: `Relance préparée ${via} pour le devis ` }, { text: q.id, bold: true as const }]
+                : [{ text: 'Devis ' }, { text: q.id, bold: true as const }, { text: ` préparé ${via} pour ` }, { text: clientName, bold: true as const }];
+              const entry: Activity = { kind: 'sent', parts, time: "À l'instant" };
+              setActivity(prev => [entry, ...prev]);
+              createActivity(orgId, { kind: 'sent', parts }).catch(err => {
+                console.error('[createActivity] failed:', err);
+                setActivity(prev => prev.filter(a => a !== entry));
+                showToast('L\'envoi n\'a pas pu être enregistré dans l\'historique.', true);
+              });
+              setSendQuote(null);
+            }}
+            onClose={() => setSendQuote(null)}
+          />
+        );
+      })()}
     </>
   );
 }

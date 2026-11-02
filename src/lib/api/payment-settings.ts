@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
+
 export type ProviderStatus = 'pending' | 'active' | 'suspended';
 
 export interface PaymentSettings {
@@ -99,6 +101,8 @@ function dbToSettings(row: Record<string, unknown>): PaymentSettings {
 }
 
 export async function fetchPaymentSettings(orgId: string): Promise<PaymentSettings> {
+  // Demo data so mock mode shows payment methods on invoices
+  if (MOCK) return { ...DEFAULT_PAYMENT_SETTINGS, methodMtnEnabled: true, methodMtnPhone: '70 00 00 00', methodCashEnabled: true };
   const { data, error } = await supabase
     .from('org_payment_settings')
     .select('*')

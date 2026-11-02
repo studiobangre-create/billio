@@ -2,6 +2,7 @@ import { useState } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { supabase } from '@/lib/supabase';
+import { authErrorMessage } from '@/lib/auth-errors';
 import BillioMark from '@/components/BillioMark';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
@@ -21,6 +22,8 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [authError, setAuthError] = useState('');
+  // Shown after sign-up when Supabase requires email confirmation (no session yet)
+  const [confirmEmailSentTo, setConfirmEmailSentTo] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
   const [email, setEmail] = useState('');
@@ -35,6 +38,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
+    setConfirmEmailSentTo('');
 
     const newErrors: Record<string, boolean> = {};
     if (!email.trim()) newErrors.email = true;
@@ -51,13 +55,22 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
         return;
       }
       if (isSignup) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: { data: { country } },
         });
         if (error) throw error;
-        posthog.capture('signed_up', { method: 'email', country });
+        // With email confirmation on, an existing address comes back with no
+        // identities. Show the same notice either way so the form doesn't reveal
+        // which addresses have an account.
+        const existingAccount = data.user?.identities?.length === 0;
+        if (!existingAccount) posthog.capture('signed_up', { method: 'email', country });
+        if (!data.session) {
+          setConfirmEmailSentTo(email.trim());
+          setLoading(false);
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -68,8 +81,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
       }
       onLogin?.();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Une erreur est survenue.';
-      setAuthError(msg);
+      setAuthError(authErrorMessage(err));
       setLoading(false);
     }
   };
@@ -78,6 +90,8 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
     setMode(next);
     setErrors({});
     setLoading(false);
+    setAuthError('');
+    setConfirmEmailSentTo('');
   };
 
   return (
@@ -209,7 +223,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
                       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
                         redirectTo: `${window.location.origin}/reset-password`,
                       });
-                      if (error) { setAuthError(error.message); return; }
+                      if (error) { setAuthError(authErrorMessage(error)); return; }
                       setResetSent(true);
                     }}
                   >
@@ -221,6 +235,12 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
               {resetSent && (
                 <div className="auth-success" role="status">
                   <Icon name="check" ariaHidden /> E-mail envoyé — vérifiez votre boîte de réception.
+                </div>
+              )}
+
+              {confirmEmailSentTo && (
+                <div className="auth-success" role="status">
+                  <Icon name="mail" ariaHidden /> Vérifiez votre boîte mail : un lien de confirmation a été envoyé à <b>{confirmEmailSentTo}</b> pour activer le compte. Si vous avez déjà un compte avec cette adresse, connectez-vous ou réinitialisez votre mot de passe.
                 </div>
               )}
 
