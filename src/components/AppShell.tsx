@@ -11,8 +11,12 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
       <Sidebar onLogout={onLogout} />
       <div className="main-rel">
         <Outlet />
-        <div className={`toast${toastVisible ? ' show' : ''}`} role="status" aria-live="polite">
-          <Icon name="circle-check-filled" ariaHidden style={{ color: toastError ? '#F0A0A0' : '#7BD17B' }} />
+        <div
+          className={`toast${toastVisible ? ' show' : ''}`}
+          role={toastError ? 'alert' : 'status'}
+          aria-live={toastError ? 'assertive' : 'polite'}
+        >
+          <Icon name={toastError ? 'alert-triangle' : 'circle-check-filled'} ariaHidden style={{ color: toastError ? '#F0A0A0' : '#7BD17B' }} />
           <span>{toastMsg}</span>
         </div>
       </div>

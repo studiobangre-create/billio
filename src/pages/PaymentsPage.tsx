@@ -8,8 +8,11 @@ import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { useApp } from '@/context/AppContext';
 import { settleInvoicePayment } from '@/lib/api/payments';
 import { fetchCreditNotes } from '@/lib/api/credit-notes';
-import { invoiceBalance } from '@/lib/invoice-status';
-import { fmt, fmtDate, clientInitials } from '@/data';
+import { invoiceBalance, todayISO } from '@/lib/invoice-status';
+import { csvBlob } from '@/lib/csv';
+import { confirmDiscard } from '@/lib/confirm-discard';
+import { downloadBlob } from '@/lib/download';
+import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
 import type { PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
@@ -45,11 +48,6 @@ const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
   cheque: { label: 'Numéro de chèque',     placeholder: 'CHQ-0001'         },
 };
 
-function fmtCompact(n: number) {
-  const a = Math.abs(n);
-  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
-  return Math.round(n).toLocaleString('fr-FR');
-}
 
 /** Rendered by SalesPage, which passes the Factures | Devis | Paiements tab switcher. */
 export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
@@ -103,6 +101,18 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
 
   const onlineCount = payments.filter(p => p.source === 'online').length;
 
+  // Relevé: the payments currently listed, as a CSV for Excel
+  function exportStatement() {
+    if (filtered.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
+    const rows = filtered.map(p => [
+      p.date, p.inv, clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status],
+    ]);
+    downloadBlob(
+      csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut'], rows),
+      `releve-paiements-${todayISO()}.csv`,
+    );
+  }
+
   function openPanel() {
     setMethod('cash'); setInvId(''); setAmount(''); setRef('');
     setDate(new Date().toISOString().split('T')[0]);
@@ -110,6 +120,9 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   }
 
   function closePanel() { setPanelOpen(false); }
+  function requestClosePanel() {
+    if (confirmDiscard(invId !== '' || amount.trim() !== '' || ref.trim() !== '')) closePanel();
+  }
 
   function handlePickInvoice(id: string) {
     setInvId(id);
@@ -165,7 +178,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
             <div className="page-sub">Argent reçu sur vos factures</div>
           </div>
           <div className="topbar-actions">
-            <button className="btn">
+            <button className="btn" onClick={exportStatement} title="Exporter les paiements affichés (CSV)">
               <Icon name="download" size={16} />
               Relevé
             </button>
@@ -183,13 +196,13 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
             <div className="metric-card pay-feature">
               <div className="metric-top">
                 <div className="metric-ico pay-ico-white"><Icon name="arrow-down-left" size={15} /></div>
-                <div className="metric-label pay-label-white">Reçu · 30 derniers jours</div>
+                <div className="metric-label pay-label-white">Total encaissé</div>
               </div>
               <div className="metric-value pay-val-white tnum">
                 {fmt(total)}<span className="metric-unit pay-unit-white">F CFA</span>
               </div>
               <div className="metric-change pay-change-white">
-                <span className="pay-up"><Icon name="trending-up" size={13} /> +18% vs mois dernier</span>
+                {completed.length} paiement{completed.length > 1 ? 's' : ''} reçu{completed.length > 1 ? 's' : ''}
               </div>
             </div>
 
@@ -354,7 +367,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
       </div>
 
       {/* Scrim */}
-      <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={closePanel} />
+      <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={requestClosePanel} />
 
       {/* Record payment panel */}
       <div className={'new-inv-panel' + (panelOpen ? ' open' : '')}>
@@ -363,7 +376,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
             <div className="panel-slide-title">Enregistrer un paiement</div>
             <div className="panel-slide-sub">Saisir un encaissement hors ligne</div>
           </div>
-          <button className="icon-btn" onClick={closePanel} aria-label="Fermer">
+          <button className="icon-btn" onClick={requestClosePanel} aria-label="Fermer">
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -450,7 +463,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
         </form>
 
         <div className="panel-footer">
-          <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={closePanel}>
+          <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={requestClosePanel}>
             Annuler
           </button>
           <button type="submit" form="pay-form" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting}>

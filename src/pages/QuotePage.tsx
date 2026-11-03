@@ -12,6 +12,7 @@ import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
 import { fmt, fmtDateLong, newLineItem } from '@/data';
 import type { LineItem } from '@/lib/schemas';
+import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 
 const STATUS_LABEL: Record<string, string> = {
   draft:    'Brouillon',
@@ -87,8 +88,8 @@ export default function QuotePage() {
 
   const client       = clientsMap[quote.client] ?? { name: quote.client, city: '—', av: 'av-a' };
   const subtotal     = lines.reduce((s, li) => s + li.qty * li.price, 0);
-  const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
-  const tax          = canInvoiceTVA ? Math.round(subtotal * 0.18) : 0;
+  const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
+  const tax          = vatOn(subtotal, canInvoiceTVA);
   const total        = subtotal + tax;
 
   const quoteUrl    = window.location.href;
@@ -97,7 +98,7 @@ export default function QuotePage() {
   const canEdit     = !isTerminal;
 
   const eSubtotal = eLines.reduce((s, l) => s + l.qty * l.price, 0);
-  const eTax      = canInvoiceTVA ? Math.round(eSubtotal * 0.18) : 0;
+  const eTax      = vatOn(eSubtotal, canInvoiceTVA);
   const eTotal    = eSubtotal + eTax;
 
   const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
@@ -346,7 +347,7 @@ export default function QuotePage() {
               <div className="pp-totals-inner">
                 <div className="tot-row"><span>Sous-total</span><span className="tv">{fmt(subtotal)} F CFA</span></div>
                 {canInvoiceTVA && (
-                  <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>
+                  <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(tax)} F CFA</span></div>
                 )}
                 <div className="tot-row grand"><span>Total estimé</span><span className="tv">{fmt(total)} F CFA</span></div>
               </div>
@@ -533,7 +534,7 @@ export default function QuotePage() {
 
         <div className="total-block">
           <div className="total-row"><span>Sous-total HT</span><span>{fmt(eSubtotal)} F CFA</span></div>
-          {canInvoiceTVA && <div className="total-row"><span>TVA (18 %)</span><span>{fmt(eTax)} F CFA</span></div>}
+          {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(eTax)} F CFA</span></div>}
           <div className="total-row final"><span>Total estimé</span><span>{fmt(eTotal)} F CFA</span></div>
         </div>
       </div>

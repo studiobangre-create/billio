@@ -9,14 +9,19 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createInvoice, nextInvoiceId, removeInvoice } from '@/lib/api/invoices';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
-import { saveLineItems } from '@/lib/api/line-items';
+import { fetchLineItems, saveLineItems } from '@/lib/api/line-items';
 import { createActivity } from '@/lib/api/activities';
 import { filledLines, lineItemsError } from '@/lib/line-validation';
+import { confirmDiscard } from '@/lib/confirm-discard';
+import { renderInvoicePdf } from '@/lib/render-pdf';
+import { downloadBlob } from '@/lib/download';
+import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
 import {
   STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem, clientInitials,
 } from '@/data';
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
+import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -33,6 +38,9 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const navigate = useNavigate();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
+  const [search, setSearch]     = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const [panelOpen, setPanelOpen] = useState(false);
 
   // New invoice form state
@@ -72,9 +80,13 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     setPickerQuery('');
   }
 
-  const filteredInvoices = useMemo(
-    () => filter === 'all' ? invoices : invoices.filter(i => i.status === filter),
-    [invoices, filter],
+  const filteredInvoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return invoices.filter(i =>
+      (filter === 'all' || i.status === filter) &&
+      (!q || i.id.toLowerCase().includes(q) || i.subject.toLowerCase().includes(q)
+          || (clientsMap[i.client]?.name ?? i.client).toLowerCase().includes(q)));
+  }, [invoices, filter, search, clientsMap],
   );
 
   const filterCounts = useMemo(() => {
@@ -83,22 +95,31 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     return counts;
   }, [invoices]);
 
-  const canInvoiceTVA   = orgSettings.taxRegime === 'RNI';
+  const canInvoiceTVA   = chargesVat(orgSettings.taxRegime);
   const subtotal        = useMemo(() => lineItems.reduce((s, li) => s + li.qty * li.price, 0), [lineItems]);
   const discountAmt     = Math.round(subtotal * (fDiscount / 100));
   const discountedSub   = subtotal - discountAmt;
-  const tax             = canInvoiceTVA ? Math.round(discountedSub * 0.18) : 0;
+  const tax             = vatOn(discountedSub, canInvoiceTVA);
   const total           = discountedSub + tax;
 
+  // Dates the panel opened with, so only a change counts as unsaved input
+  const panelDefaults = useRef({ date: '', due: '' });
   const openPanel = () => {
     const today = new Date().toISOString().slice(0, 10);
     const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+    panelDefaults.current = { date: today, due };
     setFClient(''); setFDate(today); setFDue(due); setFSubject(''); setFNotes(''); setFDiscount(0);
     setLineItems([newLineItem()]);
     setShowPicker(false); setPickerQuery('');
     setPanelOpen(true);
   };
   const closePanel = () => { setPanelOpen(false); setShowPicker(false); };
+  // Scrim, ✕ and Annuler ask first when something was typed
+  const requestClosePanel = () => {
+    const dirty = fClient !== '' || fSubject.trim() !== '' || fNotes.trim() !== '' || fDiscount !== 0 || filledLines(lineItems).length > 0
+      || fDate !== panelDefaults.current.date || fDue !== panelDefaults.current.due;
+    if (confirmDiscard(dirty)) closePanel();
+  };
 
   const addLine    = () => setLineItems(prev => [...prev, newLineItem()]);
   const removeLine = (id: string) =>
@@ -109,6 +130,36 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     }));
 
   // Sending happens from the invoice page's send dialog (email / WhatsApp)
+  // Same PDF as the invoice page, without leaving the list
+  const downloadPdf = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const invoice = invoices.find(i => i.id === id);
+    if (!invoice || downloadingId) return;
+    if (paymentMethodsStatus !== 'ready') { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
+    setDownloadingId(id);
+    try {
+      const lines = await fetchLineItems(orgId, { invoiceId: id });
+      if (lines.length === 0) {
+        showToast('Cette facture n\'a aucune ligne : ouvrez-la pour vérifier avant de télécharger le PDF.', true);
+        return;
+      }
+      const client = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
+      const blob = await renderInvoicePdf({
+        invoice, lines, client, biz: orgSettings,
+        paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
+        deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
+        paymentMethods,
+      });
+      downloadBlob(blob, `facture-${id.toLowerCase()}.pdf`);
+      posthog.capture('invoice_pdf_downloaded', { invoice_id: id, from: 'list' });
+    } catch (err) {
+      console.error('[downloadPdf] failed:', err);
+      showToast('Impossible de générer le PDF. Veuillez réessayer.', true);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const openSend = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     navigate(`/invoices/${id}`, { state: { openSend: true } });
@@ -192,7 +243,6 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
             <div className="page-sub">Gérez et suivez vos factures</div>
           </div>
           <div className="topbar-actions">
-            <button className="btn"><Icon name="search" ariaHidden /> Rechercher</button>
             <button className="btn btn-primary" onClick={openPanel}>
               <Icon name="plus" ariaHidden /> Nouvelle facture
             </button>
@@ -253,6 +303,11 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
 
           <div className="section-header">
             {tabs ?? <div className="section-title">Toutes les factures</div>}
+            <div className="list-controls">
+            <div className="search-box">
+              <Icon name="search" size={15} />
+              <input type="search" aria-label="Rechercher une facture" placeholder="N°, client ou objet…" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
             <div className="filters">
               {FILTERS.map(f => (
                 <button
@@ -263,6 +318,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                   {f.label}<span className="cnt">{filterCounts[f.key] ?? 0}</span>
                 </button>
               ))}
+            </div>
             </div>
           </div>
 
@@ -279,8 +335,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
             {filteredInvoices.length === 0 ? (
               <EmptyState
                 illustration={<InvoicesEmptyIllustration />}
-                title={filter !== 'all' ? `Aucune facture « ${STATUS_LABEL[filter as Status]} »` : 'Aucune facture'}
-                description="Créez votre première facture pour commencer à facturer vos clients."
+                title={search.trim() ? 'Aucune facture ne correspond à votre recherche' : filter !== 'all' ? `Aucune facture « ${STATUS_LABEL[filter as Status]} »` : 'Aucune facture'}
+                description={search.trim() ? 'Essayez un autre numéro, nom de client ou objet.' : 'Créez votre première facture pour commencer à facturer vos clients.'}
               />
             ) : filteredInvoices.map(inv => {
               const c = clientsMap[inv.client] ?? (() => {
@@ -324,7 +380,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                       </button>
                     )}
                     {inv.status === 'paid' && (
-                      <button className="icon-btn" aria-label="Télécharger" onClick={e => e.stopPropagation()}>
+                      <button className="icon-btn" aria-label={`Télécharger le PDF de #${inv.id}`} disabled={downloadingId !== null} onClick={e => downloadPdf(e, inv.id)}>
                         <Icon name="download" size={15} ariaHidden />
                       </button>
                     )}
@@ -333,9 +389,6 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                         <Icon name="send" size={15} ariaHidden />
                       </button>
                     )}
-                    <button className="icon-btn" aria-label="Plus d'options" onClick={e => e.stopPropagation()}>
-                      <Icon name="dots" size={15} ariaHidden />
-                    </button>
                   </div>
                 </div>
               );
@@ -345,14 +398,14 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       </div>
 
       {/* Slide-over panel — sibling of .main, both inside .main-rel */}
-      <div className={`scrim${panelOpen ? ' open' : ''}`} onClick={closePanel} />
+      <div className={`scrim${panelOpen ? ' open' : ''}`} onClick={requestClosePanel} />
       <div className={`new-inv-panel${panelOpen ? ' open' : ''}`} role="dialog" aria-label="Nouvelle facture" aria-modal="true">
         <div className="panel-slide-head">
           <div>
             <div className="panel-slide-title">Nouvelle facture</div>
             <div className="panel-slide-sub">#{nextId(invoices)}</div>
           </div>
-          <button className="icon-btn" onClick={closePanel} aria-label="Fermer">
+          <button className="icon-btn" onClick={requestClosePanel} aria-label="Fermer">
             <Icon name="x" size={15} ariaHidden />
           </button>
         </div>
@@ -469,7 +522,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
               />
             </div>
             {fDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(discountAmt)} F CFA</span></div>}
-            {canInvoiceTVA && <div className="total-row"><span>TVA (18 %)</span><span>{fmt(tax)} F CFA</span></div>}
+            {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(tax)} F CFA</span></div>}
             <div className="total-row final"><span>Total à payer</span><span>{fmt(total)} F CFA</span></div>
           </div>
 

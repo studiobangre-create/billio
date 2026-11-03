@@ -9,6 +9,7 @@ import type { SupplierBill } from '@/lib/accounting-data';
 import { fmt, fmtCompact } from '@/lib/accounting-data';
 import { useSupplierBills } from '@/lib/accounting-hooks';
 import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 
 const AV_COLORS = [
   { bg: '#B5D4F4', color: '#0C447C' },
@@ -71,7 +72,7 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
       <div style={{ border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', marginBottom: 20 }}>
         {[
           { label: 'Montant HT', value: bill.htAmount },
-          { label: `TVA (18%)`, value: bill.tvaAmount },
+          { label: VAT_LABEL, value: bill.tvaAmount },
           { label: 'Total TTC', value: bill.htAmount + bill.tvaAmount, bold: true, highlight: true },
         ].map(({ label, value, bold, highlight }) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)', background: highlight ? 'var(--brand-tint)' : 'transparent', fontWeight: bold ? 700 : 400, fontSize: 13 }}>
@@ -107,7 +108,6 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
 
 interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; ifu: string; rccm: string; taxRegime: string }
 const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', ifu: '', rccm: '', taxRegime: '' };
-const TVA_RATE = 0.18;
 
 const TAX_REGIME_OPTIONS = [
   { value: '', label: 'Sélectionner…' },
@@ -124,8 +124,8 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm, htAmount: nu
   const [saving, setSaving] = useState(false);
   const set = (k: keyof BillForm, v: string) => setForm(p => ({ ...p, [k]: v }));
   const raw = parseFloat(form.htAmount) || 0;
-  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + TVA_RATE));
-  const tva = Math.round(ht * TVA_RATE);
+  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + VAT_RATE));
+  const tva = Math.round(ht * VAT_RATE);
   const ttc = ht + tva;
   const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && raw > 0;
 
@@ -181,7 +181,7 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm, htAmount: nu
 
       {raw > 0 && (
         <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '11px 14px', marginBottom: 16 }}>
-          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
+          {[{ label: 'Montant HT', value: ht }, { label: VAT_LABEL, value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: i > 0 ? '0.5px solid var(--color-border-tertiary)' : 'none', fontWeight: i === 2 ? 700 : 400, fontSize: 12.5 }}>
               <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
               <span className="mono">{fmt(value)} F CFA</span>
@@ -232,7 +232,7 @@ export default function SuppliersPage() {
       date:          form.date,
       dueDate:       form.dueDate,
       htAmount:      ht,
-      tvaAmount:     Math.round(ht * TVA_RATE),
+      tvaAmount:     Math.round(ht * VAT_RATE),
       status:        'open',
       paymentMethod: 'wire',
       ifu:           form.ifu || undefined,

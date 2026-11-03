@@ -6,6 +6,8 @@ import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
+import FeatureGuard from '@/components/FeatureGuard';
+import type { Feature } from '@/lib/plans';
 
 // ── Lazy page chunks ────────────────────────────────────────────────────────
 // Each import() becomes its own JS chunk; the browser only downloads a page
@@ -109,22 +111,23 @@ export default function App() {
             <Route path="/clients"  element={<Navigate to="/contacts" replace />} />
             <Route path="/products" element={<ProductsPage />} />
             {ACCOUNTING_ENABLED ? (<>
-              <Route path="/accounting/chart-of-accounts"    element={<ChartOfAccountsPage />} />
-              <Route path="/accounting/journals"             element={<JournalsPage />} />
-              <Route path="/accounting/trial-balance"        element={<TrialBalancePage />} />
-              <Route path="/accounting/financial-statements" element={<FinancialStatementsPage />} />
-              <Route path="/accounting/fixed-assets"         element={<FixedAssetsPage />} />
+              <Route path="/accounting/chart-of-accounts"    element={<Gated feature="accounting_syscohada" title="Plan comptable"><ChartOfAccountsPage /></Gated>} />
+              <Route path="/accounting/journals"             element={<Gated feature="accounting_syscohada" title="Journaux"><JournalsPage /></Gated>} />
+              <Route path="/accounting/trial-balance"        element={<Gated feature="accounting_syscohada" title="Balance générale"><TrialBalancePage /></Gated>} />
+              <Route path="/accounting/financial-statements" element={<Gated feature="accounting_syscohada" title="États financiers"><FinancialStatementsPage /></Gated>} />
+              <Route path="/accounting/fixed-assets"         element={<Gated feature="fixed_assets" title="Immobilisations"><FixedAssetsPage /></Gated>} />
               <Route path="/accounting/suppliers"            element={<Navigate to="/contacts?tab=suppliers" replace />} />
-              <Route path="/accounting/tax"                  element={<TaxPage />} />
-              <Route path="/accounting/period-closing"       element={<PeriodClosingPage />} />
-              <Route path="/accounting/opening-balances"     element={<OpeningBalancesPage />} />
+              <Route path="/accounting/tax"                  element={<Gated feature="accounting_syscohada" title="Fiscalité"><TaxPage /></Gated>} />
+              <Route path="/accounting/period-closing"       element={<Gated feature="period_closing" title="Clôture"><PeriodClosingPage /></Gated>} />
+              <Route path="/accounting/opening-balances"     element={<Gated feature="accounting_syscohada" title="Ouverture"><OpeningBalancesPage /></Gated>} />
             </>) : (
               <Route path="/accounting/*" element={<Navigate to="/dashboard" replace />} />
             )}
-            <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
+            {/* Reports aren't built yet; old links land on the dashboard */}
+            <Route path="/reports"  element={<Navigate to="/dashboard" replace />} />
             <Route path="/payments" element={<Navigate to="/invoices?tab=payments" replace />} />
             <Route path="/quotes"     element={<Navigate to="/invoices?tab=quotes" replace />} />
-            <Route path="/quotes/:id" element={<QuotePage />} />
+            <Route path="/quotes/:id" element={<Gated feature="quotes" title="Devis"><QuotePage /></Gated>} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/settings"  element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -137,6 +140,18 @@ export default function App() {
   );
 }
 
+// The sidebar hides locked pages, but a bookmarked or typed URL must be gated too
+function Gated({ feature, title, children }: { feature: Feature; title: string; children: React.ReactNode }) {
+  const { hasFeature } = useApp();
+  if (hasFeature(feature)) return <>{children}</>;
+  return (
+    <div className="main">
+      <div className="topbar"><div><div className="page-title">{title}</div></div></div>
+      <div className="content"><FeatureGuard feature={feature}>{null}</FeatureGuard></div>
+    </div>
+  );
+}
+
 function OnboardingGuard() {
   const { needsOnboarding, loading } = useApp();
   if (loading) return null;
@@ -144,23 +159,3 @@ function OnboardingGuard() {
   return <Outlet />;
 }
 
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="main">
-      <div className="topbar">
-        <div>
-          <div className="page-title">{title}</div>
-          <div className="page-sub">Bientôt disponible</div>
-        </div>
-      </div>
-      <div className="content" style={{
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: 8, color: 'var(--color-text-tertiary)',
-      }}>
-        <div style={{ fontSize: 36 }}>🚧</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>Page en construction</div>
-      </div>
-    </div>
-  );
-}

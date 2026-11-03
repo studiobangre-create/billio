@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { useApp } from '@/context/AppContext';
@@ -1169,9 +1169,137 @@ function InviteLinkRow({ invite, index, onRevoke }: InviteLinkRowProps) {
   );
 }
 
+/* ─── Member dialog (change role / remove) ─────────────────────── */
+const MEMBER_ROLES = [
+  { value: 'admin',      label: 'Administrateur', hint: 'Accès complet, y compris l\'équipe et la facturation Billio.' },
+  { value: 'accountant', label: 'Comptable',      hint: 'Factures, paiements et comptabilité.' },
+  { value: 'member',     label: 'Membre',         hint: 'Factures, devis et clients.' },
+];
+
+function MemberDialog({ orgId, member, onClose, onUpdated, onRemoved }: {
+  orgId:     string;
+  member:    TeamMember;
+  onClose:   () => void;
+  onUpdated: (role: string) => void;
+  onRemoved: () => void;
+}) {
+  const { showToast } = useApp();
+  const [role, setRole]           = useState(member.role);
+  const [busy, setBusy]           = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const name = memberName(member);
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Modal focus: start on the selected role, keep Tab inside, give focus back on close
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLElement>('input:checked, button:not([disabled])')?.focus();
+    return () => opener?.focus();
+  }, []);
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) { onClose(); return; }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled])',
+      )).filter(el => !(el instanceof HTMLInputElement && el.type === 'radio' && !el.checked));
+      if (focusable.length === 0) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [onClose, busy]);
+
+  async function saveRole() {
+    if (role === member.role) { onClose(); return; }
+    setBusy(true);
+    const { error } = await supabase.rpc('update_org_member_role', { p_org_id: orgId, p_user_id: member.user_id, p_role: role });
+    setBusy(false);
+    if (error) {
+      console.error('[update_org_member_role]', error);
+      showToast('Impossible de modifier le rôle. Veuillez réessayer.', true);
+      return;
+    }
+    showToast(`${name} est maintenant ${(ROLE_LABELS[role] ?? role).toLowerCase()}`);
+    onUpdated(role);
+  }
+
+  async function remove() {
+    setBusy(true);
+    const { error } = await supabase.rpc('remove_org_member', { p_org_id: orgId, p_user_id: member.user_id });
+    setBusy(false);
+    if (error) {
+      console.error('[remove_org_member]', error);
+      showToast('Impossible de retirer ce membre. Veuillez réessayer.', true);
+      return;
+    }
+    showToast(`${name} a été retiré de l'équipe`);
+    onRemoved();
+  }
+
+  return (
+    <div className="inv-overlay" onClick={() => { if (!busy) onClose(); }}>
+      <div ref={dialogRef} className="inv-modal" role="dialog" aria-modal="true" aria-label={`Gérer ${name}`} onClick={e => e.stopPropagation()}>
+        <div className="inv-modal-head">
+          <div className="inv-modal-title"><Icon name="user" size={16} ariaHidden /> {name}</div>
+          <button className="btn btn-icon" onClick={onClose} disabled={busy} aria-label="Fermer">
+            <Icon name="x" size={16} ariaHidden />
+          </button>
+        </div>
+        <div className="inv-modal-body">
+          {confirmRemove ? (
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+              {name} ({member.email}) n'aura plus accès à ce workspace. Les factures et documents qu'il ou elle a créés restent en place.
+            </p>
+          ) : (
+            <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <legend className="form-label" style={{ marginBottom: 6 }}>Rôle</legend>
+              {MEMBER_ROLES.map(r => (
+                <label key={r.value} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+                  <input type="radio" name="member-role" value={r.value} checked={role === r.value} onChange={() => setRole(r.value)} style={{ marginTop: 3 }} />
+                  <span>
+                    <b style={{ fontSize: 13 }}>{r.label}</b>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-secondary)' }}>{r.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </div>
+        <div className="inv-modal-foot" style={{ justifyContent: 'space-between' }}>
+          {confirmRemove ? (
+            <>
+              <button className="btn" onClick={() => setConfirmRemove(false)} disabled={busy}>Annuler</button>
+              <button className="btn btn-danger" onClick={remove} disabled={busy}>
+                <Icon name="trash" size={14} ariaHidden /> {busy ? 'Retrait…' : 'Retirer de l\'équipe'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-danger" onClick={() => setConfirmRemove(true)} disabled={busy}>
+                <Icon name="trash" size={14} ariaHidden /> Retirer
+              </button>
+              <button className="btn btn-primary" onClick={saveRole} disabled={busy}>
+                {busy ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Team ──────────────────────────────────────────────────────── */
 function TeamSection() {
-  const { orgId, userId, showToast } = useApp();
+  const { orgId, userId, userRole, showToast } = useApp();
+  // Owners are 'admin' in the app; the database re-checks on every change
+  const canManage = userRole === 'admin';
+  const [managing, setManaging] = useState<TeamMember | null>(null);
 
   const [members,     setMembers]     = useState<TeamMember[]>([]);
   const [pending,     setPending]     = useState<PendingInvite[]>([]);
@@ -1205,6 +1333,15 @@ function TeamSection() {
 
   return (
     <>
+      {managing && orgId && (
+        <MemberDialog
+          orgId={orgId}
+          member={managing}
+          onClose={() => setManaging(null)}
+          onUpdated={role => { setMembers(prev => prev.map(m => m.user_id === managing.user_id ? { ...m, role } : m)); setManaging(null); }}
+          onRemoved={() => { setMembers(prev => prev.filter(m => m.user_id !== managing.user_id)); setManaging(null); }}
+        />
+      )}
       {showInvite && orgId && (
         <InviteModal
           orgId={orgId}
@@ -1241,9 +1378,11 @@ function TeamSection() {
                 <span className={'s-role-badge' + (m.role === 'owner' ? ' owner' : '')}>
                   {ROLE_LABELS[m.role] ?? m.role}
                 </span>
-                <button className="icon-btn" disabled={isMe || m.role === 'owner'}>
-                  <Icon name="dots" size={15} />
-                </button>
+                {canManage && !isMe && m.role !== 'owner' && (
+                  <button className="icon-btn" aria-label={`Gérer ${memberName(m)}`} title="Modifier le rôle ou retirer" onClick={() => setManaging(m)}>
+                    <Icon name="dots" size={15} ariaHidden />
+                  </button>
+                )}
               </div>
             );
           })}

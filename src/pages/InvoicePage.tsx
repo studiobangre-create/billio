@@ -24,6 +24,7 @@ import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Status } from '@/data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
+import { VAT_LABEL, chargesVat, splitTtc, vatOn } from '@/lib/vat';
 
 type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
@@ -164,12 +165,12 @@ export default function InvoicePage() {
 
   const client        = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
   const clientWithholdingScenario = (client as { withholdingScenario?: ServiceWithholdingScenario }).withholdingScenario;
-  const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
+  const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
   const subtotal      = lines.reduce((s, li) => s + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
   const discountAmt   = Math.round(subtotal * (discountPct / 100));
   const discountedSub = subtotal - discountAmt;
-  const tax           = canInvoiceTVA ? Math.round(discountedSub * 0.18) : 0;
+  const tax           = vatOn(discountedSub, canInvoiceTVA);
   const total         = discountedSub + tax;
   const isOverdue       = invoice.status === 'overdue';
   const { paid, credited, balance } = invoiceBalance(invoice, payments, creditNotes);
@@ -320,8 +321,7 @@ export default function InvoicePage() {
         setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' as const } : i));
       }
       // Accounting: back-calculate HT/TVA from TTC amount
-      const tvaAmount = canInvoiceTVA ? Math.round(avoirAmount - avoirAmount / 1.18) : 0;
-      const htAmount  = avoirAmount - tvaAmount;
+      const { ht: htAmount, tva: tvaAmount } = splitTtc(avoirAmount, canInvoiceTVA);
       recordCreditNoteEntry(orgId, {
         creditNoteId: avId,
         invoiceId:    invoice.id,
@@ -372,7 +372,7 @@ export default function InvoicePage() {
   const eSubtotal      = eLines.reduce((s, l) => s + l.qty * l.price, 0);
   const eDiscountAmt   = Math.round(eSubtotal * (eDiscount / 100));
   const eDiscountedSub = eSubtotal - eDiscountAmt;
-  const eTax           = canInvoiceTVA ? Math.round(eDiscountedSub * 0.18) : 0;
+  const eTax           = vatOn(eDiscountedSub, canInvoiceTVA);
   const eTotal         = eDiscountedSub + eTax;
 
   const handleSaveEdit = async () => {
@@ -585,7 +585,7 @@ export default function InvoicePage() {
                 {discountPct > 0 && (
                   <div className="tot-row"><span>Remise ({discountPct}%)</span><span className="tv" style={{ color: 'var(--color-text-secondary)' }}>−{fmt(discountAmt)} F CFA</span></div>
                 )}
-                {canInvoiceTVA && <div className="tot-row"><span>TVA (18 %)</span><span className="tv">{fmt(tax)} F CFA</span></div>}
+                {canInvoiceTVA && <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(tax)} F CFA</span></div>}
                 {paid > 0 && (
                   <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(paid)} F CFA</span></div>
                 )}
@@ -977,7 +977,7 @@ export default function InvoicePage() {
               />
             </div>
             {eDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(eDiscountAmt)} F CFA</span></div>}
-            {canInvoiceTVA && <div className="total-row"><span>TVA (18 %)</span><span>{fmt(eTax)} F CFA</span></div>}
+            {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(eTax)} F CFA</span></div>}
             <div className="total-row final"><span>Total à payer</span><span>{fmt(eTotal)} F CFA</span></div>
           </div>
         </div>

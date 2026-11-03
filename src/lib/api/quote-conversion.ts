@@ -3,6 +3,7 @@ import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-i
 import { updateQuote } from '@/lib/api/quotes';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import type { Invoice, Quote } from '@/lib/schemas';
+import { splitTtc } from '@/lib/vat';
 
 /**
  * Turns a quote into a pending invoice with the same lines, then marks the
@@ -37,8 +38,7 @@ export async function convertQuoteToInvoice(
     throw err;
   }
 
-  const htAmount  = opts.canInvoiceTVA ? Math.round(quote.amount / 1.18) : quote.amount;
-  const tvaAmount = opts.canInvoiceTVA ? quote.amount - htAmount : 0;
+  const { ht: htAmount, tva: tvaAmount } = splitTtc(quote.amount, opts.canInvoiceTVA);
   let accountingOk = true;
   try {
     await recordInvoiceIssuanceEntry(orgId, { invoiceId: invId, htAmount, tvaAmount, date: today, clientName: opts.clientName });

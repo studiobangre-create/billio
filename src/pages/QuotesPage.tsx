@@ -13,11 +13,13 @@ import { createQuote, removeQuote, nextQuoteId } from '@/lib/api/quotes';
 import { quoteMessage } from '@/lib/document-messages';
 import { createActivity } from '@/lib/api/activities';
 import { filledLines, lineItemsError } from '@/lib/line-validation';
+import { confirmDiscard } from '@/lib/confirm-discard';
 import { contactValue } from '@/lib/share-links';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
 import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
-import { fmt, fmtDate, newLineItem, clientInitials } from '@/data';
+import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
+import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 
 type FilterKey = 'all' | QuoteStatus;
 
@@ -41,13 +43,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 
-function fmtCompact(n: number) {
-  const a = Math.abs(n);
-  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
-  return Math.round(n).toLocaleString('fr-FR');
-}
 
-const TVA = 0.18;
 
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
@@ -99,9 +95,9 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     setPickerQuery('');
   }
 
-  const canInvoiceTVA = orgSettings.taxRegime === 'RNI';
+  const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
   const subtotal = lines.reduce((s, li) => s + li.qty * li.price, 0);
-  const tax      = canInvoiceTVA ? Math.round(subtotal * TVA) : 0;
+  const tax      = vatOn(subtotal, canInvoiceTVA);
   const total    = subtotal + tax;
 
   // Metrics
@@ -132,6 +128,10 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     setPanelOpen(true);
   }
   function closePanel() { setPanelOpen(false); setShowPicker(false); }
+  function requestClosePanel() {
+    const dirty = fClient !== '' || fSubject.trim() !== '' || filledLines(lines).length > 0;
+    if (confirmDiscard(dirty)) closePanel();
+  }
 
   function addLine() {
     setLines(prev => [...prev, newLineItem()]);
@@ -451,7 +451,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
       </div>
 
       {/* Scrim */}
-      <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={closePanel} />
+      <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={requestClosePanel} />
 
       {/* New quote panel */}
       <div className={'new-inv-panel' + (panelOpen ? ' open' : '')}>
@@ -460,7 +460,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
             <div className="panel-slide-title">Nouveau devis</div>
             <div className="panel-slide-sub">Nouveau devis</div>
           </div>
-          <button className="icon-btn" onClick={closePanel} aria-label="Fermer">
+          <button className="icon-btn" onClick={requestClosePanel} aria-label="Fermer">
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -595,7 +595,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
             </div>
             {canInvoiceTVA && (
               <div className="total-row">
-                <span>TVA (18%)</span>
+                <span>{VAT_LABEL}</span>
                 <span>{fmt(tax)} F CFA</span>
               </div>
             )}

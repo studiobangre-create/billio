@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { QAIllustration } from '@/components/QAIllustrations';
@@ -68,7 +68,7 @@ export default function DashboardPage() {
   // Accountants get the billing shortcuts while the accounting pages are switched off
   const actionsRole: Role = role === 'accountant' && !ACCOUNTING_ENABLED ? 'member' : role;
 
-  if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const metrics = useMemo(() => {
     const totalInvoiced  = invoices.filter(i => i.status !== 'draft').reduce((s, i) => s + i.amount, 0);
@@ -79,17 +79,19 @@ export default function DashboardPage() {
     return { totalInvoiced, collected, outstanding, overdueCount, collectionRate };
   }, [invoices]);
 
+  if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
+
+  const monthLabel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
 
   return (
     <div className="main">
       <div className="topbar">
         <div>
           <div className="page-title">Tableau de bord</div>
-          <div className="page-sub">Aperçu de juin 2026</div>
+          <div className="page-sub">Aperçu de {monthLabel}</div>
         </div>
         <div className="topbar-actions">
-          <button className="btn"><Icon name="search" ariaHidden /> Rechercher</button>
-          <button className="btn btn-icon" aria-label="Notifications"><Icon name="bell" ariaHidden /></button>
           <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
             <Icon name="plus" ariaHidden /> Nouvelle facture
           </button>
@@ -206,7 +208,11 @@ export default function DashboardPage() {
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title">Activité récente</div>
-              <button className="panel-link">Tout voir</button>
+              {activity.length > 5 && (
+                <button className="panel-link" aria-expanded={showAllActivity} onClick={() => setShowAllActivity(v => !v)}>
+                  {showAllActivity ? 'Réduire' : `Tout voir (${activity.length})`}
+                </button>
+              )}
             </div>
             {activity.length === 0 ? (
               <EmptyState
@@ -214,7 +220,7 @@ export default function DashboardPage() {
                 title="Aucune activité récente"
                 description="Les actions sur vos factures, clients et paiements apparaîtront ici."
               />
-            ) : activity.slice(0, 5).map((item, i) => (
+            ) : (showAllActivity ? activity : activity.slice(0, 5)).map((item, i) => (
               <div key={i} className="activity-item">
                 <div className={`act-dot ${item.kind}`} />
                 <div>

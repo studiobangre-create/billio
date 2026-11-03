@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import UpgradeModal from '@/components/UpgradeModal';
 import { useApp } from '@/context/AppContext';
@@ -16,10 +15,6 @@ const NAV_WORKSPACE: NavItem[] = [
   { icon: 'users',            label: 'Contacts',        to: '/contacts'  },
   { icon: 'package',          label: 'Produits',        to: '/products'  },
   { icon: 'layout-grid',      label: 'Modèles',         to: '/templates' },
-];
-
-const NAV_FINANCE: NavItem[] = [
-  { icon: 'chart-bar',   label: 'Rapports',  to: '/reports'  },
 ];
 
 const NAV_ACCOUNTING: NavItem[] = [
@@ -46,7 +41,6 @@ const NAV_ACCOUNT: NavItem[] = [
 // Cabinet+ gates: fixed assets, period closing.
 const ROUTE_FEATURE: Record<string, Feature> = {
   // Business+
-  '/reports':                            'reports',
   '/accounting/opening-balances':        'accounting_syscohada',
   '/accounting/chart-of-accounts':       'accounting_syscohada',
   '/accounting/journals':                'accounting_syscohada',
@@ -70,6 +64,31 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
   const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
   // Quote detail pages live under /quotes but belong to the Facturation item
   const onQuotePage = useLocation().pathname.startsWith('/quotes');
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLButtonElement>(null);
+
+  // Menu keyboard support: focus the first item on open, arrows move, Escape returns to the pill
+  useEffect(() => {
+    if (!menuOpen) return;
+    const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    items()[0]?.focus();
+    const onDown = (e: MouseEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false); };
+    const onKey  = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMenuOpen(false); pillRef.current?.focus(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const list = items();
+      if (list.length === 0) return;
+      e.preventDefault();
+      const i = list.indexOf(document.activeElement as HTMLButtonElement);
+      const next = e.key === 'ArrowDown' ? (i + 1) % list.length : (i - 1 + list.length) % list.length;
+      list[next].focus();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
 
   const overdueCount = useMemo(
     () => invoices.filter(i => i.status === 'overdue').length,
@@ -136,9 +155,6 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
               : undefined,
           ))}
 
-          <div className="nav-section">Finance</div>
-          {NAV_FINANCE.map(item => renderNavItem(item))}
-
           {ACCOUNTING_ENABLED && (<>
             <div className="nav-section">Comptabilité</div>
             {NAV_ACCOUNTING
@@ -151,22 +167,32 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
           {NAV_ACCOUNT.map(item => renderNavItem(item))}
         </nav>
 
-        <div className="sidebar-bottom">
-          <div
+        <div className="sidebar-bottom" ref={menuRef}>
+          {menuOpen && (
+            <div className="user-menu" role="menu" aria-label="Compte">
+              <button type="button" role="menuitem" className="user-menu-item" onClick={() => { setMenuOpen(false); navigate('/settings'); }}>
+                <Icon name="settings" size={15} ariaHidden /> Paramètres
+              </button>
+              <button type="button" role="menuitem" className="user-menu-item danger" onClick={() => { setMenuOpen(false); onLogout(); }}>
+                <Icon name="logout" size={15} ariaHidden /> Se déconnecter
+              </button>
+            </div>
+          )}
+          <button
+            ref={pillRef}
+            type="button"
             className="user-pill"
-            onClick={onLogout}
-            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onLogout()}
-            title="Se déconnecter"
-            role="button"
-            tabIndex={0}
+            onClick={() => setMenuOpen(o => !o)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
             <div className="avatar">{userInitials}</div>
-            <div>
+            <div style={{ textAlign: 'left' }}>
               <div className="user-name">{userLabel || '…'}</div>
               <div className="user-plan">Plan {PLAN_LABELS[plan]}</div>
             </div>
-            <Icon name="logout" ariaHidden />
-          </div>
+            <Icon name="chevron-up" ariaHidden />
+          </button>
         </div>
       </aside>
     </>

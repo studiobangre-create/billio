@@ -19,6 +19,10 @@ import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@
 import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
 import { useSupplierBills } from '@/lib/accounting-hooks';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
+import { csvBlob } from '@/lib/csv';
+import { todayISO } from '@/lib/invoice-status';
+import { downloadBlob } from '@/lib/download';
+import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -140,7 +144,6 @@ const PAYMENT_METHOD_ICONS: Record<PaymentMethod, string> = {
   cash:   'cash',
   mobile: 'device-mobile',
 };
-const TVA_RATE = 0.18;
 
 function JournalLines({ lines }: { lines: SupplierBill['acctLines'] }) {
   return (
@@ -199,7 +202,7 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
       <div style={{ border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', marginBottom: 20 }}>
         {[
           { label: 'Montant HT', value: bill.htAmount },
-          { label: 'TVA (18%)', value: bill.tvaAmount },
+          { label: VAT_LABEL, value: bill.tvaAmount },
           { label: 'Total TTC', value: bill.htAmount + bill.tvaAmount, bold: true, highlight: true },
         ].map(({ label, value, bold, highlight }) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)', background: highlight ? 'var(--brand-tint)' : 'transparent', fontWeight: bold ? 700 : 400, fontSize: 13 }}>
@@ -254,8 +257,8 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
   const [saving, setSaving] = useState(false);
   const set = (k: keyof BillForm, v: string) => setForm(p => ({ ...p, [k]: v }));
   const raw = parseFloat(form.htAmount) || 0;
-  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + TVA_RATE));
-  const tva = Math.round(ht * TVA_RATE);
+  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + VAT_RATE));
+  const tva = Math.round(ht * VAT_RATE);
   const ttc = ht + tva;
   const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && raw > 0;
   const handleSave = async () => {
@@ -327,7 +330,7 @@ function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: 
 
       {raw > 0 && (
         <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '11px 14px', marginBottom: 16 }}>
-          {[{ label: 'Montant HT', value: ht }, { label: 'TVA (18%)', value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
+          {[{ label: 'Montant HT', value: ht }, { label: VAT_LABEL, value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: i > 0 ? '0.5px solid var(--color-border-tertiary)' : 'none', fontWeight: i === 2 ? 700 : 400, fontSize: 12.5 }}>
               <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
               <span className="mono">{fmt(value)} F CFA</span>
@@ -401,6 +404,17 @@ function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
   });
   const ageCols: Record<string, string> = { cur: '#2E7D32', d30: '#B26A09', d60: '#C2570B', d90: '#A32D2D' };
   const ageTotal = Object.values(ageTot).reduce((a, v) => a + v, 0) || 1;
+
+  // Relevé: every bill from this supplier, as a CSV for Excel
+  const BILL_STATUS: Record<SupplierBill['status'], string> = { open: 'À payer', overdue: 'En retard', paid: 'Payée' };
+  function exportStatement() {
+    const rows = supplier.bills.map(b => [b.date, b.piece, b.dueDate, b.htAmount, b.tvaAmount, b.htAmount + b.tvaAmount, BILL_STATUS[b.status]]);
+    const slug = supplier.name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'fournisseur';
+    downloadBlob(
+      csvBlob(['Date', 'Pièce', 'Échéance', 'HT (F CFA)', 'TVA (F CFA)', 'TTC (F CFA)', 'Statut'], rows),
+      `releve-${slug}-${todayISO()}.csv`,
+    );
+  }
 
   return (
     <DrawerPanel open onClose={onClose} title={
@@ -483,7 +497,7 @@ function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
       </div>
 
       <div style={{ display: 'flex', gap: 9, marginTop: 20 }}>
-        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => {}}>
+        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={exportStatement} disabled={supplier.bills.length === 0}>
           <Icon name="download" size={15} />Relevé
         </button>
         <button className="btn btn-primary" style={{ flex: 1.4, justifyContent: 'center' }} onClick={() => { onClose(); onNewBill(supplier.name); }}>
@@ -693,7 +707,7 @@ export default function ContactsPage() {
 
   async function handleCreateBill(billForm: BillForm) {
     const ht = parseFloat(billForm.htAmount);
-    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * TVA_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined, fiscalDivision: billForm.fiscalDivision || undefined });
+    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * VAT_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined, fiscalDivision: billForm.fiscalDivision || undefined });
   }
 
   // ── Contextual KPIs ───────────────────────────────────────────────────────
@@ -1121,7 +1135,8 @@ export default function ContactsPage() {
       {/* ── Supplier drawers ─────────────────────────────────────────────── */}
       {selectedSupplier && (
         <SupplierDetailDrawer
-          supplier={selectedSupplier}
+          // The list's copy: marking a bill paid updates it, the captured one doesn't
+          supplier={supplierContacts.find(s => s.name === selectedSupplier.name) ?? selectedSupplier}
           onMarkPaid={markPaid}
           onNewBill={name => { setBillInitialSupplier(name); setSelectedSupplier(null); setShowBillForm(true); }}
           onClose={() => setSelectedSupplier(null)}

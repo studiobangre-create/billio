@@ -123,14 +123,19 @@ export const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export function fmtCompact(n: number): string {
   const a = Math.abs(n);
-  if (a >= 1_000_000) return (n / 1_000_000).toFixed(a % 1_000_000 === 0 ? 0 : 1) + 'M';
+  // French decimal comma: 1,3 M (not 1.3M)
+  if (a >= 1_000_000) return (n / 1_000_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' M';
   return Math.round(n).toLocaleString('fr-FR');
 }
 
-/** Format an ISO date string ("2026-06-01") to French short date ("1 juin"). */
-export function fmtDate(iso: string): string {
+/** French short date: "1 juin" this year, "1 juin 2025" for any other year. */
+export function fmtDate(iso: string, today: Date = new Date()): string {
   try {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const d = new Date(iso + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('fr-FR', d.getFullYear() === today.getFullYear()
+      ? { day: 'numeric', month: 'long' }
+      : { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
     return iso;
   }

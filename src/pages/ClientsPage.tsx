@@ -7,7 +7,7 @@ import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
-import { fmt, clientInitials } from '@/data';
+import { fmt, fmtCompact, clientInitials } from '@/data';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 
 type FilterKey = 'all' | 'active' | 'lead' | 'balance';
@@ -43,11 +43,6 @@ const EMPTY_FORM: NewClientForm = {
   name: '', contact: '', email: '', country: '', phone: '', city: '', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '',
 };
 
-function fmtCompact(n: number) {
-  const a = Math.abs(n);
-  if (a >= 1e6) return (n / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + 'M';
-  return Math.round(n).toLocaleString('fr-FR');
-}
 
 export default function ClientsPage() {
   const { clients, setClients, invoices, orgId, showToast, loading } = useApp();

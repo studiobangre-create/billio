@@ -4,6 +4,7 @@ import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
 import type { BizInfo } from '@/components/InvoicePaper';
 import type { PaymentMethodLine } from '@/lib/payment-methods';
+import { VAT_LABEL, chargesVat, documentHasVat, vatOn } from '@/lib/vat';
 
 // toLocaleString is unreliable in the react-pdf renderer environment
 const pdfFmt = (n: number): string =>
@@ -268,7 +269,10 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
   const discountPct   = invoice.discountPct ?? 0;
   const discountAmt   = Math.round(subtotal * (discountPct / 100));
   const discountedSub = subtotal - discountAmt;
-  const tax           = Math.round(discountedSub * 0.18);
+  // VAT as issued: the stored total says whether it was charged, so a later
+  // change of tax regime doesn't rewrite old invoices
+  const showVat       = documentHasVat(invoice.amount, discountedSub, chargesVat(biz.taxRegime));
+  const tax           = vatOn(discountedSub, showVat);
   const total         = discountedSub + tax;
   const isPaid = invoice.status === 'paid';
 
@@ -395,10 +399,12 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
                 <Text style={[s.totVal, { color: '#888' }]}>{'-'}{pdfFmt(discountAmt)} F CFA</Text>
               </View>
             )}
-            <View style={s.totRow}>
-              <Text style={s.totLabel}>TVA (18 %)</Text>
-              <Text style={s.totVal}>{pdfFmt(tax)} F CFA</Text>
-            </View>
+            {showVat && (
+              <View style={s.totRow}>
+                <Text style={s.totLabel}>{VAT_LABEL}</Text>
+                <Text style={s.totVal}>{pdfFmt(tax)} F CFA</Text>
+              </View>
+            )}
             {svcWithholding !== null && !isPaid && (
               <View style={s.totRow}>
                 <Text style={s.totLabel}>
