@@ -44,9 +44,9 @@ function supplierAvColor(name: string) {
 function supplierInitials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
-const TODAY = new Date('2026-06-12');
+// Whole calendar days between today and the due date (both at UTC midnight)
 function daysDue(dueDate: string) {
-  return Math.round((new Date(dueDate).getTime() - TODAY.getTime()) / 86400000);
+  return Math.round((Date.parse(dueDate + 'T00:00:00Z') - Date.parse(todayISO() + 'T00:00:00Z')) / 86400000);
 }
 function ageBucket(b: SupplierBill): 'cur' | 'd30' | 'd60' | 'd90' | null {
   if (b.status === 'paid') return null;

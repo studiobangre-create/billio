@@ -11,6 +11,7 @@ import { fmt, fmtCompact, clsOf, openingOf } from '@/lib/accounting-data';
 import { useTrialBalance, useBalanceFns } from '@/lib/accounting-hooks';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
+import { exerciseYear, monthLabel } from '@/lib/period';
 
 function LedgerDrawer({
   account, classes, journals, onClose,
@@ -170,10 +171,10 @@ export default function TrialBalancePage() {
             <Icon name="book-2" size={13} /> Accounting
           </div>
           <div className="page-title">Balance générale</div>
-          <div className="page-sub">Plan comptable SYSCOHADA · Juin 2026</div>
+          <div className="page-sub">Plan comptable SYSCOHADA · {monthLabel()}</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button
             className={`btn${showDraft ? ' btn-primary' : ''}`}
             onClick={() => setShowDraft(p => !p)}

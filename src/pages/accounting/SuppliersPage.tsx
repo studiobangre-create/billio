@@ -10,6 +10,8 @@ import { fmt, fmtCompact } from '@/lib/accounting-data';
 import { useSupplierBills } from '@/lib/accounting-hooks';
 import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
+import { exerciseYear } from '@/lib/period';
+import { todayISO } from '@/lib/invoice-status';
 
 const AV_COLORS = [
   { bg: '#B5D4F4', color: '#0C447C' },
@@ -29,10 +31,9 @@ function supplierInitials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
 
+// Whole calendar days between today and the due date (both at UTC midnight)
 function daysDue(dueDate: string): number {
-  const today = new Date('2026-06-10');
-  const due = new Date(dueDate);
-  return Math.round((due.getTime() - today.getTime()) / 86400000);
+  return Math.round((Date.parse(dueDate + 'T00:00:00Z') - Date.parse(todayISO() + 'T00:00:00Z')) / 86400000);
 }
 
 function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkPaid: (id: string) => void; onClose: () => void }) {
@@ -271,7 +272,7 @@ export default function SuppliersPage() {
           <div className="page-sub">Gestion des dettes fournisseurs et factures d'achat</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle facture</button>
         </div>
       </div>

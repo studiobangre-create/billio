@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { QAIllustration } from '@/components/QAIllustrations';
@@ -9,6 +9,10 @@ import { useApp } from '@/context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue, clientInitials } from '@/data';
 import type { ActivityPart } from '@/data';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
+import { dashboardMetrics } from '@/lib/dashboard-metrics';
+import { fetchCreditNotes } from '@/lib/api/credit-notes';
+import { todayISO } from '@/lib/invoice-status';
+import type { CreditNote } from '@/lib/schemas';
 
 function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   return (
@@ -62,7 +66,7 @@ const ROLE_ACTIONS: Record<Role, QATile[]> = {
 };
 
 export default function DashboardPage() {
-  const { invoices, activity, clientsMap, loading, userRole } = useApp();
+  const { invoices, payments, activity, clientsMap, loading, userRole, orgId } = useApp();
   const navigate = useNavigate();
   const role = userRole as Role;
   // Accountants get the billing shortcuts while the accounting pages are switched off
@@ -70,14 +74,13 @@ export default function DashboardPage() {
 
   const [showAllActivity, setShowAllActivity] = useState(false);
 
-  const metrics = useMemo(() => {
-    const totalInvoiced  = invoices.filter(i => i.status !== 'draft').reduce((s, i) => s + i.amount, 0);
-    const collected      = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0);
-    const outstanding    = invoices.filter(i => i.status === 'overdue' || i.status === 'pending').reduce((s, i) => s + i.amount, 0);
-    const overdueCount   = invoices.filter(i => i.status === 'overdue').length;
-    const collectionRate = totalInvoiced ? Math.round((collected / totalInvoiced) * 100) : 0;
-    return { totalInvoiced, collected, outstanding, overdueCount, collectionRate };
-  }, [invoices]);
+  const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
+  useEffect(() => {
+    if (orgId) fetchCreditNotes(orgId).then(setCreditNotes).catch(err => console.error('[fetchCreditNotes]', err));
+  }, [orgId]);
+  // Keyed on the date too, so a dashboard left open past midnight recomputes
+  const today = todayISO();
+  const metrics = useMemo(() => dashboardMetrics(invoices, payments, creditNotes, today), [invoices, payments, creditNotes, today]);
 
   if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
 
@@ -107,7 +110,16 @@ export default function DashboardPage() {
               <div className="metric-label">Total facturé</div>
             </div>
             <div className="metric-value tnum">{fmtCompact(metrics.totalInvoiced)}<span className="metric-unit">F CFA</span></div>
-            <div className="metric-change"><span className="up"><Icon name="trending-up" size={14} ariaHidden />+12 % MoM</span></div>
+            <div className="metric-change">
+              {metrics.monthOverMonthPct === null
+                ? <span className="neutral">{fmtCompact(metrics.invoicedThisMonth)} F CFA ce mois-ci</span>
+                : metrics.monthOverMonthPct === 0
+                ? <span className="neutral">Stable vs mois dernier</span>
+                : <span className={metrics.monthOverMonthPct >= 0 ? 'up' : 'dn'}>
+                    <Icon name={metrics.monthOverMonthPct >= 0 ? 'trending-up' : 'trending-down'} size={14} ariaHidden />
+                    {metrics.monthOverMonthPct >= 0 ? '+' : '−'}{Math.abs(metrics.monthOverMonthPct)} % vs mois dernier
+                  </span>}
+            </div>
           </div>
 
           <div className="metric-card">
@@ -133,8 +145,15 @@ export default function DashboardPage() {
               <div className="metric-ico violet"><Icon name="calendar-stats" size={15} ariaHidden /></div>
               <div className="metric-label">Délai moy. de paiement</div>
             </div>
-            <div className="metric-value tnum">8,4<span className="metric-unit">jours</span></div>
-            <div className="metric-change"><span className="up"><Icon name="trending-down" size={14} ariaHidden />−2,1 jours</span></div>
+            <div className="metric-value tnum">
+              {metrics.avgDaysToPay === null ? '—' : metrics.avgDaysToPay.toLocaleString('fr-FR')}
+              {metrics.avgDaysToPay !== null && <span className="metric-unit">jours</span>}
+            </div>
+            <div className="metric-change">
+              <span className="neutral">
+                {metrics.settledCount === 0 ? 'Pas encore de paiement à mesurer' : `Sur ${metrics.settledCount} facture${metrics.settledCount > 1 ? 's' : ''} soldée${metrics.settledCount > 1 ? 's' : ''}`}
+              </span>
+            </div>
           </div>
         </div>
 

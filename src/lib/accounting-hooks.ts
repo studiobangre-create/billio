@@ -36,9 +36,9 @@ import {
 import type {
   AccountClass, Account, Journal, JournalEntry, FixedAsset, SupplierBill,
 } from '@/lib/accounting-data';
+import { exerciseYear } from '@/lib/period';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
-const EXERCISE_YEAR = 2026;
 
 // ─── Shared helper ───────────────────────────────────────────────────────────
 
@@ -100,16 +100,18 @@ export interface ChartData {
 
 export function useChartOfAccounts() {
   const { orgId } = useApp();
-  const result = useAsyncData<ChartData>(`chart:${orgId}`, async () => {
+  // Per load, so a tab left open across 31 December fetches the new exercise
+  const year = exerciseYear();
+  const result = useAsyncData<ChartData>(`chart:${orgId}:${year}`, async () => {
     const [classes, accounts, journals, opening, balances] = await Promise.all([
       fetchAccountClasses(),
       fetchAccounts(orgId),
       fetchJournals(orgId),
-      fetchOpeningBalances(orgId, EXERCISE_YEAR),
+      fetchOpeningBalances(orgId, year),
       fetchAccountBalances(orgId),
     ]);
     return { classes, accounts, journals, opening, balances };
-  }, [orgId]);
+  }, [orgId, year]);
 
   const addAccount = useCallback(async (account: Account) => {
     await apiCreateAccount(orgId, account);
@@ -199,16 +201,18 @@ export interface TrialBalanceData {
 
 export function useTrialBalance() {
   const { orgId } = useApp();
-  return useAsyncData<TrialBalanceData>(`trial:${orgId}`, async () => {
+  // Per load, so a tab left open across 31 December fetches the new exercise
+  const year = exerciseYear();
+  return useAsyncData<TrialBalanceData>(`trial:${orgId}:${year}`, async () => {
     const [classes, accounts, journals, opening, balances] = await Promise.all([
       fetchAccountClasses(),
       fetchAccounts(orgId),
       fetchJournals(orgId),
-      fetchOpeningBalances(orgId, EXERCISE_YEAR),
+      fetchOpeningBalances(orgId, year),
       fetchAccountBalances(orgId),
     ]);
     return { classes, accounts, journals, opening, balances };
-  }, [orgId]);
+  }, [orgId, year]);
 }
 
 // ─── Financial Statements ────────────────────────────────────────────────────
@@ -220,13 +224,15 @@ export interface FinancialStatementsData {
 
 export function useFinancialStatements() {
   const { orgId } = useApp();
-  return useAsyncData<FinancialStatementsData>(`fin-stmt:${orgId}`, async () => {
+  // Per load, so a tab left open across 31 December fetches the new exercise
+  const year = exerciseYear();
+  return useAsyncData<FinancialStatementsData>(`fin-stmt:${orgId}:${year}`, async () => {
     const [opening, balances] = await Promise.all([
-      fetchOpeningBalances(orgId, EXERCISE_YEAR),
+      fetchOpeningBalances(orgId, year),
       fetchAccountBalances(orgId),
     ]);
     return { opening, balances };
-  }, [orgId]);
+  }, [orgId, year]);
 }
 
 // ─── Fixed Assets ─────────────────────────────────────────────────────────────
@@ -358,15 +364,17 @@ export interface PeriodClosingData {
 
 export function usePeriodClosing() {
   const { orgId } = useApp();
-  const result = useAsyncData<PeriodClosingData>(`period-closing:${orgId}`, async () => {
+  // Per load, so a tab left open across 31 December fetches the new exercise
+  const year = exerciseYear();
+  const result = useAsyncData<PeriodClosingData>(`period-closing:${orgId}:${year}`, async () => {
     const [periods, entries, opening, balances] = await Promise.all([
-      fetchFiscalPeriods(orgId, EXERCISE_YEAR),
+      fetchFiscalPeriods(orgId, year),
       fetchJournalEntries(orgId, { includeDraft: true }),
-      fetchOpeningBalances(orgId, EXERCISE_YEAR),
+      fetchOpeningBalances(orgId, year),
       fetchAccountBalances(orgId),
     ]);
     return { periods, entries, opening, balances };
-  }, [orgId]);
+  }, [orgId, year]);
 
   const closePeriod = useCallback(async (periodId: string) => {
     await apiClosePeriod(periodId);

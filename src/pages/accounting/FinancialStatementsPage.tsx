@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '@/components/Icon';
 import { fmt } from '@/lib/accounting-data';
 import { useFinancialStatements, useBalanceFns } from '@/lib/accounting-hooks';
+import { exerciseYear } from '@/lib/period';
 
 type Tab = 'bilan' | 'cr' | 'flux' | 'notes';
 
@@ -140,13 +141,13 @@ function IncomeStatement({ mvtOf }: Pick<Fns, 'mvtOf'>) {
   return (
     <div>
       <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)', marginBottom: 16 }}>
-        <div style={{ padding: '12px 16px', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--color-text-secondary)' }}>Compte de résultat · Juin 2026</div>
+        <div style={{ padding: '12px 16px', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--color-text-secondary)' }}>Compte de résultat · cumul à date</div>
         {rows.map((r, i) => <SheetRowEl key={i} row={r} />)}
       </div>
       <div style={{ padding: '20px 24px', borderRadius: 'var(--border-radius-lg)', background: isProfit ? 'linear-gradient(135deg,#2E7D32,#1B5E20)' : 'linear-gradient(135deg,#A32D2D,#7B1111)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: 0.8, textTransform: 'uppercase' }}>Résultat net du mois</div>
-          <div style={{ fontSize: 13.5, fontWeight: 500, opacity: 0.9, marginTop: 3 }}>{isProfit ? 'Bénéfice' : 'Perte'} · Exercice 2026</div>
+          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: 0.8, textTransform: 'uppercase' }}>Résultat net à date</div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, opacity: 0.9, marginTop: 3 }}>{isProfit ? 'Bénéfice' : 'Perte'} · Exercice {exerciseYear()}</div>
         </div>
         <div className="mono" style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1 }}>{fmt(Math.abs(netResult))} <span style={{ fontSize: 14, opacity: 0.8 }}>F CFA</span></div>
       </div>
@@ -175,7 +176,7 @@ function CashFlow({ signedOf, mvtOf }: Fns) {
 
   return (
     <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
-      <div style={{ padding: '12px 16px', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--color-text-secondary)' }}>Tableau de flux de trésorerie · Juin 2026</div>
+      <div style={{ padding: '12px 16px', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--color-text-secondary)' }}>Tableau de flux de trésorerie · cumul à date</div>
       {rows.filter(r => r.value !== 0 || r.bold).map((r, i) => (
         <SheetRowEl key={i} row={r as SheetRow} />
       ))}
@@ -244,10 +245,10 @@ export default function FinancialStatementsPage() {
             <Icon name="report-money" size={13} /> Accounting
           </div>
           <div className="page-title">États financiers</div>
-          <div className="page-sub">Bilan · Compte de résultat · Flux · Notes · Juin 2026</div>
+          <div className="page-sub">Bilan · Compte de résultat · Flux · Notes · cumul à date</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn"><Icon name="printer" />Imprimer</button>
           <button className="btn"><Icon name="download" />Exporter PDF</button>
         </div>

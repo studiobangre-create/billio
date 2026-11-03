@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
 import { nextClientCode } from '@/lib/api/clients';
 import './OnboardingPage.css';
+import { fmtDateLong } from '@/data';
 
 /* ── types ── */
 interface TeamInvite { id: string; email: string; role: string }
@@ -12,6 +13,14 @@ interface ClientDraft { name: string; email: string; av: string }
 
 const AV = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e', 'av-f'] as const;
 const TERMS_OPTIONS = ['À réception', 'Net 7 jours', 'Net 14 jours', 'Net 30 jours'];
+const TERMS_DAYS: Record<string, number> = { 'À réception': 0, 'Net 7 jours': 7, 'Net 14 jours': 14, 'Net 30 jours': 30 };
+
+/** Preview due date (YYYY-MM-DD) for the chosen payment terms, from today. */
+function previewDue(terms: string): string {
+  const d = new Date();
+  d.setDate(d.getDate() + (TERMS_DAYS[terms] ?? 14));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 const STEPS = [
   { label: 'Informations entreprise', skippable: false },
   { label: 'Paramètres factures',     skippable: false },
@@ -732,7 +741,7 @@ export default function OnboardingPage() {
                     </div>
                     <div>
                       <div className="ob-mini-label">Conditions</div>
-                      <div className="ob-mini-val">{terms}<span className="dim"><br />Échéance 20 juin 2026</span></div>
+                      <div className="ob-mini-val">{terms}<span className="dim"><br />Échéance {fmtDateLong(previewDue(terms))}</span></div>
                     </div>
                   </div>
                   <div className="ob-paper-items">

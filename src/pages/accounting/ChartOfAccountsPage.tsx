@@ -10,6 +10,7 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { EmptyState } from '@/components/EmptyState';
 import { ChartOfAccountsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import { exerciseYear } from '@/lib/period';
 
 function SideTag({ signed }: { signed: number }) {
   if (Math.abs(signed) < 0.5) return null;
@@ -292,7 +293,7 @@ export default function ChartOfAccountsPage() {
           <div className="page-sub">SYSCOHADA · Système Normal</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn"><Icon name="download" />Importer</button>
           <button className="btn btn-primary" onClick={() => setShowNewAccount(true)}><Icon name="plus" />Nouveau compte</button>
         </div>

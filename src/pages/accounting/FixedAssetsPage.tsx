@@ -8,6 +8,7 @@ import type { FixedAsset } from '@/lib/accounting-data';
 import { fmt, fmtCompact, amortSchedule, netValueOf } from '@/lib/accounting-data';
 import { useFixedAssets } from '@/lib/accounting-hooks';
 import { FixedAssetsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import { exerciseYear } from '@/lib/period';
 
 const ASSET_METHODS = ['Linéaire', 'Dégressif'];
 const ASSET_ICONS = ['building-warehouse', 'device-laptop', 'car', 'tool', 'server', 'printer'] as const;
@@ -103,7 +104,7 @@ function AssetDrawer({ asset, onClose }: { asset: FixedAsset; onClose: () => voi
   const pct = grossValue > 0 ? (amortCumul / grossValue) * 100 : 0;
   const annualAmort = grossValue / asset.usefulLife;
   const schedule = amortSchedule(asset);
-  const currentYear = 2026;
+  const currentYear = exerciseYear();
 
   return (
     <DrawerPanel
@@ -192,7 +193,7 @@ export default function FixedAssetsPage() {
           <div className="page-sub">Registre des actifs et plan d'amortissement</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle immobilisation</button>
         </div>
       </div>

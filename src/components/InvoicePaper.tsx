@@ -1,5 +1,6 @@
 import { fmt } from '@/data';
 import { getFiscalIdLabel } from '@/lib/ohada';
+import { VAT_RATE } from '@/lib/vat';
 
 export type PaperLayout   = 'classic' | 'band' | 'minimal' | 'sidebar' | 'receipt';
 export type PaperDensity  = 'compact' | 'cozy' | 'spacious';
@@ -51,14 +52,21 @@ const MOCK_BIZ: BizInfo = {
 };
 
 const CLI   = { name: 'TechKonsult', city: 'Ouagadougou, Burkina Faso', ifu: '00067890 C', rccm: 'BF-OUA-2020-B-5678', taxRegime: 'RSI', fiscalDivision: 'DCI Ouaga III' };
-const INV   = { id: 'INV-0041', issued: '7 juin 2026', due: '21 juin 2026', subject: 'Refonte web — phase 2' };
+// Sample invoice for template previews: dated today (at render) with a 14-day term
+const longDate = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+function sampleInvoice() {
+  const issued = new Date();
+  const due = new Date(issued);
+  due.setDate(due.getDate() + 14);
+  return { id: 'INV-0041', issued: longDate(issued), due: longDate(due), subject: 'Refonte web — phase 2' };
+}
 const LINES = [
   { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens', qty: 1, price: 300_000 },
   { desc: 'Développement front-end', note: 'Build responsive, composants', qty: 8, price: 35_000 },
   { desc: 'AQ & livraison', note: 'Tests, déploiement', qty: 1, price: 80_000 },
 ];
 const SUB   = LINES.reduce((s, l) => s + l.qty * l.price, 0);
-const TAX   = Math.round(SUB * 0.18);
+const TAX   = Math.round(SUB * VAT_RATE);
 const TOTAL = SUB + TAX;
 
 function bizInitials(name: string) {
@@ -104,9 +112,9 @@ function Parties() {
       <div>
         <div className="tp-block-label">Détails</div>
         <div className="tp-meta-grid">
-          <div className="k">Émis le</div><div className="v">{INV.issued}</div>
-          <div className="k">Échéance</div><div className="v due">{INV.due}</div>
-          <div className="k">Objet</div><div className="v">{INV.subject}</div>
+          <div className="k">Émis le</div><div className="v">{sampleInvoice().issued}</div>
+          <div className="k">Échéance</div><div className="v due">{sampleInvoice().due}</div>
+          <div className="k">Objet</div><div className="v">{sampleInvoice().subject}</div>
         </div>
       </div>
     </div>
@@ -207,13 +215,13 @@ function ClassicBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
         </div>
         <div className="tp-doc">
           <div className="tp-doc-title">Facture</div>
-          <div className="tp-doc-num">#{INV.id}</div>
+          <div className="tp-doc-num">#{sampleInvoice().id}</div>
           <div className="tp-status">En attente</div>
         </div>
       </div>
       <div className="tp-strip">
-        <span>Émis le: {INV.issued}</span>
-        <span>Échéance: {INV.due}</span>
+        <span>Émis le: {sampleInvoice().issued}</span>
+        <span>Échéance: {sampleInvoice().due}</span>
         <span>Net 14 jours</span>
       </div>
       <Parties />
@@ -250,7 +258,7 @@ function BandBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
         </div>
         <div className="tp-band-right">
           <div className="tp-band-title">Facture</div>
-          <div className="tp-band-num">#{INV.id}</div>
+          <div className="tp-band-num">#{sampleInvoice().id}</div>
         </div>
       </div>
       <div className="tp-band-body">
@@ -271,7 +279,7 @@ function MinimalBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
     <>
       <div className="tp-min-top">
         <div className="tp-doc-title tp-min">FACTURE</div>
-        <div className="tp-min-num">#{INV.id}</div>
+        <div className="tp-min-num">#{sampleInvoice().id}</div>
       </div>
       <div className="tp-min-rule" />
       <div className="tp-min-head">
@@ -285,8 +293,8 @@ function MinimalBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
           <div className="tp-client-name">{CLI.name}</div>
           <div className="tp-client-meta">{CLI.city}</div>
           <div className="tp-meta-grid" style={{ marginTop: 10 }}>
-            <div className="k">Émis le</div><div className="v">{INV.issued}</div>
-            <div className="k">Échéance</div><div className="v due">{INV.due}</div>
+            <div className="k">Émis le</div><div className="v">{sampleInvoice().issued}</div>
+            <div className="k">Échéance</div><div className="v due">{sampleInvoice().due}</div>
           </div>
         </div>
       </div>
@@ -310,7 +318,7 @@ function SidebarBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
         <div className="tp-aside-sep" />
         <div className="tp-aside-label">Total dû</div>
         <div className="tp-aside-total">{fmt(TOTAL)}<span>F CFA</span></div>
-        <div className="tp-aside-due">Éch. {INV.due}</div>
+        <div className="tp-aside-due">Éch. {sampleInvoice().due}</div>
         <div className="tp-aside-sep" />
         <div className="tp-aside-label">Paiement</div>
         <div className="tp-aside-pm">Mobile Money</div>
@@ -320,7 +328,7 @@ function SidebarBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
         <div className="tp-side-head">
           <div>
             <div className="tp-doc-title" style={{ fontSize: 22 }}>Facture</div>
-            <div className="tp-doc-num">#{INV.id}</div>
+            <div className="tp-doc-num">#{sampleInvoice().id}</div>
           </div>
           <div className="tp-status">En attente</div>
         </div>
@@ -360,8 +368,8 @@ function ReceiptBody({ cfg, biz }: { cfg: PaperConfig; biz: BizInfo }) {
       </div>
       <div className="tp-rcpt-divider" />
       <div className="tp-rcpt-row">
-        <span className="tp-rcpt-doc">Facture #{INV.id}</span>
-        <span>{INV.issued}</span>
+        <span className="tp-rcpt-doc">Facture #{sampleInvoice().id}</span>
+        <span>{sampleInvoice().issued}</span>
       </div>
       <div className="tp-rcpt-row">
         <span>Client</span><span>{CLI.name}</span>

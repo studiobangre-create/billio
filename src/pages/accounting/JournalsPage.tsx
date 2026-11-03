@@ -10,6 +10,7 @@ import type { JournalEntry, Journal, Account } from '@/lib/accounting-data';
 import { fmt, fmtCompact, acctOf } from '@/lib/accounting-data';
 import { useJournalsData } from '@/lib/accounting-hooks';
 import { JournalsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
+import { exerciseYear } from '@/lib/period';
 
 function entryTotal(e: JournalEntry) {
   return e.lines.reduce((s, l) => s + l.d, 0);
@@ -321,7 +322,7 @@ export default function JournalsPage() {
           <div className="page-sub">Saisie et consultation des écritures</div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn"><Icon name="download" />Exporter</button>
           <button className="btn btn-primary" onClick={() => setShowComposer(true)}><Icon name="plus" />Nouvelle écriture</button>
         </div>

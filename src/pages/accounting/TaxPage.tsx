@@ -8,6 +8,7 @@ import { useTaxData } from '@/lib/accounting-hooks';
 import { useApp } from '@/context/AppContext';
 import { calculateTVA, calculateIS, isRegimeCaducite, isFirstFiscalYear } from '@/lib/tax-bf';
 import type { Regime } from '@/lib/tax-bf';
+import { exerciseYear, monthLabel } from '@/lib/period';
 
 // ─── Regime metadata ─────────────────────────────────────────────────────────
 
@@ -130,12 +131,15 @@ export default function TaxPage() {
 
   if (loading) return <PageSkeleton title="Fiscalité" variant="accounting" rows={6} />;
 
-  const entries  = data?.entries  ?? [];
+  const allEntries = data?.entries ?? [];
   const journals = data?.journals ?? {};
 
   const { regime, meta } = orgRegimeToMeta(orgSettings.taxRegime);
   const creationDate = orgSettings.businessCreationDate || undefined;
-  const EXERCISE_YEAR = 2026;
+  const EXERCISE_YEAR = exerciseYear();
+  // Totals cover this exercise only; earlier years' entries stay out of them
+  const entriesOf = (y: number) => allEntries.filter(e => e.date.startsWith(`${y}-`));
+  const entries   = entriesOf(EXERCISE_YEAR);
   const firstYear    = isFirstFiscalYear(creationDate, EXERCISE_YEAR);
   const { canInvoiceTVA, declarations } = meta;
 
@@ -167,13 +171,14 @@ export default function TaxPage() {
   const periodExpenses = sumPostedDebitPrefix(entries, '6');
   const taxableProfit  = periodRevenue - periodExpenses;
 
-  const isEstimate = calculateIS({
-    taxableProfit,
+  const isEstimateFor = (profit: number, y: number) => calculateIS({
+    taxableProfit: profit,
     regime:        regime === 'RNI' ? 'RNI' : 'RSI',
     creationDate,
     isAdherentCGA: false,
-    taxYear:       EXERCISE_YEAR,
+    taxYear:       y,
   });
+  const isEstimate = isEstimateFor(taxableProfit, EXERCISE_YEAR);
 
   // ── Caducité watch ────────────────────────────────────────────────────────
   const ytdCA         = periodRevenue; // rough proxy: period revenue credits
@@ -195,10 +200,10 @@ export default function TaxPage() {
   };
 
   // Per-month TVA net (collected − deductible) derived from journal entries
-  const monthlyNetTVA = Array.from({ length: 12 }, (_, i) => {
-    const prefix = `${EXERCISE_YEAR}-${String(i + 1).padStart(2, '0')}`;
-    const c = taxLines.filter(l => l.type === 'collected'  && l.date.startsWith(prefix)).reduce((s, l) => s + l.tvaAmount, 0);
-    const d = taxLines.filter(l => l.type === 'deductible' && l.date.startsWith(prefix)).reduce((s, l) => s + l.tvaAmount, 0);
+  const netTVAFor = (lines: typeof taxLines, y: number) => Array.from({ length: 12 }, (_, i) => {
+    const prefix = `${y}-${String(i + 1).padStart(2, '0')}`;
+    const c = lines.filter(l => l.type === 'collected'  && l.date.startsWith(prefix)).reduce((s, l) => s + l.tvaAmount, 0);
+    const d = lines.filter(l => l.type === 'deductible' && l.date.startsWith(prefix)).reduce((s, l) => s + l.tvaAmount, 0);
     return c - d;
   });
 
@@ -206,50 +211,65 @@ export default function TaxPage() {
   const dl = (label: string, date: string, amount: number, category: string): Deadline =>
     ({ label, date, amount, status: dlStatus(date), category });
 
-  const deadlines: Deadline[] = [
+  // Deadlines of exercise Y (some fall due early in Y + 1)
+  const deadlinesFor = (Y: number, monthlyNetTVA: number[], isEst: number): Deadline[] => [
     // ── Annual fixed (early year) ──────────────────────────────────────────
-    dl(`TVM — Taxe sur la Valeur Marginale ${EXERCISE_YEAR}`,   isoDate(EXERCISE_YEAR, 3, 31), 0, 'Annuelle'),
+    dl(`TVM — Taxe sur la Valeur Marginale ${Y}`,   isoDate(Y, 3, 31), 0, 'Annuelle'),
     ...(regime === 'CME-declaratif' ? [
-      dl(`CME — Déclaration annuelle ${EXERCISE_YEAR}`,         isoDate(EXERCISE_YEAR, 3, 31), 0, 'Annuelle'),
+      dl(`CME — Déclaration annuelle ${Y}`,         isoDate(Y, 3, 31), 0, 'Annuelle'),
     ] : []),
 
     // ── 1ᵉʳ acompte IS (25 %) — juin ──────────────────────────────────────
     ...(isMonthly || isQuarterly ? [
-      dl(`1ᵉʳ acompte provisionnel IS (25 %) — juin ${EXERCISE_YEAR}`, isoDate(EXERCISE_YEAR, 6, 15), Math.round(isEstimate * 0.25), 'Acomptes IS'),
+      dl(`1ᵉʳ acompte provisionnel IS (25 %) — juin ${Y}`, isoDate(Y, 6, 15), Math.round(isEst * 0.25), 'Acomptes IS'),
     ] : []),
 
     // ── Monthly TVA CA3 — one entry per month (RNI only) ──────────────────
     ...(canInvoiceTVA && isMonthly ? Array.from({ length: 12 }, (_, i) => {
       const ref      = i + 1;
-      const dueYear  = ref === 12 ? EXERCISE_YEAR + 1 : EXERCISE_YEAR;
+      const dueYear  = ref === 12 ? Y + 1 : Y;
       const dueMonth = ref === 12 ? 1 : ref + 1;
-      return dl(`TVA CA3 — ${MONTH_FR[i]} ${EXERCISE_YEAR}`, isoDate(dueYear, dueMonth, 15), Math.max(0, monthlyNetTVA[i]), 'Mensuelle TVA');
+      return dl(`TVA CA3 — ${MONTH_FR[i]} ${Y}`, isoDate(dueYear, dueMonth, 15), Math.max(0, monthlyNetTVA[i]), 'Mensuelle TVA');
     }) : []),
 
     // ── IUTS + TPA monthly (RNI) ───────────────────────────────────────────
     ...(isMonthly ? Array.from({ length: 12 }, (_, i) => {
       const ref      = i + 1;
-      const dueYear  = ref === 12 ? EXERCISE_YEAR + 1 : EXERCISE_YEAR;
+      const dueYear  = ref === 12 ? Y + 1 : Y;
       const dueMonth = ref === 12 ? 1 : ref + 1;
-      return dl(`IUTS + TPA — ${MONTH_FR[i]} ${EXERCISE_YEAR}`, isoDate(dueYear, dueMonth, 15), 0, 'Mensuelle');
+      return dl(`IUTS + TPA — ${MONTH_FR[i]} ${Y}`, isoDate(dueYear, dueMonth, 15), 0, 'Mensuelle');
     }) : []),
 
     // ── IUTS + TPA quarterly (RSI) ─────────────────────────────────────────
     ...(!isMonthly && isQuarterly ? [
-      dl(`IUTS + TPA — T1 ${EXERCISE_YEAR} (jan–mar)`, isoDate(EXERCISE_YEAR,      4, 15), 0, 'Trimestrielle'),
-      dl(`IUTS + TPA — T2 ${EXERCISE_YEAR} (avr–jun)`, isoDate(EXERCISE_YEAR,      7, 15), 0, 'Trimestrielle'),
-      dl(`IUTS + TPA — T3 ${EXERCISE_YEAR} (jul–sep)`, isoDate(EXERCISE_YEAR,     10, 15), 0, 'Trimestrielle'),
-      dl(`IUTS + TPA — T4 ${EXERCISE_YEAR} (oct–déc)`, isoDate(EXERCISE_YEAR + 1,  1, 15), 0, 'Trimestrielle'),
+      dl(`IUTS + TPA — T1 ${Y} (jan–mar)`, isoDate(Y,      4, 15), 0, 'Trimestrielle'),
+      dl(`IUTS + TPA — T2 ${Y} (avr–jun)`, isoDate(Y,      7, 15), 0, 'Trimestrielle'),
+      dl(`IUTS + TPA — T3 ${Y} (jul–sep)`, isoDate(Y,     10, 15), 0, 'Trimestrielle'),
+      dl(`IUTS + TPA — T4 ${Y} (oct–déc)`, isoDate(Y + 1,  1, 15), 0, 'Trimestrielle'),
     ] : []),
 
     // ── Annual fixed (later in year) ───────────────────────────────────────
-    dl(`Droit de licence des Étrangers ${EXERCISE_YEAR}`, isoDate(EXERCISE_YEAR, 10, 20), 0, 'Annuelle'),
-    dl(`Taxe sur Actions ${EXERCISE_YEAR}`,               isoDate(EXERCISE_YEAR, 10, 20), 0, 'Annuelle'),
-    dl(`Autres Droits de Licence ${EXERCISE_YEAR}`,       isoDate(EXERCISE_YEAR, 10, 30), 0, 'Annuelle'),
-    dl(`2ᵉ acompte provisionnel IS (25 %) — nov. ${EXERCISE_YEAR}`, isoDate(EXERCISE_YEAR, 11, 15), Math.round(isEstimate * 0.25), 'Acomptes IS'),
-    dl(`Patente ${EXERCISE_YEAR}`,                        isoDate(EXERCISE_YEAR, 12, 15), 0, 'Annuelle'),
-    dl(`3ᵉ acompte provisionnel IS (25 %) — déc. ${EXERCISE_YEAR}`, isoDate(EXERCISE_YEAR, 12, 15), Math.round(isEstimate * 0.25), 'Acomptes IS'),
-    dl(`IS / IBICA — Déclaration annuelle ${EXERCISE_YEAR}`, isoDate(EXERCISE_YEAR + 1, 2, 28), isEstimate, 'Annuelle IS'),
+    dl(`Droit de licence des Étrangers ${Y}`, isoDate(Y, 10, 20), 0, 'Annuelle'),
+    dl(`Taxe sur Actions ${Y}`,               isoDate(Y, 10, 20), 0, 'Annuelle'),
+    dl(`Autres Droits de Licence ${Y}`,       isoDate(Y, 10, 30), 0, 'Annuelle'),
+    dl(`2ᵉ acompte provisionnel IS (25 %) — nov. ${Y}`, isoDate(Y, 11, 15), Math.round(isEst * 0.25), 'Acomptes IS'),
+    dl(`Patente ${Y}`,                        isoDate(Y, 12, 15), 0, 'Annuelle'),
+    dl(`3ᵉ acompte provisionnel IS (25 %) — déc. ${Y}`, isoDate(Y, 12, 15), Math.round(isEst * 0.25), 'Acomptes IS'),
+    dl(`IS / IBICA — Déclaration annuelle ${Y}`, isoDate(Y + 1, 2, 28), isEst, 'Annuelle IS'),
+  ];
+
+  // Last exercise's December/T4 returns and annual IS are still due early this year
+  const prevYear     = EXERCISE_YEAR - 1;
+  const prevEntries  = entriesOf(prevYear);
+  const prevDeadlines = deadlinesFor(
+    prevYear,
+    netTVAFor(buildTaxLines(prevEntries), prevYear),
+    isEstimateFor(sumPostedCreditPrefix(prevEntries, '7') - sumPostedDebitPrefix(prevEntries, '6'), prevYear),
+  ).filter(d => d.date >= isoDate(EXERCISE_YEAR, 1, 1));
+
+  const deadlines: Deadline[] = [
+    ...prevDeadlines,
+    ...deadlinesFor(EXERCISE_YEAR, netTVAFor(taxLines, EXERCISE_YEAR), isEstimate),
   ].sort((a, b) => a.date < b.date ? -1 : 1);
 
   // ── Risk KPI ──────────────────────────────────────────────────────────────
@@ -289,12 +309,12 @@ export default function TaxPage() {
             )}
           </div>
           <div className="page-sub">
-            Obligations fiscales · Juin 2026
+            Obligations fiscales · {monthLabel()}
             {declarations && <> · Déclarations <strong>{declarations === 'monthly' ? 'mensuelles' : 'trimestrielles'}</strong></>}
           </div>
         </div>
         <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice 2026 · ouvert</span>
+          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn"><Icon name="download" />Exporter déclaration</button>
         </div>
       </div>
