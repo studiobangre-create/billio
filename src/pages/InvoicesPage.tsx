@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
@@ -33,6 +34,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
+  const { writable } = usePermissions();
   const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
 
   const navigate = useNavigate();
@@ -243,9 +245,11 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
             <div className="page-sub">Gérez et suivez vos factures</div>
           </div>
           <div className="topbar-actions">
-            <button className="btn btn-primary" onClick={openPanel}>
-              <Icon name="plus" ariaHidden /> Nouvelle facture
-            </button>
+            {writable && (
+              <button className="btn btn-primary" onClick={openPanel}>
+                <Icon name="plus" ariaHidden /> Nouvelle facture
+              </button>
+            )}
           </div>
         </div>
 
@@ -374,7 +378,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                     <span className={`status-pill s-${inv.status}`}>{STATUS_LABEL[inv.status]}</span>
                   </div>
                   <div className="row-actions">
-                    {inv.status === 'draft' && (
+                    {writable && inv.status === 'draft' && (
                       <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); navigate(`/invoices/${inv.id}`); }}>
                         <Icon name="edit" size={15} ariaHidden />
                       </button>
@@ -384,7 +388,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                         <Icon name="download" size={15} ariaHidden />
                       </button>
                     )}
-                    {(inv.status === 'overdue' || inv.status === 'pending') && (
+                    {writable && (inv.status === 'overdue' || inv.status === 'pending') && (
                       <button className="icon-btn" aria-label={inv.status === 'overdue' ? 'Envoyer une relance' : 'Envoyer au client'} onClick={e => openSend(e, inv.id)}>
                         <Icon name="send" size={15} ariaHidden />
                       </button>

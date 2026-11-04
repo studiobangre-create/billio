@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type Dispatch, type SetStateAction, type ReactNode } from 'react';
+import { toUserRole, type UserRole } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useToast } from '@/context/ToastContext';
 import type { User } from '@supabase/supabase-js';
@@ -55,7 +56,7 @@ interface AppContextValue {
   orgId:       string;
   userLabel:   string;
   userInitials:string;
-  userRole:    'admin' | 'accountant' | 'member';
+  userRole:    UserRole;
   // Onboarding
   needsOnboarding:    boolean;
   /** Reloads the org (settings, data, realtime) once onboarding has been saved. */
@@ -90,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [orgId,           setOrgId]           = useState(MOCK ? 'mock-org'  : '');
   const [userLabel,       setUserLabel]       = useState('');
   const [userInitials,    setUserInitials]    = useState('??');
-  const [userRole,        setUserRole]        = useState<'admin' | 'accountant' | 'member'>('member');
+  const [userRole,        setUserRole]        = useState<UserRole>(MOCK ? 'admin' : 'observer');
   const [needsOnboarding,         setNeedsOnboarding]         = useState(false);
   const [openingBalancesAdopted,  setOpeningBalancesAdopted]  = useState(false);
   const [plan,          setPlan]          = useState<PlanId>(MOCK ? 'solo' : 'solo');
@@ -157,11 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const resolvedOrgId = membership?.org_id ?? '';
       setOrgId(resolvedOrgId);
-      const validRoles = ['admin', 'accountant', 'member'] as const;
-      const rawRole = membership?.role as string | undefined;
-      // 'owner' is the DB role assigned by create_initial_org; treat it as 'admin' in the UI
-      const normalizedRole = rawRole === 'owner' ? 'admin' : rawRole;
-      setUserRole(validRoles.includes(normalizedRole as typeof validRoles[number]) ? normalizedRole as typeof validRoles[number] : 'member');
+      setUserRole(toUserRole(membership?.role as string | undefined));
 
       if (!resolvedOrgId) {
         setNeedsOnboarding(true);
@@ -299,7 +296,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
-        if (bootedUserRef.current === session.user.id) return;
+        if (bootedUserRef.current === session.user.id) {
+          // Same user (supabase-js re-emits SIGNED_IN on refocus): pick up a role changed meanwhile
+          void supabase.from('org_members').select('role').eq('user_id', session.user.id).limit(1).maybeSingle()
+            .then(({ data, error }) => { if (!error && data) setUserRole(toUserRole(data.role as string)); });
+          return;
+        }
         bootedUserRef.current = session.user.id;
         boot(session.user);
       }
@@ -326,6 +328,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setOrgId('');
         setUserLabel('');
         setUserInitials('??');
+        setUserRole('observer');
         setOrgSettings(EMPTY_ORG);
         setNeedsOnboarding(false);
         setInvoices([]);

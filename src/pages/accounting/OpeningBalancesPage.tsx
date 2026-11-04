@@ -236,7 +236,7 @@ function SuccessView({
       <div style={{ textAlign: 'center', padding: '14px 0 22px' }}>
         <div style={{
           width: 68, height: 68, margin: '0 auto', borderRadius: 20,
-          background: 'linear-gradient(155deg, #4FAE58, #2E7D32)',
+          background: 'linear-gradient(155deg, #4FAE58, #276C2B)',
           color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 34, boxShadow: '0 12px 28px -10px rgba(46,125,50,0.55)',
           animation: 'ob-pop .5s cubic-bezier(.18,.89,.32,1.28)',
@@ -630,7 +630,7 @@ export default function OpeningBalancesPage() {
                 <span style={{
                   fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                   background: Math.abs(ecart) < 0.5 ? '#E7F3E2' : '#FCEBEB',
-                  color:      Math.abs(ecart) < 0.5 ? '#2E7D32' : '#A32D2D',
+                  color:      Math.abs(ecart) < 0.5 ? '#276C2B' : '#A32D2D',
                 }}>
                   {Math.abs(ecart) < 0.5 ? 'Équilibrée ✓' : `Écart ${grp(ecart)}${ecart > 0 ? ' D' : ' C'}`}
                 </span>
@@ -652,9 +652,9 @@ export default function OpeningBalancesPage() {
               {!banner.ok && (
                 <button
                   onClick={autoBalance}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 'var(--border-radius-md)', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#B26A09', color: '#fff', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.12)' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 'var(--border-radius-md)', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#8A5207', color: '#fff', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.12)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#95590A'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#B26A09'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#8A5207'; }}
                 >
                   <Icon name="arrows-exchange" size={14} /> Auto-balance to 110
                 </button>

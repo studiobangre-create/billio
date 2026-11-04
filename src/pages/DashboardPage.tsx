@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { canWrite, type UserRole } from '@/lib/permissions';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { QAIllustration } from '@/components/QAIllustrations';
@@ -22,18 +23,20 @@ function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   );
 }
 
-type Role = 'admin' | 'accountant' | 'member';
+type Role = UserRole;
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: 'Admin',
   accountant: 'Comptable',
   member: 'Membre',
+  observer: 'Observateur',
 };
 
 const ROLE_NOTES: Record<Role, string> = {
   admin: 'Accès complet — gestion et supervision',
   accountant: 'Saisie comptable et déclarations fiscales',
   member: 'Facturation et suivi client',
+  observer: 'Accès en lecture seule',
 };
 
 interface QATile {
@@ -62,6 +65,12 @@ const ROLE_ACTIONS: Record<Role, QATile[]> = {
     { icon: 'file-text', label: 'Nouveau devis', sub: 'Transformer en facture', path: '/invoices?tab=quotes' },
     { icon: 'users', label: 'Mes clients', sub: 'Carnet d\'adresses', path: '/contacts' },
     { icon: 'bell', label: 'Relances', sub: 'Factures à relancer', path: '/invoices' },
+  ],
+  observer: [
+    { icon: 'file-text', label: 'Factures', sub: 'Consulter la facturation', primary: true, path: '/invoices' },
+    { icon: 'users', label: 'Clients', sub: 'Carnet d\'adresses', path: '/contacts' },
+    { icon: 'chart-bar', label: 'Rapports', sub: 'Analyse des performances', path: '/reports' },
+    { icon: 'credit-card', label: 'Paiements', sub: 'Suivi des encaissements', path: '/invoices?tab=payments' },
   ],
 };
 
@@ -95,9 +104,11 @@ export default function DashboardPage() {
           <div className="page-sub">Aperçu de {monthLabel}</div>
         </div>
         <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
-            <Icon name="plus" ariaHidden /> Nouvelle facture
-          </button>
+          {canWrite(role) && (
+            <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
+              <Icon name="plus" ariaHidden /> Nouvelle facture
+            </button>
+          )}
         </div>
       </div>
 
@@ -257,7 +268,7 @@ export default function DashboardPage() {
                 <div className="panel-title">Actions rapides</div>
               </div>
               <div className="qa-role-note">
-                <Icon name={role === 'admin' ? 'shield-check' : role === 'accountant' ? 'book' : 'user'} size={13} ariaHidden />
+                <Icon name={role === 'admin' ? 'shield-check' : role === 'accountant' ? 'book' : role === 'observer' ? 'eye' : 'user'} size={13} ariaHidden />
                 {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[actionsRole]}
               </div>
             </div>

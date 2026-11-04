@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import Icon from '@/components/Icon';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import KPIStrip from '@/components/accounting/KPIStrip';
@@ -221,6 +222,7 @@ function NewAccountModal({ classes, onSave, onClose }: { classes: Record<number,
 }
 
 export default function ChartOfAccountsPage() {
+  const { writable } = usePermissions();
   const { data, loading, addAccount } = useChartOfAccounts();
   const [activeClass, setActiveClass] = useState<string>('all');
   const [query, setQuery] = useState('');
@@ -295,16 +297,16 @@ export default function ChartOfAccountsPage() {
         <div className="topbar-actions">
           <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
           <button className="btn"><Icon name="download" />Importer</button>
-          <button className="btn btn-primary" onClick={() => setShowNewAccount(true)}><Icon name="plus" />Nouveau compte</button>
+          {writable && <button className="btn btn-primary" onClick={() => setShowNewAccount(true)}><Icon name="plus" />Nouveau compte</button>}
         </div>
       </div>
 
       <div className="content">
         <KPIStrip items={[
           { icon: 'book', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Comptes', value: accounts.length, sub: `${usedClassCount} classes utilisées` },
-          { icon: 'building-bank', iconBg: '#E7F3E2', iconColor: '#2E7D32', label: 'Trésorerie (5x)', value: fmtCompact(cash), unit: 'F CFA', sub: 'Banque + caisse' },
+          { icon: 'building-bank', iconBg: '#E7F3E2', iconColor: '#276C2B', label: 'Trésorerie (5x)', value: fmtCompact(cash), unit: 'F CFA', sub: 'Banque + caisse' },
           { icon: 'receipt', iconBg: '#E9F0FA', iconColor: 'var(--brand)', label: 'Créances (411)', value: fmtCompact(recv), unit: 'F CFA', sub: 'Clients à encaisser' },
-          { icon: 'truck-delivery', iconBg: '#FCEFE0', iconColor: '#B26A09', label: 'Dettes (401)', value: fmtCompact(pay), unit: 'F CFA', sub: 'Fournisseurs à payer' },
+          { icon: 'truck-delivery', iconBg: '#FCEFE0', iconColor: '#8A5207', label: 'Dettes (401)', value: fmtCompact(pay), unit: 'F CFA', sub: 'Fournisseurs à payer' },
         ]} />
 
         <div className="acc-toolbar">

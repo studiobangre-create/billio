@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { canWrite } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
@@ -33,7 +34,7 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading, userRole } = useApp();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -94,8 +95,8 @@ export default function QuotePage() {
 
   const quoteUrl    = window.location.href;
   const isTerminal  = ['invoiced', 'declined', 'expired'].includes(quote.status);
-  const canConvert  = !isTerminal;
-  const canEdit     = !isTerminal;
+  const canConvert  = !isTerminal && canWrite(userRole);
+  const canEdit     = !isTerminal && canWrite(userRole);
 
   const eSubtotal = eLines.reduce((s, l) => s + l.qty * l.price, 0);
   const eTax      = vatOn(eSubtotal, canInvoiceTVA);

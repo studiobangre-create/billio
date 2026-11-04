@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -23,6 +24,7 @@ function TypePill({ type }: { type: ProductType }) {
 }
 
 export default function ProductsPage() {
+  const { writable, deletable } = usePermissions();
   const { showToast, products, setProducts, orgId, loading } = useApp();
 
   if (loading) return <PageSkeleton title="Produits & Services" subtitle="Gérez votre catalogue" variant="table-only" rows={6} />;
@@ -156,9 +158,11 @@ export default function ProductsPage() {
           </div>
           <div className="topbar-actions">
             <button className="btn"><Icon name="download" ariaHidden /> Exporter</button>
-            <button className="btn btn-primary" onClick={openPanel}>
-              <Icon name="plus" ariaHidden /> Nouvel article
-            </button>
+            {writable && (
+              <button className="btn btn-primary" onClick={openPanel}>
+                <Icon name="plus" ariaHidden /> Nouvel article
+              </button>
+            )}
           </div>
         </div>
 
@@ -285,13 +289,17 @@ export default function ProductsPage() {
                     </div>
                   </div>
                   <div className="row-actions" style={{ position: 'relative' }}>
-                    <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
-                      <Icon name="edit" size={15} ariaHidden />
-                    </button>
-                    <button className="icon-btn" aria-label="Plus" onClick={e => { e.stopPropagation(); setDotsOpen(dotsOpen === p.id ? null : p.id); }}>
-                      <Icon name="dots" size={15} ariaHidden />
-                    </button>
-                    {dotsOpen === p.id && (
+                    {writable && (
+                      <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
+                        <Icon name="edit" size={15} ariaHidden />
+                      </button>
+                    )}
+                    {deletable && (
+                      <button className="icon-btn" aria-label="Plus" onClick={e => { e.stopPropagation(); setDotsOpen(dotsOpen === p.id ? null : p.id); }}>
+                        <Icon name="dots" size={15} ariaHidden />
+                      </button>
+                    )}
+                    {deletable && dotsOpen === p.id && (
                       <div className="dropdown-menu" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10 }}>
                         <button className="dropdown-item danger" onClick={() => handleDelete(p)}>
                           <Icon name="trash" size={14} ariaHidden /> Supprimer
@@ -329,9 +337,11 @@ export default function ProductsPage() {
                   </div>
                   <div className="pc-foot">
                     <div className="pc-used"><b className="tnum">{p.used}×</b> sur factures</div>
-                    <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
-                      <Icon name="edit" size={15} ariaHidden />
-                    </button>
+                    {writable && (
+                      <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
+                        <Icon name="edit" size={15} ariaHidden />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
@@ -51,6 +52,7 @@ const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
 
 /** Rendered by SalesPage, which passes the Factures | Devis | Paiements tab switcher. */
 export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
+  const { writable } = usePermissions();
   const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading } = useApp();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
@@ -182,10 +184,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
               <Icon name="download" size={16} />
               Relevé
             </button>
-            <button className="btn btn-primary" onClick={openPanel}>
-              <Icon name="plus" size={16} />
-              Enregistrer un paiement
-            </button>
+            {writable && (
+              <button className="btn btn-primary" onClick={openPanel}>
+                <Icon name="plus" size={16} />
+                Enregistrer un paiement
+              </button>
+            )}
           </div>
         </div>
 

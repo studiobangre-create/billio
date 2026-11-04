@@ -30,7 +30,7 @@ function PeriodCell({ m, status }: { m: string; status: string }) {
       <div style={{
         fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' as const,
         marginTop: 5, display: 'inline-flex', alignItems: 'center', gap: 3,
-        color: isClosed ? '#2E7D32' : isCurrent ? 'var(--brand)' : 'var(--color-text-tertiary)',
+        color: isClosed ? '#276C2B' : isCurrent ? 'var(--brand)' : 'var(--color-text-tertiary)',
       }}>
         {isClosed && <><Icon name="lock" size={10} />Clôturé</>}
         {isCurrent && <><Icon name="edit" size={10} />Ouvert</>}
@@ -44,7 +44,7 @@ function ProgressRing({ pct }: { pct: number }) {
   const R = 56;
   const C = 2 * Math.PI * R;
   const offset = C * (1 - pct / 100);
-  const color = pct === 100 ? '#2E7D32' : 'var(--brand)';
+  const color = pct === 100 ? '#276C2B' : 'var(--brand)';
   return (
     <div style={{ position: 'relative', width: 132, height: 132, margin: '8px auto 4px' }}>
       <svg width="132" height="132" viewBox="0 0 132 132">
@@ -130,7 +130,7 @@ export default function PeriodClosingPage() {
         </div>
         <div className="topbar-actions">
           <span className="period-pill">
-            <span className="dot" style={closed ? { background: '#2E7D32' } : {}} />
+            <span className="dot" style={closed ? { background: '#276C2B' } : {}} />
             {closed ? `Exercice ${exerciseYear()} · ${monthLabel().toLowerCase()} clôturé` : `Exercice ${exerciseYear()} · ouvert`}
           </span>
           <button
@@ -181,8 +181,8 @@ export default function PeriodClosingPage() {
                     onClick={() => toggleCheck(i)}
                     style={{
                       width: 24, height: 24, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: c.done ? '1.5px solid #2E7D32' : '1.5px dashed var(--color-border-secondary)',
-                      background: c.done ? '#2E7D32' : 'var(--color-background-primary)',
+                      border: c.done ? '1.5px solid #276C2B' : '1.5px dashed var(--color-border-secondary)',
+                      background: c.done ? '#276C2B' : 'var(--color-background-primary)',
                       color: c.done ? '#fff' : 'transparent', cursor: 'pointer', transition: 'all .14s', padding: 0,
                     }}
                   >
@@ -221,7 +221,7 @@ export default function PeriodClosingPage() {
                 {[
                   { label: 'Étapes complètes', value: `${doneCount} / ${checks.length}` },
                   { label: 'Écritures à poster', value: drafts ? `${drafts} brouillon` : 'Aucun' },
-                  { label: 'Balance générale', value: 'Équilibrée ✓', color: '#2E7D32' },
+                  { label: 'Balance générale', value: 'Équilibrée ✓', color: '#276C2B' },
                 ].map(({ label, value, color }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5 }}>
                     <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
@@ -245,7 +245,7 @@ export default function PeriodClosingPage() {
 
                 {!allDone && (
                   <div style={{ display: 'flex', gap: 11, padding: '13px 15px', background: '#FCF3E6', border: '0.5px solid #F0D9A8', borderRadius: 'var(--border-radius-md)', marginTop: 14 }}>
-                    <div style={{ color: '#B26A09', flexShrink: 0, marginTop: 1 }}><Icon name="alert-triangle" size={17} /></div>
+                    <div style={{ color: '#8A5207', flexShrink: 0, marginTop: 1 }}><Icon name="alert-triangle" size={17} /></div>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: '#8C5207' }}>
                         {checks.length - doneCount} étape{checks.length - doneCount > 1 ? 's' : ''} incomplète{checks.length - doneCount > 1 ? 's' : ''}
@@ -259,7 +259,7 @@ export default function PeriodClosingPage() {
 
                 {closed && (
                   <div style={{ display: 'flex', gap: 11, padding: '13px 15px', background: '#E7F3E2', border: '0.5px solid #A5D6A7', borderRadius: 'var(--border-radius-md)', marginTop: 14 }}>
-                    <div style={{ color: '#2E7D32', flexShrink: 0, marginTop: 1 }}><Icon name="circle-check" size={17} /></div>
+                    <div style={{ color: '#276C2B', flexShrink: 0, marginTop: 1 }}><Icon name="circle-check" size={17} /></div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#1B5E20' }}>
                       {monthLabel()} clôturé · écritures figées · à-nouveaux reportés
                     </div>
@@ -278,7 +278,7 @@ export default function PeriodClosingPage() {
                 <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0 9px', fontWeight: 700, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 3, fontSize: 12.5 }}>
                     <span>Résultat de l'exercice (à ce jour)</span>
-                    <span className="mono" style={{ fontWeight: 700, color: result >= 0 ? '#2E7D32' : '#A32D2D' }}>
+                    <span className="mono" style={{ fontWeight: 700, color: result >= 0 ? '#276C2B' : '#A32D2D' }}>
                       {result >= 0 ? '+' : ''}{fmt(result)} F CFA
                     </span>
                   </div>

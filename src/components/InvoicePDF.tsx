@@ -91,7 +91,7 @@ const s = StyleSheet.create({
   blockLabel: {
     fontSize: 7,
     fontFamily: 'Helvetica-Bold',
-    color: '#888',
+    color: '#666',
     letterSpacing: 0.5,
     marginBottom: 5,
     textTransform: 'uppercase',
@@ -112,7 +112,7 @@ const s = StyleSheet.create({
   },
   metaKey: {
     fontSize: 8,
-    color: '#888',
+    color: '#666',
     width: 72,
   },
   metaVal: {
@@ -232,7 +232,7 @@ const s = StyleSheet.create({
     paddingBottom: 6,
   },
   fixedHeaderBiz: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#555' },
-  fixedHeaderRef: { fontSize: 7, color: '#888' },
+  fixedHeaderRef: { fontSize: 7, color: '#666' },
   footer: {
     position: 'absolute',
     bottom: 20,
@@ -245,9 +245,9 @@ const s = StyleSheet.create({
     borderTopColor: '#e5e7eb',
     paddingTop: 6,
   },
-  footerLeft:   { fontSize: 7, color: '#aaa' },
-  footerCenter: { fontSize: 7, color: '#aaa' },
-  footerRight:  { fontSize: 7, color: '#aaa' },
+  footerLeft:   { fontSize: 7, color: '#767676' },
+  footerCenter: { fontSize: 7, color: '#767676' },
+  footerRight:  { fontSize: 7, color: '#767676' },
 });
 
 export interface InvoicePDFProps {
@@ -374,7 +374,7 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
           </View>
           {lines.length === 0 ? (
             <View style={s.tableRow}>
-              <Text style={[s.tdDesc, { color: '#aaa' }]}>Aucune ligne</Text>
+              <Text style={[s.tdDesc, { color: '#767676' }]}>Aucune ligne</Text>
             </View>
           ) : lines.map(li => (
             <View key={li.id} style={s.tableRow}>
@@ -396,7 +396,7 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
             {discountPct > 0 && (
               <View style={s.totRow}>
                 <Text style={s.totLabel}>Remise ({discountPct}%)</Text>
-                <Text style={[s.totVal, { color: '#888' }]}>{'-'}{pdfFmt(discountAmt)} F CFA</Text>
+                <Text style={[s.totVal, { color: '#666' }]}>{'-'}{pdfFmt(discountAmt)} F CFA</Text>
               </View>
             )}
             {showVat && (
@@ -410,7 +410,7 @@ export function InvoicePDFDocument({ invoice, lines, client, biz, accentColor = 
                 <Text style={s.totLabel}>
                   {'Retenue à la source ('}{RATE_LABEL[client.withholdingScenario!]}{') — Art.207/212'}
                 </Text>
-                <Text style={[s.totVal, { color: '#B26A09' }]}>{'−'}{pdfFmt(svcWithholding)} F CFA</Text>
+                <Text style={[s.totVal, { color: '#8A5207' }]}>{'−'}{pdfFmt(svcWithholding)} F CFA</Text>
               </View>
             )}
             {isPaid ? (

@@ -144,7 +144,7 @@ function IncomeStatement({ mvtOf }: Pick<Fns, 'mvtOf'>) {
         <div style={{ padding: '12px 16px', background: 'var(--color-background-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--color-text-secondary)' }}>Compte de résultat · cumul à date</div>
         {rows.map((r, i) => <SheetRowEl key={i} row={r} />)}
       </div>
-      <div style={{ padding: '20px 24px', borderRadius: 'var(--border-radius-lg)', background: isProfit ? 'linear-gradient(135deg,#2E7D32,#1B5E20)' : 'linear-gradient(135deg,#A32D2D,#7B1111)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '20px 24px', borderRadius: 'var(--border-radius-lg)', background: isProfit ? 'linear-gradient(135deg,#276C2B,#1B5E20)' : 'linear-gradient(135deg,#A32D2D,#7B1111)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: 0.8, textTransform: 'uppercase' }}>Résultat net à date</div>
           <div style={{ fontSize: 13.5, fontWeight: 500, opacity: 0.9, marginTop: 3 }}>{isProfit ? 'Bénéfice' : 'Perte'} · Exercice {exerciseYear()}</div>

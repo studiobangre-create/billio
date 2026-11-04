@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
@@ -47,6 +48,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
+  const { writable, deletable } = usePermissions();
   const { showToast, quotes, setQuotes, setInvoices, setActivity, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const [sendQuote, setSendQuote] = useState<{ id: string; kind: 'send' | 'reminder' } | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
@@ -273,10 +275,12 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
             <div className="page-sub">Estimations envoyées avant facturation</div>
           </div>
           <div className="topbar-actions">
-            <button className="btn btn-primary" onClick={openPanel}>
-              <Icon name="plus" size={16} />
-              Nouveau devis
-            </button>
+            {writable && (
+              <button className="btn btn-primary" onClick={openPanel}>
+                <Icon name="plus" size={16} />
+                Nouveau devis
+              </button>
+            )}
           </div>
         </div>
 
@@ -410,7 +414,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
 
                     {/* Actions */}
                     <div className="row-actions">
-                      {!['invoiced', 'declined', 'expired'].includes(q.status) && (
+                      {writable && !['invoiced', 'declined', 'expired'].includes(q.status) && (
                         <button
                           className="btn-convert"
                           onClick={e => convertToInvoice(q.id, e)}
@@ -419,7 +423,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                           Facturer
                         </button>
                       )}
-                      {q.status === 'sent' && (
+                      {writable && q.status === 'sent' && (
                         <button
                           className="icon-btn"
                           title="Envoyer une relance"
@@ -428,19 +432,21 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                           <Icon name="send" size={14} />
                         </button>
                       )}
-                      {q.status === 'draft' && (
+                      {writable && q.status === 'draft' && (
                         <button className="icon-btn" title="Modifier" onClick={e => { e.stopPropagation(); navigate(`/quotes/${q.id}`); }}>
                           <Icon name="edit" size={14} />
                         </button>
                       )}
-                      {!['accepted', 'sent', 'draft'].includes(q.status) && (
+                      {writable && !['accepted', 'sent', 'draft'].includes(q.status) && (
                         <button className="icon-btn" title="Dupliquer" disabled={duplicating !== null} onClick={e => duplicateQuote(q.id, e)}>
                           <Icon name="copy" size={14} />
                         </button>
                       )}
-                      <button className="icon-btn" title="Supprimer" onClick={e => handleDelete(q.id, e)}>
-                        <Icon name="trash" size={14} />
-                      </button>
+                      {deletable && (
+                        <button className="icon-btn" title="Supprimer" onClick={e => handleDelete(q.id, e)}>
+                          <Icon name="trash" size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

@@ -199,7 +199,7 @@ textarea.inv-ed { resize: none; overflow: hidden; }
 .inv { padding: 40px 44px 32px; font-size: 13px; color: var(--ink); --acc: #185FA5; --acc-l: #2E78C4; --acc-d: #0C447C; }
 .inv[data-tpl="bandeau"] { --acc: #1F7A38; --acc-l: #2E9B4D; --acc-d: #145626; }
 .inv[data-tpl="epure"]   { --acc: #16223A; --acc-l: #33425C; --acc-d: #0B1322; }
-.inv[data-tpl="moderne"] { --acc: #B26A09; --acc-l: #D38416; --acc-d: #8A5207; }
+.inv[data-tpl="moderne"] { --acc: #8A5207; --acc-l: #D38416; --acc-d: #8A5207; }
 
 /* Bandeau template */
 .inv[data-tpl="bandeau"] .inv-top { margin: -40px -44px 28px; padding: 34px 44px; background: linear-gradient(135deg, var(--acc-l), var(--acc-d)); color: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }

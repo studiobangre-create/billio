@@ -189,8 +189,8 @@ export default function TrialBalancePage() {
         <KPIStrip items={[
           { icon: 'trending-up', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Mouvement total', value: fmtCompact(totalDebitMvt), unit: 'F CFA', sub: 'Débit = Crédit' },
           { icon: 'book-2', iconBg: '#E9F0FA', iconColor: 'var(--brand)', label: 'Comptes actifs', value: activeAccounts.length, sub: `${Object.keys(byClass).length} classes` },
-          { icon: 'chart-bar', iconBg: result >= 0 ? '#E7F3E2' : '#FCEBEB', iconColor: result >= 0 ? '#2E7D32' : '#A32D2D', label: 'Résultat', value: fmtCompact(Math.abs(result)), unit: 'F CFA', sub: result >= 0 ? 'Bénéfice net' : 'Perte nette' },
-          { icon: isTied ? 'circle-check' : 'alert-triangle', iconBg: isTied ? '#E7F3E2' : '#FCEBEB', iconColor: isTied ? '#2E7D32' : '#A32D2D', label: 'Équilibre', value: isTied ? 'Vérifié' : 'Erreur', sub: isTied ? 'Actif = Passif' : 'Déséquilibre détecté' },
+          { icon: 'chart-bar', iconBg: result >= 0 ? '#E7F3E2' : '#FCEBEB', iconColor: result >= 0 ? '#276C2B' : '#A32D2D', label: 'Résultat', value: fmtCompact(Math.abs(result)), unit: 'F CFA', sub: result >= 0 ? 'Bénéfice net' : 'Perte nette' },
+          { icon: isTied ? 'circle-check' : 'alert-triangle', iconBg: isTied ? '#E7F3E2' : '#FCEBEB', iconColor: isTied ? '#276C2B' : '#A32D2D', label: 'Équilibre', value: isTied ? 'Vérifié' : 'Erreur', sub: isTied ? 'Actif = Passif' : 'Déséquilibre détecté' },
         ]} />
 
         {isTied && (

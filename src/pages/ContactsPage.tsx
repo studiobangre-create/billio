@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -66,8 +67,8 @@ function fmtDate(iso: string) {
 // ─── Aging strip ──────────────────────────────────────────────────────────────
 
 const AGING_SEGS = [
-  { key: 'cur' as const, label: 'Not due',    color: '#2E7D32' },
-  { key: 'd30' as const, label: '1–30 days',  color: '#B26A09' },
+  { key: 'cur' as const, label: 'Not due',    color: '#276C2B' },
+  { key: 'd30' as const, label: '1–30 days',  color: '#8A5207' },
   { key: 'd60' as const, label: '31–60 days', color: '#C2570B' },
   { key: 'd90' as const, label: '60+ days',   color: '#A32D2D' },
 ];
@@ -164,6 +165,7 @@ function JournalLines({ lines }: { lines: SupplierBill['acctLines'] }) {
 }
 
 function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkPaid: (id: string) => void; onClose: () => void }) {
+  const { writable } = usePermissions();
   const av = supplierAvColor(bill.supplier);
   return (
     <DrawerPanel open onClose={onClose} title={
@@ -233,7 +235,7 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
         );
       })()}
 
-      {bill.status !== 'paid' && (
+      {writable && bill.status !== 'paid' && (
         <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { onMarkPaid(bill.id); onClose(); }}>
           <Icon name="check" />Marquer comme payé · <span style={{ opacity: 0.8, fontSize: 12 }}>{PAYMENT_METHOD_LABELS[bill.paymentMethod]}</span>
         </button>
@@ -402,7 +404,7 @@ function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
     const k = ageBucket(b);
     if (k) ageTot[k] = (ageTot[k] || 0) + b.htAmount + b.tvaAmount;
   });
-  const ageCols: Record<string, string> = { cur: '#2E7D32', d30: '#B26A09', d60: '#C2570B', d90: '#A32D2D' };
+  const ageCols: Record<string, string> = { cur: '#276C2B', d30: '#8A5207', d60: '#C2570B', d90: '#A32D2D' };
   const ageTotal = Object.values(ageTot).reduce((a, v) => a + v, 0) || 1;
 
   // Relevé: every bill from this supplier, as a CSV for Excel
@@ -511,6 +513,7 @@ function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
+  const { writable, deletable } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   // Suppliers (and their bills) belong to the accounting module
   const [tab, setTab] = useState<Tab>(() =>
@@ -715,12 +718,12 @@ export default function ContactsPage() {
     { icon: 'users',        iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)',  label: 'Clients',          value: clients.length,         sub: `${activeCount} actifs · ${leadCount} prospect${leadCount !== 1 ? 's' : ''}` },
     { icon: 'user-check',   iconBg: '#EAF3DE',           iconColor: '#3B6D11',       label: 'Actifs',           value: activeCount,             sub: 'relations de facturation' },
     { icon: 'report-money', iconBg: '#ECE9FB',            iconColor: '#5B45C7',       label: 'Total facturé',    value: fmtCompact(totalBilled), unit: 'F CFA', sub: 'revenu cumulé' },
-    { icon: 'clock-pause',  iconBg: '#FAEEDA',            iconColor: '#B26A09',       label: 'Solde impayé (411)', value: fmtCompact(outstanding), unit: 'F CFA', sub: `${withBalance} client${withBalance !== 1 ? 's' : ''} avec solde` },
+    { icon: 'clock-pause',  iconBg: '#FAEEDA',            iconColor: '#8A5207',       label: 'Solde impayé (411)', value: fmtCompact(outstanding), unit: 'F CFA', sub: `${withBalance} client${withBalance !== 1 ? 's' : ''} avec solde` },
   ] : [
     { icon: 'truck-delivery', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'À payer (401)',    value: fmtCompact(totalPayable), unit: 'F CFA', sub: `${supplierBills.filter(b => b.status !== 'paid').length} factures ouvertes` },
-    { icon: 'clock',          iconBg: '#FAEEDA',            iconColor: '#B26A09',      label: 'Échéance ≤ 7 j.', value: fmtCompact(dueSoon),      unit: 'F CFA', sub: 'à planifier' },
+    { icon: 'clock',          iconBg: '#FAEEDA',            iconColor: '#8A5207',      label: 'Échéance ≤ 7 j.', value: fmtCompact(dueSoon),      unit: 'F CFA', sub: 'à planifier' },
     { icon: 'alert-triangle', iconBg: '#FCEBEB',            iconColor: '#A32D2D',      label: 'En retard',       value: fmtCompact(overdueTTC),   unit: 'F CFA', sub: `${supplierBills.filter(b => b.status === 'overdue').length} facture${supplierBills.filter(b => b.status === 'overdue').length !== 1 ? 's' : ''} échues` },
-    { icon: 'briefcase',      iconBg: '#E7F3E2',            iconColor: '#2E7D32',      label: 'Fournisseurs',    value: suppCount,                sub: 'avec activité' },
+    { icon: 'briefcase',      iconBg: '#E7F3E2',            iconColor: '#276C2B',      label: 'Fournisseurs',    value: suppCount,                sub: 'avec activité' },
   ];
 
   const tabSwitcher = !ACCOUNTING_ENABLED ? <div className="section-title">Clients</div> : (
@@ -745,10 +748,10 @@ export default function ContactsPage() {
           </div>
           <div className="topbar-actions">
             <button className="btn"><Icon name="download" size={15} />Exporter</button>
-            {tab === 'clients'
+            {writable && (tab === 'clients'
               ? <button className="btn btn-primary" onClick={() => setClientPanel({ kind: 'new' })}><Icon name="user-plus" size={15} />Nouveau client</button>
               : <button className="btn btn-primary" onClick={() => setShowBillForm(true)}><Icon name="plus" size={15} />Nouvelle facture</button>
-            }
+            )}
           </div>
         </div>
 
@@ -1046,11 +1049,11 @@ export default function ContactsPage() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-                  <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openDetailEdit(detailClient)}><Icon name="edit" size={15} /> Modifier</button>
+                  {writable && <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => openDetailEdit(detailClient)}><Icon name="edit" size={15} /> Modifier</button>}
                   <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}><Icon name="plus" size={15} /> Nouvelle facture</button>
                 </div>
               )}
-              <button className="btn" style={{ width: '100%', justifyContent: 'center', color: '#A32D2D' }} onClick={() => handleDeleteClient(detailClient)}><Icon name="trash" size={15} /> Supprimer ce client</button>
+              {deletable && <button className="btn" style={{ width: '100%', justifyContent: 'center', color: '#A32D2D' }} onClick={() => handleDeleteClient(detailClient)}><Icon name="trash" size={15} /> Supprimer ce client</button>}
             </div>
           </>
         )}

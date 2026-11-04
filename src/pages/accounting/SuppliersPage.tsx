@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePermissions } from '@/lib/use-permissions';
 import Icon from '@/components/Icon';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import KPIStrip from '@/components/accounting/KPIStrip';
@@ -37,6 +38,7 @@ function daysDue(dueDate: string): number {
 }
 
 function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkPaid: (id: string) => void; onClose: () => void }) {
+  const { writable } = usePermissions();
   const av = supplierAvColor(bill.supplier);
   const days = daysDue(bill.dueDate);
   return (
@@ -98,7 +100,7 @@ function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkP
         ))}
       </div>
 
-      {bill.status !== 'paid' && (
+      {writable && bill.status !== 'paid' && (
         <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { onMarkPaid(bill.id); onClose(); }}>
           <Icon name="check" />Marquer comme payé
         </button>
@@ -220,6 +222,7 @@ function NewBillDrawer({ onSave, onClose }: { onSave: (f: BillForm, htAmount: nu
 }
 
 export default function SuppliersPage() {
+  const { writable } = usePermissions();
   const { data: bills, loading, markPaid, createBill } = useSupplierBills();
   const [activeStatus, setActiveStatus] = useState('all');
   const [selected, setSelected] = useState<SupplierBill | null>(null);
@@ -273,14 +276,14 @@ export default function SuppliersPage() {
         </div>
         <div className="topbar-actions">
           <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle facture</button>
+          {writable && <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle facture</button>}
         </div>
       </div>
 
       <div className="content">
         <KPIStrip items={[
-          { icon: 'truck-delivery', iconBg: '#FCEFE0', iconColor: '#B26A09', label: 'Total à payer', value: fmtCompact(totalPayable), unit: 'F CFA', sub: `${supplierBills.filter(b => b.status !== 'paid').length} factures ouvertes` },
-          { icon: 'clock-pause', iconBg: '#FAEEDA', iconColor: '#B26A09', label: 'Échéances ≤ 7j', value: fmtCompact(dueSoon), unit: 'F CFA', sub: 'Règlements urgents' },
+          { icon: 'truck-delivery', iconBg: '#FCEFE0', iconColor: '#8A5207', label: 'Total à payer', value: fmtCompact(totalPayable), unit: 'F CFA', sub: `${supplierBills.filter(b => b.status !== 'paid').length} factures ouvertes` },
+          { icon: 'clock-pause', iconBg: '#FAEEDA', iconColor: '#8A5207', label: 'Échéances ≤ 7j', value: fmtCompact(dueSoon), unit: 'F CFA', sub: 'Règlements urgents' },
           { icon: 'alert-triangle', iconBg: '#FCEBEB', iconColor: '#A32D2D', label: 'En retard', value: fmtCompact(overdue), unit: 'F CFA', sub: 'Dépassement d\'échéance' },
           { icon: 'users', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Fournisseurs actifs', value: suppCount, sub: 'Fournisseurs uniques' },
         ]} />
@@ -341,7 +344,7 @@ export default function SuppliersPage() {
                   <div style={{ textAlign: 'right' }}><StatusPill status={bill.status} /></div>
                   <div style={{ textAlign: 'right' }}>
                     {bill.status === 'overdue' && <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A32D2D' }}>{Math.abs(days)} j.</span>}
-                    {bill.status === 'open' && days <= 7 && <span style={{ fontSize: 11.5, fontWeight: 700, color: '#B26A09' }}>{days} j.</span>}
+                    {bill.status === 'open' && days <= 7 && <span style={{ fontSize: 11.5, fontWeight: 700, color: '#8A5207' }}>{days} j.</span>}
                     {bill.status === 'paid' && <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11.5 }}>—</span>}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--color-text-tertiary)' }}><Icon name="chevron-right" size={16} /></div>
