@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { canWrite, canDelete } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import InvoiceClientSelect from '@/components/InvoiceClientSelect';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentDialog';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { removeInvoice, updateInvoice, createInvoice, nextInvoiceId } from '@/lib/api/invoices';
+import { removeInvoice, updateInvoice, createInvoice, newDraftId } from '@/lib/api/invoices';
+import { creditNoteRef, invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
 import { createActivity } from '@/lib/api/activities';
 import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordCreditNoteEntry, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import { settleInvoicePayment } from '@/lib/api/payments';
@@ -19,6 +21,7 @@ import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
@@ -70,7 +73,7 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
+  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
@@ -190,8 +193,8 @@ export default function InvoicePage() {
     // Opening the email app or WhatsApp doesn't mean the message went out
     const via = channel === 'email' ? 'par email' : 'par WhatsApp';
     const parts = sendKind === 'reminder'
-      ? [{ text: `Relance préparée ${via} pour ` }, { text: `#${invoice.id}`, bold: true as const }]
-      : [{ text: 'Facture ' }, { text: `#${invoice.id}`, bold: true as const }, { text: ` préparée ${via} pour ` }, { text: client.name, bold: true as const }];
+      ? [{ text: `Relance préparée ${via} pour ` }, { text: `#${invoiceRef(invoice)}`, bold: true as const }]
+      : [{ text: 'Facture ' }, { text: `#${invoiceRef(invoice)}`, bold: true as const }, { text: ` préparée ${via} pour ` }, { text: client.name, bold: true as const }];
     const entry: Activity = { kind: 'sent', parts, time: "À l'instant" };
     setActivity(prev => [entry, ...prev]);
     createActivity(orgId, { kind: 'sent', parts }).catch(err => {
@@ -214,7 +217,7 @@ export default function InvoicePage() {
       const termDays = Number.isFinite(sourceTerm) ? Math.max(0, sourceTerm) : 14;
       const issued = todayISO();
       const due = new Date(Date.parse(issued + 'T00:00:00Z') + termDays * 86_400_000).toISOString().slice(0, 10);
-      const id = await nextInvoiceId(orgId);
+      const id = newDraftId();
       const copy = { id, subject: invoice.subject, client: invoice.client, issued, due, amount: total, status: 'draft' as const, discountPct };
       await createInvoice(orgId, copy);
       try {
@@ -224,7 +227,7 @@ export default function InvoicePage() {
         throw err;
       }
       setInvoices(prev => prev.some(i => i.id === id) ? prev : [copy, ...prev]);
-      showToast(`Brouillon #${id} créé à partir de #${invoice.id}`);
+      showToast(`Brouillon #${id} créé à partir de #${invoiceRef(invoice)}`);
       navigate(`/invoices/${id}`);
     } catch (err) {
       console.error('[handleDuplicate] failed:', err);
@@ -251,18 +254,20 @@ export default function InvoicePage() {
     if (linesProblem) { showToast(`${linesProblem} Modifiez la facture avant de l'émettre.`, true); return; }
     setBusyAction('issue');
     try {
-      await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total } : i));
+      const { firstIssuedAt, number, issuedByName } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
+      // Keep the database's legal number and first issue time (the Solo limit counts it; now in demo mode)
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, number: number ?? i.number, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString(), issuedByName: issuedByName ?? i.issuedByName ?? userLabel } : i));
       try {
         await recordInvoiceIssuanceEntry(orgId, { invoiceId: invoice.id, htAmount: discountedSub, tvaAmount: tax, date: invoice.issued, clientName: client.name });
-        showToast(`Facture #${invoice.id} émise`);
+        showToast(`Facture #${number ?? invoiceRef(invoice)} émise`);
       } catch (err) {
         console.error('[recordInvoiceIssuanceEntry] failed:', err);
-        showToast(`Facture #${invoice.id} émise, mais l'écriture comptable de vente n'a pas pu être enregistrée. Signalez-le à votre comptable.`, true);
+        showToast(`Facture #${number ?? invoiceRef(invoice)} émise, mais l'écriture comptable de vente n'a pas pu être enregistrée. Signalez-le à votre comptable.`, true);
       }
       setSendKind('send');
     } catch (err) {
       console.error('[handleIssue] failed:', err);
+      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast('Impossible d\'émettre la facture. Veuillez réessayer.', true);
     } finally {
       setBusyAction(null);
@@ -283,7 +288,7 @@ export default function InvoicePage() {
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
         paymentMethods,
       });
-      downloadBlob(blob, `facture-${invoice.id.toLowerCase()}.pdf`);
+      downloadBlob(blob, `facture-${invoiceRef(invoice).toLowerCase()}.pdf`);
       posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
     } catch (err) {
       console.error('[handleDownloadPDF] failed:', err);
@@ -297,7 +302,9 @@ export default function InvoicePage() {
     } catch (err) {
       console.error('[removeInvoice] failed:', err);
       setDeleteDialog(false);
-      showToast('Erreur lors de la suppression de la facture. Veuillez réessayer.', true);
+      showToast(isIssuedLockedError(err)
+        ? 'Une facture émise ne peut pas être supprimée. Annulez-la avec un avoir.'
+        : 'Erreur lors de la suppression de la facture. Veuillez réessayer.', true);
       return;
     }
     deleteInvoiceEntries(orgId, invoice.id).catch(err => console.error('[deleteInvoiceEntries] failed:', err));
@@ -322,7 +329,7 @@ export default function InvoicePage() {
       const cn = await createCreditNote(orgId, {
         id:        avId,
         invoiceId: invoice.id,
-        subject:   `Avoir sur ${invoice.id}`,
+        subject:   `Avoir sur ${invoiceRef(invoice)}`,
         client:    invoice.client,
         issued:    today,
         amount:    avoirAmount,
@@ -344,7 +351,7 @@ export default function InvoicePage() {
         clientName:   client.name,
       }).catch(err => console.error('Credit note accounting failed:', err));
       setAvoirDialog(false);
-      showToast(`Avoir ${avId} émis`);
+      showToast(`Avoir ${creditNoteRef(cn)} émis`);
     } catch (err) {
       console.error('Create credit note failed:', err);
       showToast('Erreur lors de l\'émission de l\'avoir', true);
@@ -474,7 +481,7 @@ export default function InvoicePage() {
           </button>
           <div className="crumb-text">
             <button className="crumb-link" onClick={() => navigate('/invoices')}>Factures</button>
-            {' / '}<b>#{invoice.id}</b>
+            {' / '}<b>#{invoiceRef(invoice)}</b>
           </div>
         </div>
         <div className="topbar-actions">
@@ -525,7 +532,7 @@ export default function InvoicePage() {
               </div>
               <div className="pp-doc">
                 <div className="pp-doc-title">Facture</div>
-                <div className="pp-doc-num">#{invoice.id}</div>
+                <div className="pp-doc-num">#{invoiceRef(invoice)}</div>
                 <div className={`pp-status st-${invoice.status}`}>{STATUS_LABEL[invoice.status]}</div>
               </div>
             </div>
@@ -700,7 +707,7 @@ export default function InvoicePage() {
                 <div key={cn.id} className="tl-item">
                   <div className="tl-dot avoir" />
                   <div>
-                    <div className="tl-text">Avoir {cn.id} — {fmt(cn.amount)} F CFA</div>
+                    <div className="tl-text">Avoir {creditNoteRef(cn)} — {fmt(cn.amount)} F CFA</div>
                     <div className="tl-time">{fmtDateLong(cn.issued)} · {cn.reason}</div>
                   </div>
                 </div>
@@ -722,13 +729,13 @@ export default function InvoicePage() {
 
     {sendKind && paymentMethodsReady && (() => {
       const msg = invoiceMessage(sendKind, {
-        invoiceId: invoice.id, clientName: client.name, orgName: orgSettings.name,
+        invoiceId: invoiceRef(invoice), clientName: client.name, orgName: orgSettings.name,
         amountDue, due: invoice.due, methods: paymentMethods,
         overdueDays: daysOverdue(invoice.due),
       });
       return (
         <SendDocumentDialog
-          title={sendKind === 'reminder' ? `Relancer ${client.name}` : `Envoyer la facture #${invoice.id}`}
+          title={sendKind === 'reminder' ? `Relancer ${client.name}` : `Envoyer la facture #${invoiceRef(invoice)}`}
           recipientName={client.name}
           email={contactValue(client.email)}
           phone={contactValue(client.phone)}
@@ -880,7 +887,7 @@ export default function InvoicePage() {
         <div className="panel-slide-head">
           <div>
             <div className="panel-slide-title">Modifier la facture</div>
-            <div className="panel-slide-sub">#{invoice.id}</div>
+            <div className="panel-slide-sub">#{invoiceRef(invoice)}</div>
           </div>
           <button className="icon-btn" onClick={() => setEditOpen(false)} aria-label="Fermer">
             <Icon name="x" size={15} ariaHidden />
@@ -890,12 +897,7 @@ export default function InvoicePage() {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <select className="form-input" value={eClient} onChange={e => setEClient(e.target.value)}>
-              <option value="">Sélectionner un client…</option>
-              {Object.entries(clientsMap).map(([code, c]) => (
-                <option key={code} value={code}>{c.name}</option>
-              ))}
-            </select>
+            <InvoiceClientSelect value={eClient} onChange={setEClient} open={editOpen} disabled={saving} />
           </div>
 
           <div className="form-row">
@@ -1016,7 +1018,7 @@ export default function InvoicePage() {
       {deleteDialog && (
         <ConfirmModal
           title="Supprimer la facture"
-          body={`Supprimer la facture #${invoice.id} ? Cette action est irréversible et effacera également les écritures comptables associées.`}
+          body={`Supprimer la facture #${invoiceRef(invoice)} ? Cette action est irréversible et effacera également les écritures comptables associées.`}
           confirmLabel="Supprimer la facture"
           onConfirm={handleConfirmDelete}
           onClose={() => setDeleteDialog(false)}
@@ -1068,6 +1070,7 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+      {compliance.dialog}
     </>
   );
 }

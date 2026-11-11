@@ -31,6 +31,8 @@ export interface OrgSettings {
   rccm:                 string;
   taxRegime:            string;
   divisionFiscale:      string;
+  /** Cadastral reference of the place of sale (11 digits) */
+  cadastralRef:         string;
   /** ISO date string (YYYY-MM-DD) — used for first-year IS exemption and threshold prorating */
   businessCreationDate: string;
   paymentTerms:         string;
@@ -39,7 +41,7 @@ export interface OrgSettings {
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', businessCreationDate: '', paymentTerms: 'Net 14 jours', deliveryTerms: 'À convenir' };
+const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', cadastralRef: '', businessCreationDate: '', paymentTerms: 'Net 14 jours', deliveryTerms: 'À convenir' };
 
 interface AppContextValue {
   // Entities
@@ -76,6 +78,8 @@ interface AppContextValue {
   planRenewsAt:  string | null;
   trialEndsAt:   string | null;
   hasFeature:    (feature: Feature) => boolean;
+  /** Re-reads the plan (Billio changes it in Supabase while the app is open). */
+  refreshPlan:   () => Promise<PlanId>;
   // UI
   loading:   boolean;
   showToast: (msg: string, isError?: boolean) => void;
@@ -121,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Derived client lookup
   const clientsMap = useMemo<Record<string, Client>>(
-    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario }])),
+    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario, clientType: c.clientType }])),
     [clients],
   );
 
@@ -173,7 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         const { data: org, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, business_creation_date, payment_terms, delivery_terms, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
+          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, cadastral_ref, business_creation_date, payment_terms, delivery_terms, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
           .eq('id', resolvedOrgId)
           .single();
         if (orgErr) {
@@ -196,6 +200,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             rccm:           org.rccm            ?? '',
             taxRegime:            org.tax_regime            ?? '',
             divisionFiscale:      org.division_fiscale      ?? '',
+            cadastralRef:         org.cadastral_ref         ?? '',
             businessCreationDate: org.business_creation_date ?? '',
             paymentTerms:         org.payment_terms         ?? 'Net 14 jours',
             deliveryTerms:        org.delivery_terms        ?? 'À convenir',
@@ -371,6 +376,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const hasFeature = useCallback((feature: Feature) => checkFeature(plan, feature), [plan]);
 
+  const refreshPlan = useCallback(async (): Promise<PlanId> => {
+    if (MOCK || !orgId) return plan;
+    const { data, error } = await supabase.from('organizations').select('plan, plan_status').eq('id', orgId).single();
+    if (error || !data) return plan;
+    const validPlans: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
+    const next: PlanId = validPlans.includes(data.plan as PlanId) ? (data.plan as PlanId) : 'solo';
+    setPlan(next);
+    const validStatuses: PlanStatus[] = ['free', 'trialing', 'active', 'canceled', 'past_due'];
+    if (validStatuses.includes(data.plan_status as PlanStatus)) setPlanStatus(data.plan_status as PlanStatus);
+    return next;
+  }, [orgId, plan]);
+
   return (
     <AppContext.Provider value={{
       invoices: invoicesView, setInvoices,
@@ -387,7 +404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userLabel, userInitials, userRole,
       needsOnboarding, completeOnboarding,
       openingBalancesAdopted, setOpeningBalancesAdopted,
-      plan, planStatus, planRenewsAt, trialEndsAt, hasFeature,
+      plan, planStatus, planRenewsAt, trialEndsAt, hasFeature, refreshPlan,
       loading,
       showToast,
     }}>

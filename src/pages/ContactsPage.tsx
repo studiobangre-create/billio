@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
@@ -16,6 +17,7 @@ import FiscalDivisionSelect, { fiscalDivisionLabel } from '@/components/FiscalDi
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
 import { fmt, fmtCompact, clientInitials } from '@/data';
 import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
+import { CLIENT_TYPES, clientTypeDef, clientTypeOf, type ClientType } from '@/lib/client-type';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
 import { useSupplierBills } from '@/lib/accounting-hooks';
@@ -107,11 +109,22 @@ function AgingStrip({ bills }: { bills: SupplierBill[] }) {
 // ─── Clients sub-components ───────────────────────────────────────────────────
 
 type ClientFilterKey = 'all' | 'active' | 'lead' | 'balance';
-type MiniInv = { id: string; sub: string; amt: number; status: InvoiceStatus };
+type MiniInv = { id: string; ref: string; sub: string; amt: number; status: InvoiceStatus };
 
 const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
 const INV_STATUS_LABEL: Record<MiniInv['status'], string> = { paid: 'Payée', pending: 'En attente', overdue: 'En retard', draft: 'Brouillon' };
-const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', country: 'Burkina Faso', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
+const EMPTY_FORM: NewClientForm = { name: '', contact: '', email: '', phone: '', city: '', country: 'Burkina Faso', status: 'active', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '', clientType: 'PM' };
+/** Type select (DGI client types); the IFU is required for PM and PC. */
+function ClientTypeSelect({ value, onChange }: { value: ClientType; onChange: (t: ClientType) => void }) {
+  return (
+    <select className="form-input" value={value} onChange={e => onChange(e.target.value as ClientType)}>
+      {CLIENT_TYPES.filter(t => t.code !== 'CC').map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
+      {value === 'CC' && <option value="CC">{clientTypeDef('CC').label}</option>}
+    </select>
+  );
+}
+const ifuHint = (t: ClientType | undefined) => clientTypeDef(t ?? 'PP').ifuRequired ? '— requis' : '— optionnel';
+
 const CLIENT_FILTERS: { key: ClientFilterKey; label: string }[] = [
   { key: 'all', label: 'Tous' }, { key: 'active', label: 'Actifs' }, { key: 'lead', label: 'Prospects' }, { key: 'balance', label: 'Avec solde' },
 ];
@@ -631,12 +644,12 @@ export default function ContactsPage() {
   function closeClientPanel() { setClientPanel(null); setEditMode(false); }
   function openDetailEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, country: cl.country ?? 'Burkina Faso', status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '' });
+    setEditForm({ name: cl.name, contact: cl.contact === '—' ? '' : cl.contact, email: cl.email === '—' ? '' : cl.email, phone: cl.phone === '—' ? '' : cl.phone, city: cl.city === '—' ? '' : cl.city, country: cl.country ?? 'Burkina Faso', status: cl.status, ifu: cl.ifu ?? '', rccm: cl.rccm ?? '', taxRegime: cl.taxRegime ?? '', fiscalDivision: cl.fiscalDivision ?? '', clientType: clientTypeOf(cl) });
     setEditMode(true);
   }
   async function handleSaveEdit(cl: ClientRecord | null) {
     if (!cl) return;
-    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', country: editForm.country || 'Burkina Faso', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, fiscalDivision: editForm.fiscalDivision };
+    const patch = { name: editForm.name, contact: editForm.contact || '—', email: editForm.email || '—', phone: editForm.phone || '—', city: editForm.city || '—', country: editForm.country || 'Burkina Faso', status: editForm.status, ifu: editForm.ifu, rccm: editForm.rccm, taxRegime: editForm.taxRegime, fiscalDivision: editForm.fiscalDivision, clientType: editForm.clientType };
     const previous = clients.find(c => c.code === cl.code);
     setClients(prev => prev.map(c => c.code === cl.code ? { ...c, ...patch } : c));
     try {
@@ -695,7 +708,7 @@ export default function ContactsPage() {
     if (!form.name.trim()) return;
     if (!orgId) { showToast('Impossible de sauvegarder : organisation introuvable.', true); return; }
     const avs = ['av-a','av-b','av-c','av-d','av-e','av-f','av-g','av-h'];
-    const payload = { av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', country: form.country || 'Burkina Faso', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, status: form.status };
+    const payload = { av: avs[clients.length % avs.length], name: form.name, contact: form.contact || '—', email: form.email || '—', phone: form.phone || '—', city: form.city || '—', country: form.country || 'Burkina Faso', ifu: form.ifu, rccm: form.rccm, taxRegime: form.taxRegime, fiscalDivision: form.fiscalDivision, clientType: form.clientType, status: form.status };
     try {
       // The code comes from the server sequence, so the client is added once it exists
       const created = await createClient(orgId, payload);
@@ -1006,7 +1019,11 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
-                      <label className="form-label">{getFiscalIdLabel(editForm.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— requis pour un client professionnel</span></label>
+                      <label className="form-label">Type de client</label>
+                      <ClientTypeSelect value={editForm.clientType ?? 'PP'} onChange={t => setEditForm(f => ({ ...f, clientType: t }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label className="form-label">{getFiscalIdLabel(editForm.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>{ifuHint(editForm.clientType)}</span></label>
                       <input className="form-input" type="text" placeholder="00012345 B" value={editForm.ifu} onChange={e => setEditForm(f => ({ ...f, ifu: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
@@ -1030,9 +1047,10 @@ export default function ContactsPage() {
                   </>
                 )}
               </div>
-              {(detailClient.ifu || detailClient.rccm || detailClient.taxRegime || detailClient.fiscalDivision) && (
+              {!editMode && (
                 <div className="detail-block">
                   <div className="detail-block-title">Identifiants fiscaux</div>
+                  <div className="contact-line"><Icon name="users" size={16} /><span>Type&nbsp;<strong>{clientTypeDef(clientTypeOf(detailClient)).label}</strong></span></div>
                   {detailClient.ifu && <div className="contact-line"><Icon name="file-text" size={16} /><span>{getFiscalIdLabel(detailClient.country)}&nbsp;<strong>{detailClient.ifu}</strong></span></div>}
                   {detailClient.rccm && <div className="contact-line"><Icon name="building" size={16} /><span>RCCM&nbsp;<strong>{detailClient.rccm}</strong></span></div>}
                   {detailClient.taxRegime && <div className="contact-line"><Icon name="tag" size={16} /><span>Régime&nbsp;<strong>{detailClient.taxRegime}</strong></span></div>}
@@ -1042,12 +1060,12 @@ export default function ContactsPage() {
               <div className="detail-block">
                 <div className="detail-block-title">Factures récentes</div>
                 {(() => {
-                  const recentInvs: MiniInv[] = invoices.filter(i => i.client === detailClient.code).slice(0, 5).map(i => ({ id: i.id, sub: i.subject, amt: i.amount, status: i.status }));
+                  const recentInvs: MiniInv[] = invoices.filter(i => i.client === detailClient.code).slice(0, 5).map(i => ({ id: i.id, ref: invoiceRef(i), sub: i.subject, amt: i.amount, status: i.status }));
                   return recentInvs.length === 0 ? (
                     <EmptyInline message="Aucune facture pour ce client." />
                   ) : recentInvs.map(inv => (
                     <div key={inv.id} className="mini-inv">
-                      <div><div className="mini-id">#{inv.id}</div><div className="mini-sub">{inv.sub}</div></div>
+                      <div><div className="mini-id">#{inv.ref}</div><div className="mini-sub">{inv.sub}</div></div>
                       <div className="mini-amt">{fmt(inv.amt)} F CFA</div>
                       <span className={`mini-status st-${inv.status}`}>{INV_STATUS_LABEL[inv.status]}</span>
                     </div>
@@ -1119,9 +1137,13 @@ export default function ContactsPage() {
               <option value="lead">Prospect</option>
             </select>
           </div>
+          <div className="form-group">
+            <label className="form-label">Type de client</label>
+            <ClientTypeSelect value={form.clientType ?? 'PM'} onChange={t => setForm(f => ({ ...f, clientType: t }))} />
+          </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">{getFiscalIdLabel(form.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— requis pour un client professionnel</span></label>
+              <label className="form-label">{getFiscalIdLabel(form.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>{ifuHint(form.clientType)}</span></label>
               <input className="form-input" placeholder={form.country === 'Sénégal' ? '0123456789123' : form.country === 'Cameroun' ? 'M012345678901R' : '00012345 B'} value={form.ifu} onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
             </div>
             <div className="form-group">

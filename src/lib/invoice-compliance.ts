@@ -7,6 +7,8 @@
 // issue anyway; it doesn't block.
 
 import { getFiscalIdLabel } from '@/lib/ohada';
+import { clientTypeDef, clientTypeOf } from '@/lib/client-type';
+import { cadastralRequired, parseCadastralRef } from '@/lib/cadastral';
 import type { PaymentSettings } from '@/lib/api/payment-settings';
 
 export type ComplianceFix = 'business' | 'payments' | 'client';
@@ -22,11 +24,15 @@ export interface ComplianceIssue {
 export interface SellerInfo {
   name: string; address: string; city: string; country: string;
   ifu: string; rccm: string; taxRegime: string; divisionFiscale: string;
+  /** Cadastral reference of the place of sale, 11 digits (DGI spec v2.0, 3 c) */
+  cadastralRef?: string;
 }
 
 export interface ClientInfo {
   name: string; city?: string; country?: string; ifu?: string;
   withholdingScenario?: string;
+  /** DGI client type (CC / PM / PP / PC); inferred from the IFU when missing */
+  clientType?: string;
 }
 
 const blank = (v: string | undefined) => !v || !v.trim() || v.trim() === '—';
@@ -44,6 +50,7 @@ export function sellerIssues(org: SellerInfo, payments: PaymentSettings | null):
   add(blank(org.rccm), 'seller-rccm', 'RCCM');
   add(blank(org.taxRegime), 'seller-regime', "Régime d'imposition");
   add(blank(org.divisionFiscale), 'seller-division', 'Service des impôts de rattachement');
+  add(cadastralRequired(org.country) && !parseCadastralRef(org.cadastralRef ?? ''), 'seller-cadastre', 'Référence cadastrale du lieu de vente (section, îlot, parcelle)');
   // null: the payment settings couldn't be loaded, so don't claim they're missing
   if (payments) {
     add(!payments.methodBankEnabled || blank(payments.methodBankIban), 'seller-bank', 'Coordonnées bancaires (RIB / IBAN)', 'payments');
@@ -51,15 +58,21 @@ export function sellerIssues(org: SellerInfo, payments: PaymentSettings | null):
   return issues;
 }
 
-/** Client mentions missing from the client's record. */
+/**
+ * Client mentions missing from the client's record (DGI spec v2.0, section 3 e
+ * and annexe "Types du client"): the name always, the IFU for companies (PM)
+ * and individual traders (PC). The address is only printed when the client
+ * asks for it, so it isn't required.
+ */
 export function clientIssues(client: ClientInfo | undefined): ComplianceIssue[] {
   if (!client) return [];
   const issues: ComplianceIssue[] = [];
-  if (blank(client.city)) issues.push({ key: 'client-address', label: 'Adresse du client', fix: 'client' });
+  if (blank(client.name)) issues.push({ key: 'client-name', label: 'Nom du client', fix: 'client' });
+  const type = clientTypeOf(client);
   // A client declared without an IFU (withholding at 25 %) or abroad has none
   const expectsNoIfu = client.withholdingScenario === 'resident-without-ifu' || client.withholdingScenario === 'non-resident';
-  if (blank(client.ifu) && !expectsNoIfu) {
-    issues.push({ key: 'client-ifu', label: `${getFiscalIdLabel(client.country)} du client (nécessaire pour qu'un client professionnel déduise la TVA)`, fix: 'client' });
+  if (clientTypeDef(type).ifuRequired && blank(client.ifu) && !expectsNoIfu) {
+    issues.push({ key: 'client-ifu', label: `${getFiscalIdLabel(client.country)} du client (obligatoire pour un client ${type === 'PM' ? 'personne morale' : 'commerçant'})`, fix: 'client' });
   }
   return issues;
 }

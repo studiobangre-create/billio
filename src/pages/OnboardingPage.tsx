@@ -6,10 +6,12 @@ import { useApp } from '@/context/AppContext';
 import { nextClientCode, updateClient } from '@/lib/api/clients';
 import { fetchPaymentSettings, upsertPaymentSettings } from '@/lib/api/payment-settings';
 import { clientIssues, sellerIssues } from '@/lib/invoice-compliance';
+import { CLIENT_TYPES, clientTypeDef, clientTypeOf, type ClientType } from '@/lib/client-type';
 import { snoozeCompliance } from '@/lib/use-compliance-guard';
 import { usePermissions } from '@/lib/use-permissions';
 import FiscalDivisionSelect from '@/components/FiscalDivisionSelect';
 import { safeReturn } from '@/lib/safe-return';
+import { cadastralRequired, formatCadastralRef, parseCadastralRef } from '@/lib/cadastral';
 import './OnboardingPage.css';
 import { fmtDateLong } from '@/data';
 
@@ -17,7 +19,7 @@ const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 /* ── types ── */
 interface TeamInvite { id: string; email: string; role: string }
-interface ClientDraft { name: string; email: string; av: string }
+interface ClientDraft { name: string; email: string; av: string; type: ClientType }
 
 const AV = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e', 'av-f'] as const;
 const TERMS_OPTIONS = ['À réception', 'Net 7 jours', 'Net 14 jours', 'Net 30 jours'];
@@ -169,11 +171,14 @@ export default function OnboardingPage() {
   const [currency, setCurrency] = useState('F CFA');
   const [taxRegime, setTaxRegime] = useState('');
   const [divisionFiscale, setDivisionFiscale] = useState('');
+  const [cadastralRef, setCadastralRef] = useState('');
   const [iban,     setIban]     = useState('');
   /* ── completion mode: the client being invoiced ── */
+  const [cliName,  setCliName]  = useState('');
   const [cliCity,  setCliCity]  = useState('');
   const [cliIfu,   setCliIfu]   = useState('');
   const [cliRccm,  setCliRccm]  = useState('');
+  const [cliType,  setCliType]  = useState<ClientType>('PP');
   const [fieldErr, setFieldErr] = useState<Set<string>>(new Set());
   const [logoType, setLogoType] = useState<'none' | 'mono' | 'img'>('none');
   const [logoUrl,  setLogoUrl]  = useState<string | null>(null);
@@ -195,6 +200,7 @@ export default function OnboardingPage() {
 
   /* ── step 4: clients ── */
   const [clientName,    setClientName]    = useState('');
+  const [clientType,    setClientType]    = useState<ClientType>('PM');
   const [clientEmail,   setClientEmail]   = useState('');
   const [clients,       setClients]       = useState<ClientDraft[]>([]);
   const [clientNameErr, setClientNameErr] = useState(false);
@@ -224,6 +230,8 @@ export default function OnboardingPage() {
 
   function validateCurrentStep() {
     if (cur === 'business' && !bizName.trim()) { setBizNameErr(true); return false; }
+    // A reference typed in must be complete (11 digits)
+    if (cur === 'business' && cadastralRef.trim() && !parseCadastralRef(cadastralRef)) { setFieldErr(new Set(['cadastre'])); return false; }
     if (cur === 'invoicing' && !nextNum.trim())  { setNextNumErr(true); return false; }
     if (complete) {
       // The mentions that were missing must now be filled in
@@ -235,9 +243,15 @@ export default function OnboardingPage() {
         if (missing.has('seller-address') && empty(address) && empty(city)) errs.add('city');
         if (missing.has('seller-regime') && empty(taxRegime)) errs.add('regime');
         if (missing.has('seller-division') && empty(divisionFiscale)) errs.add('division');
+        if (missing.has('seller-cadastre') && cadastralRequired(country) && !parseCadastralRef(cadastralRef)) errs.add('cadastre');
       }
       if (cur === 'bank' && empty(iban)) errs.add('iban');
-      if (cur === 'client' && missing.has('client-address') && empty(cliCity)) errs.add('cliCity');
+      if (cur === 'client') {
+        // Re-check with the type chosen here: PM and PC need their IFU, PP and CC don't
+        const left = clientIssues({ ...targetClient, name: cliName, ifu: cliIfu, clientType: cliType });
+        if (left.some(i => i.key === 'client-name')) errs.add('cliName');
+        if (left.some(i => i.key === 'client-ifu')) errs.add('cliIfu');
+      }
       setFieldErr(errs);
       if (errs.size > 0) return false;
     }
@@ -259,9 +273,10 @@ export default function OnboardingPage() {
               name: orgSettings.name, ifu: orgSettings.ifu, rccm: orgSettings.rccm, address: orgSettings.address,
               city: orgSettings.city, country: orgSettings.country, currency: 'F CFA',
               tax_regime: orgSettings.taxRegime, division_fiscale: orgSettings.divisionFiscale,
+              cadastral_ref: orgSettings.cadastralRef,
             } })
           : supabase.from('organizations')
-              .select('name, ifu, rccm, address, city, country, currency, tax_regime, division_fiscale')
+              .select('name, ifu, rccm, address, city, country, currency, tax_regime, division_fiscale, cadastral_ref')
               .eq('id', orgId).single(),
         fetchPaymentSettings(orgId).catch(() => null),
       ]);
@@ -275,14 +290,18 @@ export default function OnboardingPage() {
       setBizName(org.name ?? ''); setTaxId(org.ifu ?? ''); setRccm(org.rccm ?? '');
       setAddress(org.address ?? ''); setCity(org.city ?? ''); setCountry(org.country || 'Burkina Faso');
       setCurrency(org.currency || 'F CFA'); setTaxRegime(org.tax_regime ?? ''); setDivisionFiscale(org.division_fiscale ?? '');
+      setCadastralRef(formatCadastralRef(org.cadastral_ref));
       setIban(payments?.methodBankIban ?? '');
       if (targetClient) {
+        setCliName(targetClient.name);
         setCliCity(targetClient.city === '—' ? '' : targetClient.city);
         setCliIfu(targetClient.ifu ?? ''); setCliRccm(targetClient.rccm ?? '');
+        setCliType(clientTypeOf(targetClient));
       }
       const seller = sellerIssues({
         name: org.name ?? '', address: org.address ?? '', city: org.city ?? '', country: org.country ?? '',
         ifu: org.ifu ?? '', rccm: org.rccm ?? '', taxRegime: org.tax_regime ?? '', divisionFiscale: org.division_fiscale ?? '',
+        cadastralRef: org.cadastral_ref ?? '',
       }, payments);
       const forClient = clientIssues(targetClient);
       const keys = new Set([...seller, ...forClient].map(i => i.key));
@@ -302,21 +321,37 @@ export default function OnboardingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complete, orgId, targetClientCode, targetClient, orgClients.length, completeLoaded]);
 
+  /**
+   * A cadastral reference typed in must be complete before anything is saved:
+   * the progress bar can skip the business step's own check. Sends the user
+   * back to that step if not.
+   */
+  function cadastralBlocksSave(): boolean {
+    if (!cadastralRef.trim() || parseCadastralRef(cadastralRef)) return false;
+    const i = steps.indexOf('business');
+    if (i >= 0) goTo(i);
+    setFieldErr(new Set(['cadastre']));
+    showToast('Référence cadastrale : 11 chiffres (section, îlot, parcelle), ex. 0123 456 7890.', true);
+    return true;
+  }
+
   async function handleCompleteSave() {
     if (saving || !validateCurrentStep()) return;
+    if (steps.includes('business') && cadastralBlocksSave()) return;
     setSaving(true);
     try {
       if (steps.includes('business')) {
         const patch = {
           name: bizName.trim(), ifu: taxId.trim(), rccm: rccm.trim(), address: address.trim(), city: city.trim(),
           country, tax_regime: taxRegime, division_fiscale: divisionFiscale,
+          cadastral_ref: parseCadastralRef(cadastralRef),
         };
         if (!MOCK) {
           const { error } = await supabase.from('organizations').update(patch).eq('id', orgId);
           if (error) throw error;
         }
         setOrgSettings(prev => ({ ...prev, name: patch.name, ifu: patch.ifu, rccm: patch.rccm, address: patch.address,
-          city: patch.city, country, taxRegime, divisionFiscale }));
+          city: patch.city, country, taxRegime, divisionFiscale, cadastralRef: patch.cadastral_ref ?? '' }));
       }
       if (steps.includes('bank') && !MOCK) {
         await upsertPaymentSettings(orgId, { methodBankEnabled: true, methodBankIban: iban.trim() });
@@ -324,7 +359,7 @@ export default function OnboardingPage() {
       // Demo payment settings aren't stored: don't send the user back here this session
       if (MOCK) snoozeCompliance();
       if (steps.includes('client') && targetClient) {
-        const patch = { city: cliCity.trim() || '—', ifu: cliIfu.trim(), rccm: cliRccm.trim() };
+        const patch = { name: cliName.trim(), city: cliCity.trim() || '—', ifu: cliIfu.trim(), rccm: cliRccm.trim(), clientType: cliType };
         await updateClient(orgId, targetClient.code, patch);
         setOrgClients(prev => prev.map(c => c.code === targetClient.code ? { ...c, ...patch } : c));
       }
@@ -384,7 +419,7 @@ export default function OnboardingPage() {
   /* ── clients ── */
   function addClient() {
     if (!clientName.trim()) { setClientNameErr(true); return; }
-    setClients(prev => [...prev, { name: clientName.trim(), email: clientEmail.trim(), av: AV[prev.length % AV.length] }]);
+    setClients(prev => [...prev, { name: clientName.trim(), email: clientEmail.trim(), av: AV[prev.length % AV.length], type: clientType }]);
     setClientName(''); setClientEmail('');
     setClientNameErr(false);
   }
@@ -397,15 +432,15 @@ export default function OnboardingPage() {
     if (clients.some(c => c.name === 'Sahel Banque')) return;
     setClients(prev => [
       ...prev,
-      { name: 'Sahel Banque',    email: 'finance@sahel.bf',        av: AV[prev.length     % AV.length] },
-      { name: 'Faso Textiles',   email: 'compta@fasotextiles.bf',  av: AV[(prev.length+1) % AV.length] },
-      { name: 'Ouaga Catering',  email: '',                         av: AV[(prev.length+2) % AV.length] },
+      { name: 'Sahel Banque',    email: 'finance@sahel.bf',        av: AV[prev.length     % AV.length], type: 'PM' },
+      { name: 'Faso Textiles',   email: 'compta@fasotextiles.bf',  av: AV[(prev.length+1) % AV.length], type: 'PM' },
+      { name: 'Ouaga Catering',  email: '',                         av: AV[(prev.length+2) % AV.length], type: 'PM' },
     ]);
   }
 
   /* ── finish: save to Supabase ── */
   async function handleFinish() {
-    if (saving) return;
+    if (saving || cadastralBlocksSave()) return;
     setSaving(true);
     const orgName = bizName.trim() || 'Mon entreprise';
     try {
@@ -427,6 +462,7 @@ export default function OnboardingPage() {
           rccm:                  rccm.trim(),
           tax_regime:            taxRegime,
           division_fiscale:      divisionFiscale,
+          cadastral_ref:         parseCadastralRef(cadastralRef),
           address:               address.trim(),
           city:                  city.trim(),
           country,
@@ -494,6 +530,7 @@ export default function OnboardingPage() {
             phone:      '—',
             city:       '—',
             ifu:        '',
+            client_type: c.type,
             status:     'active',
           }))
         );
@@ -648,6 +685,13 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-cadastre">Référence cadastrale du lieu de vente{!cadastralRequired(country) && <span className="opt"> · facultatif</span>}</label>
+                    <input id="ob-cadastre" className={`ob-input${errCls('cadastre')}`} type="text" inputMode="numeric" value={cadastralRef}
+                      placeholder="Section, îlot, parcelle : 0123 456 7890" onChange={e => setCadastralRef(e.target.value)} />
+                    {fieldErr.has('cadastre') && <div className="ob-field-hint" role="alert">11 chiffres : section (4), îlot (3), parcelle (4).</div>}
+                  </div>
+
+                  <div className="ob-field">
                     <label className="ob-field-label">Adresse</label>
                     <input className="ob-input" type="text" value={address} placeholder="Rue, bâtiment" onChange={e => setAddress(e.target.value)} />
                   </div>
@@ -768,17 +812,27 @@ export default function OnboardingPage() {
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="users" /></span> Client
                 </div>
-                <h2 className="ob-step-title">Complétez la fiche de {targetClient?.name ?? 'votre client'}</h2>
-                <p className="ob-step-sub">Un client professionnel a besoin que son IFU figure sur la facture pour déduire la TVA. Laissez-le vide pour un particulier.</p>
+                <h2 className="ob-step-title">Complétez la fiche de {targetClient?.name.trim() || 'votre client'}</h2>
+                <p className="ob-step-sub">La facture indique le type du client. L'IFU est obligatoire pour une entreprise ou un commerçant, facultatif pour un particulier.</p>
                 <div className="ob-step-form">
                   <div className="ob-field">
-                    <label className="ob-field-label" htmlFor="ob-cli-city">Adresse ou ville</label>
-                    <input id="ob-cli-city" className={`ob-input${errCls('cliCity')}`} type="text" value={cliCity} placeholder="ex. Ouagadougou" onChange={e => setCliCity(e.target.value)} />
+                    <label className="ob-field-label" htmlFor="ob-cli-name">Nom ou raison sociale</label>
+                    <input id="ob-cli-name" className={`ob-input${errCls('cliName')}`} type="text" value={cliName} onChange={e => setCliName(e.target.value)} />
+                  </div>
+                  <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-cli-type">Type de client</label>
+                    <select id="ob-cli-type" className="ob-input" value={cliType} onChange={e => setCliType(e.target.value as ClientType)}>
+                      {CLIENT_TYPES.filter(t => t.code !== 'CC' || cliType === 'CC').map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-cli-city">Adresse ou ville <span className="opt">· facultatif</span></label>
+                    <input id="ob-cli-city" className="ob-input" type="text" value={cliCity} placeholder="ex. Ouagadougou" onChange={e => setCliCity(e.target.value)} />
                   </div>
                   <div className="ob-row">
                     <div className="ob-field">
-                      <label className="ob-field-label" htmlFor="ob-cli-ifu">IFU du client</label>
-                      <input id="ob-cli-ifu" className="ob-input" type="text" value={cliIfu} placeholder="00067890 C" onChange={e => setCliIfu(e.target.value)} />
+                      <label className="ob-field-label" htmlFor="ob-cli-ifu">IFU du client {!clientTypeDef(cliType).ifuRequired && <span className="opt">· facultatif</span>}</label>
+                      <input id="ob-cli-ifu" className={`ob-input${errCls('cliIfu')}`} type="text" value={cliIfu} placeholder="00067890 C" onChange={e => setCliIfu(e.target.value)} />
                     </div>
                     <div className="ob-field">
                       <label className="ob-field-label" htmlFor="ob-cli-rccm">RCCM du client <span className="opt">· facultatif</span></label>
@@ -885,6 +939,12 @@ export default function OnboardingPage() {
                       />
                     </div>
                   </div>
+                  <div className="ob-field" style={{ marginBottom: 10 }}>
+                    <label className="ob-field-label" htmlFor="ob-new-cli-type">Type de client</label>
+                    <select id="ob-new-cli-type" className="ob-input" value={clientType} onChange={e => setClientType(e.target.value as ClientType)}>
+                      {CLIENT_TYPES.filter(t => t.code !== 'CC').map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
+                    </select>
+                  </div>
                   <button className="ob-btn-sm" type="button" onClick={addClient}>
                     <Ico name="plus" /> Ajouter le client
                   </button>
@@ -907,7 +967,7 @@ export default function OnboardingPage() {
                           <div className={`ob-entry-av ${c.av}`}>{initials(c.name)}</div>
                           <div className="ob-entry-main">
                             <div className="ob-entry-name">{c.name}</div>
-                            <div className="ob-entry-sub">{c.email || 'Pas d\'e-mail'}</div>
+                            <div className="ob-entry-sub">{clientTypeDef(c.type).label} · {c.email || 'Pas d\'e-mail'}</div>
                           </div>
                           <button className="ob-entry-del" onClick={() => removeClient(i)}>
                             <Ico name="trash" />

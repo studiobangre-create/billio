@@ -1,6 +1,10 @@
+import { invoiceRef } from '@/lib/invoice-number';
+import { invoiceTotalMention } from '@/lib/amount-in-words';
+import { formatCadastralRef } from '@/lib/cadastral';
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '@/lib/tax-bf';
+import { clientTypeDef, clientTypeOf } from '@/lib/client-type';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
 import type { BizInfo, PaperConfig } from '@/components/InvoicePaper';
@@ -36,6 +40,8 @@ type ClientInfo = {
   taxRegime?: string;
   fiscalDivision?: string;
   withholdingScenario?: string;
+  /** DGI client type (CC / PM / PP / PC), printed under the name */
+  clientType?: string;
 };
 
 export interface InvoicePDFProps {
@@ -46,6 +52,8 @@ export interface InvoicePDFProps {
   /** The organisation's invoice template (Modèles); the standard one when omitted. */
   template?: PaperConfig;
   title?: string;
+  /** Which wording the total in words uses; from the title when omitted */
+  documentKind?: 'facture' | 'devis';
   clientLabel?: string;
   paymentTerms?: string;
   deliveryTerms?: string;
@@ -183,6 +191,7 @@ function makeStyles(t: PaperConfig) {
       payCol: isReceipt ? {} : { flex: 1 },
       payMethod: { fontSize: 8, color: '#444', marginBottom: 2 },
       notesText: { fontSize: 8, color: '#666', lineHeight: 1.5 },
+      totalWords: { fontSize: 8, color: '#444', marginTop: -sp(10), marginBottom: sp(14), textAlign: isReceipt ? 'left' : 'right' },
       certBox: {
         flexDirection: 'row', alignItems: 'center', gap: 12, padding: 8, marginBottom: sp(16),
         borderWidth: 1, borderColor: '#1C2733', borderRadius: 4,
@@ -226,11 +235,12 @@ function PdfQr({ text, size }: { text: string; size: number }) {
 const pdfFmtDateTime = (iso: string): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // Burkina Faso time (UTC, no daylight saving), whatever the device's zone
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Ouagadougou' });
 };
 
 export function InvoicePDFDocument({
-  invoice, lines, client, biz, template, title = 'Facture', clientLabel = 'Facturé à',
+  invoice, lines, client, biz, template, title = 'Facture', documentKind, clientLabel = 'Facturé à',
   paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification,
 }: InvoicePDFProps) {
   registerPdfFonts();
@@ -265,6 +275,7 @@ export function InvoicePDFDocument({
     biz.rccm && `RCCM ${biz.rccm}`,
     biz.taxRegime,
     biz.divisionFiscale,
+    biz.cadastralRef && `Réf. cadastrale ${formatCadastralRef(biz.cadastralRef)}`,
   ].filter(Boolean).join(' · ');
 
   const clientCompliance = [
@@ -288,6 +299,7 @@ export function InvoicePDFDocument({
     <>
       <Text style={s.blockLabel}>{clientLabel}</Text>
       <Text style={s.clientName}>{client.name}</Text>
+      <Text style={s.smallText}>{clientTypeDef(clientTypeOf(client)).mention}</Text>
       {client.city    ? <Text style={s.smallText}>{client.city}</Text> : null}
       {client.contact ? <Text style={[s.smallText, { marginTop: 2 }]}>Contact : {client.contact}</Text> : null}
       {client.phone   ? <Text style={s.smallText}>Tél : {client.phone}</Text> : null}
@@ -301,6 +313,9 @@ export function InvoicePDFDocument({
       <Text style={s.blockLabel}>Détails</Text>
       {([
         ['Émis le', pdfFmtDate(invoice.issued)],
+        // DGI mentions w and y: when the invoice was issued, and by whom
+        ...(invoice.firstIssuedAt ? [['Émission', pdfFmtDateTime(invoice.firstIssuedAt)] as const] : []),
+        ...(invoice.issuedByName ? [['Émise par', invoice.issuedByName] as const] : []),
         ['Échéance', pdfFmtDate(invoice.due)],
         ['Paiement', paymentTerms],
         ['Livraison', deliveryTerms],
@@ -411,6 +426,11 @@ export function InvoicePDFDocument({
     </View>
   );
 
+  // DGI mention t: the total in words, in every layout
+  const totalInWords = (
+    <Text style={s.totalWords}>{invoiceTotalMention(total, documentKind ?? (title === 'Devis' ? 'devis' : 'facture'))}</Text>
+  );
+
   const payment = (
     <View style={s.paySection} wrap={false}>
       <View style={s.payCol}>
@@ -462,7 +482,7 @@ export function InvoicePDFDocument({
             </View>
             <View>
               <Text style={s.bandTitle}>{title}</Text>
-              <Text style={s.bandNum}>#{invoice.id}</Text>
+              <Text style={s.bandNum}>#{invoiceRef(invoice)}</Text>
             </View>
           </View>
           {parties}
@@ -474,7 +494,7 @@ export function InvoicePDFDocument({
         <>
           <View style={s.minTop}>
             <Text style={s.minTitle}>{title}</Text>
-            <Text style={s.minNum}>#{invoice.id}</Text>
+            <Text style={s.minNum}>#{invoiceRef(invoice)}</Text>
           </View>
           <View style={s.minRule} />
           <View style={s.parties}>
@@ -493,7 +513,7 @@ export function InvoicePDFDocument({
         <>
           <View style={[s.header, { alignItems: 'flex-end' }]}>
             <Text style={[s.docTitle, { textAlign: 'left' }]}>{title}</Text>
-            <Text style={s.docNum}>#{invoice.id}</Text>
+            <Text style={s.docNum}>#{invoiceRef(invoice)}</Text>
           </View>
           {parties}
         </>
@@ -508,7 +528,7 @@ export function InvoicePDFDocument({
           </View>
           <View style={s.rcptRule} />
           <View style={s.rcptRow}>
-            <Text style={{ fontSize: 9, fontWeight: 700 }}>{title} #{invoice.id}</Text>
+            <Text style={{ fontSize: 9, fontWeight: 700 }}>{title} #{invoiceRef(invoice)}</Text>
           </View>
           <View style={{ marginTop: 6 }}>{clientBlock}</View>
           <View style={{ marginTop: 8 }}>{detailsBlock}</View>
@@ -523,7 +543,7 @@ export function InvoicePDFDocument({
             <View style={{ flex: 1, paddingRight: 16 }}>{sellerBlock}</View>
             <View>
               <Text style={s.docTitle}>{title}</Text>
-              <Text style={s.docNum}>#{invoice.id}</Text>
+              <Text style={s.docNum}>#{invoiceRef(invoice)}</Text>
             </View>
           </View>
           <View style={s.strip}>
@@ -557,6 +577,7 @@ export function InvoicePDFDocument({
         {subject}
         {table}
         {totals}
+        {totalInWords}
         {certified}
         {payment}
         {signature}
@@ -566,7 +587,7 @@ export function InvoicePDFDocument({
           pageNumber === 1 ? null : (
             <View style={s.fixedHeaderRow}>
               <Text style={s.fixedHeaderBiz}>{bizName}</Text>
-              <Text style={s.fixedHeaderRef}>{title} #{invoice.id}</Text>
+              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}</Text>
             </View>
           )
         } />

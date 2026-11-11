@@ -1,3 +1,4 @@
+import { formatCadastralRef } from '@/lib/cadastral';
 import { createContext, useContext } from 'react';
 import { fmt } from '@/data';
 import { getFiscalIdLabel } from '@/lib/ohada';
@@ -39,6 +40,8 @@ export interface BizInfo {
   rccm:            string;
   taxRegime?:      string;
   divisionFiscale?: string;
+  /** Cadastral reference of the place of sale (11 digits) */
+  cadastralRef?:   string;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,7 @@ const MOCK_BIZ: BizInfo = {
   rccm:            'BF-OUA-2021-B-1234',
   taxRegime:       'RNI',
   divisionFiscale: 'Ouagadougou I',
+  cadastralRef:    '01234567890',
 };
 const MOCK_PAYMENT: PaymentMethodLine[] = [
   { label: 'Orange Money', value: '70 00 00 00' },
@@ -70,7 +74,7 @@ function sampleInvoice() {
   const issued = new Date();
   const due = new Date(issued);
   due.setDate(due.getDate() + 14);
-  return { id: 'FACT-0041', issued: longDate(issued), due: longDate(due), subject: 'Refonte web — phase 2' };
+  return { id: `FACT-${issued.getFullYear()}-0041`, issued: longDate(issued), due: longDate(due), subject: 'Refonte web — phase 2' };
 }
 const LINES = [
   { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens', qty: 1, price: 300_000 },
@@ -93,7 +97,8 @@ function bizLines(biz: BizInfo) {
   return {
     addr: [biz.address, biz.city, biz.country].filter(Boolean).join(', '),
     contact: [biz.email, biz.phone].filter(Boolean).join(' · '),
-    compliance: [biz.ifu && `${fiscalLabel} ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`, biz.taxRegime, biz.divisionFiscale]
+    compliance: [biz.ifu && `${fiscalLabel} ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`, biz.taxRegime, biz.divisionFiscale,
+      biz.cadastralRef && `Réf. cadastrale ${formatCadastralRef(biz.cadastralRef)}`]
       .filter(Boolean).join(' · '),
   };
 }
@@ -121,6 +126,7 @@ function ClientBlock() {
     <>
       <div className="tp-block-label">Facturé à</div>
       <div className="tp-client-name">{CLI.name}</div>
+      <div className="tp-client-meta">[PM] Personne morale</div>
       <div className="tp-client-meta">{CLI.city}</div>
       <ClientIds />
     </>

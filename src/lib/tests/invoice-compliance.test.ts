@@ -5,6 +5,7 @@ import type { PaymentSettings } from '@/lib/api/payment-settings';
 const complete: SellerInfo = {
   name: 'Studio Wend', address: 'Av. Kwame Nkrumah', city: 'Ouagadougou', country: 'Burkina Faso',
   ifu: '00012345B', rccm: 'BF-OUA-2021-B-1234', taxRegime: 'RNI', divisionFiscale: 'DME Centre',
+  cadastralRef: '01234567890',
 };
 // Only the bank fields matter here (importing the real defaults loads the Supabase client)
 const noBank = { methodBankEnabled: false, methodBankIban: '' } as PaymentSettings;
@@ -21,6 +22,12 @@ describe('sellerIssues', () => {
     expect(keys(issues)).toEqual(['seller-ifu', 'seller-rccm', 'seller-regime', 'seller-division']);
     expect(issues.every(i => i.fix === 'business')).toBe(true);
     expect(issues[0].label).toBe("IFU de l'entreprise");
+  });
+
+  it('asks for the cadastral reference in Burkina Faso, complete (11 digits)', () => {
+    expect(keys(sellerIssues({ ...complete, cadastralRef: '' }, bank))).toEqual(['seller-cadastre']);
+    expect(keys(sellerIssues({ ...complete, cadastralRef: '0123 456' }, bank))).toEqual(['seller-cadastre']);
+    expect(sellerIssues({ ...complete, cadastralRef: '' , country: 'Sénégal' }, bank)).toEqual([]);
   });
 
   it('uses the country fiscal ID label', () => {
@@ -45,22 +52,30 @@ describe('sellerIssues', () => {
 });
 
 describe('clientIssues', () => {
-  it('is empty for a client with an address and an IFU', () => {
-    expect(clientIssues({ name: 'TK', city: 'Ouagadougou', ifu: '00067890C' })).toEqual([]);
+  it('requires the IFU of a company (PM) and an individual trader (PC)', () => {
+    expect(keys(clientIssues({ name: 'TK', clientType: 'PM' }))).toEqual(['client-ifu']);
+    expect(keys(clientIssues({ name: 'TK', clientType: 'PC' }))).toEqual(['client-ifu']);
+    expect(clientIssues({ name: 'TK', clientType: 'PM', ifu: '00067890C' })).toEqual([]);
   });
 
-  it("treats the app's '—' placeholder as missing", () => {
-    expect(keys(clientIssues({ name: 'TK', city: '—', ifu: '00067890C' }))).toEqual(['client-address']);
+  it("doesn't require an IFU for an individual (PP) or a cash client (CC)", () => {
+    expect(clientIssues({ name: 'Awa', clientType: 'PP' })).toEqual([]);
+    expect(clientIssues({ name: 'Client comptant', clientType: 'CC' })).toEqual([]);
   });
 
-  it('asks for the IFU of a client that should have one', () => {
-    expect(keys(clientIssues({ name: 'TK', city: 'Ouaga' }))).toEqual(['client-ifu']);
-    expect(keys(clientIssues({ name: 'TK', city: 'Ouaga', withholdingScenario: 'resident-with-ifu' }))).toEqual(['client-ifu']);
+  it('infers the type of clients saved before types existed', () => {
+    expect(clientIssues({ name: 'Old', ifu: '00067890C' })).toEqual([]);   // PM with its IFU
+    expect(clientIssues({ name: 'Old' })).toEqual([]);                     // PP
   });
 
   it("doesn't ask for an IFU the client is declared not to have", () => {
-    expect(clientIssues({ name: 'TK', city: 'Ouaga', withholdingScenario: 'resident-without-ifu' })).toEqual([]);
-    expect(clientIssues({ name: 'TK', city: 'Paris', withholdingScenario: 'non-resident' })).toEqual([]);
+    expect(clientIssues({ name: 'TK', clientType: 'PM', withholdingScenario: 'resident-without-ifu' })).toEqual([]);
+    expect(clientIssues({ name: 'TK', clientType: 'PM', withholdingScenario: 'non-resident' })).toEqual([]);
+  });
+
+  it("requires the name, not the address (printed only on the client's request)", () => {
+    expect(keys(clientIssues({ name: ' ', clientType: 'PP' }))).toEqual(['client-name']);
+    expect(clientIssues({ name: 'TK', city: '—', clientType: 'PP' })).toEqual([]);
   });
 
   it('is empty for an unknown client', () => {

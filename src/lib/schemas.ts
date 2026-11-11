@@ -35,6 +35,12 @@ export const invoiceSchema = z.object({
   amount:      z.number().min(0),
   status:      invoiceStatusSchema,
   discountPct: z.number().min(0).max(100).default(0),
+  /** When the invoice was first issued (set by the database); counts toward the Solo limit */
+  firstIssuedAt: z.string().optional(),
+  /** Legal number (FACT-2026-0001), given by the database when the invoice is issued; none for drafts */
+  number:      z.string().optional(),
+  /** Who issued it (set by the database at first issue): the operator mention */
+  issuedByName: z.string().optional(),
 });
 
 export const serviceWithholdingScenarioSchema = z.enum([
@@ -57,6 +63,7 @@ export const clientSchema = z.object({
   taxRegime:           z.string().optional(),
   fiscalDivision:      z.string().optional(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
+  clientType:          z.enum(['CC', 'PM', 'PP', 'PC']).optional(),
 });
 
 export const clientRecordSchema = z.object({
@@ -73,6 +80,8 @@ export const clientRecordSchema = z.object({
   taxRegime:           z.string().optional(),
   fiscalDivision:      z.string().optional(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
+  /** DGI client type (see src/lib/client-type.ts); inferred from the IFU when missing */
+  clientType:          z.enum(['CC', 'PM', 'PP', 'PC']).optional(),
   invoices:            z.number().int().min(0),
   billed:              z.number().min(0),
   balance:             z.number().min(0),
@@ -112,6 +121,8 @@ export const creditNoteSchema = z.object({
   issued:    z.string(),
   amount:    z.number().min(0),
   reason:    z.string(),
+  /** Legal number (AV-2026-0001), given by the database */
+  number:    z.string().optional(),
 });
 
 export const quoteSchema = z.object({
@@ -153,6 +164,7 @@ export const newClientFormSchema = z.object({
   taxRegime:           z.string(),
   fiscalDivision:      z.string(),
   withholdingScenario: serviceWithholdingScenarioSchema.optional(),
+  clientType:          z.enum(['CC', 'PM', 'PP', 'PC']).optional(),
 });
 
 export const lineItemFormSchema = lineItemSchema.omit({ id: true }).extend({
