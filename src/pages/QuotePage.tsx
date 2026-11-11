@@ -8,6 +8,7 @@ import { useApp } from '@/context/AppContext';
 import { updateQuote } from '@/lib/api/quotes';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
@@ -34,7 +35,8 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading, userRole } = useApp();
+  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
+  const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -184,6 +186,7 @@ export default function QuotePage() {
     const pdfAmount  = editOpen ? eTotal : total;
     try {
       const blob = await renderInvoicePdf({
+        template: invoiceTemplate,
         invoice: { id: quote.id, subject: pdfSubject, client: quote.client, issued: pdfIssued, due: pdfValid, amount: pdfAmount, status: 'pending', discountPct: 0 },
         lines: pdfLines,
         client,
@@ -200,6 +203,12 @@ export default function QuotePage() {
       console.error('[handleDownloadPDF] failed:', err);
       showToast('Impossible de générer le PDF. Veuillez réessayer.', true);
     }
+  };
+
+  // Converting issues an invoice: check the mandatory mentions first
+  const requestConvert = () => {
+    if (convertingRef.current) return;
+    void compliance.guard(quote.client, () => void handleConvertToInvoice(), { returnTo: `/quotes/${quote.id}` });
   };
 
   const handleConvertToInvoice = async () => {
@@ -246,7 +255,7 @@ export default function QuotePage() {
             </button>
           )}
           {canConvert && (
-            <button className="btn btn-primary" onClick={handleConvertToInvoice} disabled={converting}>
+            <button className="btn btn-primary" onClick={requestConvert} disabled={converting || compliance.checking}>
               <Icon name="arrow-right" ariaHidden />
               {converting ? 'Conversion…' : 'Créer une facture'}
             </button>
@@ -379,7 +388,7 @@ export default function QuotePage() {
 
               <div className="rail-actions">
                 {canConvert && (
-                  <button className="btn btn-primary btn-block" onClick={handleConvertToInvoice} disabled={converting}>
+                  <button className="btn btn-primary btn-block" onClick={requestConvert} disabled={converting || compliance.checking}>
                     <Icon name="arrow-right" ariaHidden />
                     {converting ? 'Conversion…' : 'Créer une facture'}
                   </button>
