@@ -176,6 +176,18 @@ export const PAY_METHOD_LABEL: Record<PayMethod, string> = {
   momo: 'Mobile Money', wire: 'Virement', cash: 'Espèces', cheque: 'Chèque', pispi: 'PI-SPI',
 };
 
+// ── Rapprochement (PRO-175) ─────────────────────────────────────────────────────
+
+/** Where a payment stands against the statement: only a completed payment is matched or not. */
+export function reconcileStatus(p: Pick<Payment, 'status' | 'reconciledAt'>): 'none' | 'to_match' | 'matched' {
+  if (p.status !== 'completed') return 'none';
+  return p.reconciledAt ? 'matched' : 'to_match';
+}
+export const RECONCILE_STATUS: Record<'to_match' | 'matched', RowStatus> = {
+  to_match: { label: 'À rapprocher', tone: 'wait' },
+  matched:  { label: 'Rapproché',    tone: 'paid' },
+};
+
 export const PAYMENT_STATUS: Record<Payment['status'], RowStatus> = {
   completed: { label: 'Effectué',   tone: 'paid' },
   pending:   { label: 'En attente', tone: 'wait' },
@@ -222,4 +234,13 @@ export function paymentAuthorOptions(payments: Pick<Payment, 'source' | 'created
   const names = [...new Set(payments.map(paymentAuthor))];
   const rank = (n: string) => (n === 'En ligne' ? 1 : n === 'Inconnu' ? 2 : 0);
   return names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'fr')).map(n => ({ key: n, label: n }));
+}
+
+/**
+ * Whether an issued invoice is booked (PRO-174): its sales entry is posted. Null for a draft or a
+ * credit note (nothing of its own to show), and while the entries are not read yet.
+ */
+export function bookingStatus(r: DocRow, booked: Set<string> | null): RowStatus | null {
+  if (!booked || r.kind !== 'invoice' || r.status === 'draft') return null;
+  return booked.has(r.id) ? { label: 'Comptabilisée', tone: 'paid' } : { label: 'À comptabiliser', tone: 'wait' };
 }

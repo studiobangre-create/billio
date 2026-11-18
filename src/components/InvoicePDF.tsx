@@ -1,7 +1,8 @@
 import { invoiceRef } from '@/lib/invoice-number';
-import { documentAmounts } from '@/lib/document-amounts';
-import { invoiceTotalMention } from '@/lib/amount-in-words';
-import { formatCadastralRef } from '@/lib/cadastral';
+import { documentTaxes } from '@/lib/document-amounts';
+import { taxSummary, vatRows } from '@/lib/tax-groups';
+import { cashStampMention, invoiceTotalMention } from '@/lib/amount-in-words';
+import { cadastralRequired, formatCadastralRef } from '@/lib/cadastral';
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, Link, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { cleanRichText, type RichBlock, type RichDoc, type RichInline, type RichMark, type TextAlign } from '@/lib/rich-text';
@@ -11,7 +12,7 @@ import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
 import type { BizInfo, PaperConfig } from '@/components/InvoicePaper';
 import type { PaymentMethodLine } from '@/lib/payment-methods';
-import { VAT_LABEL, chargesVat, documentHasVat } from '@/lib/vat';
+import { chargesVat, documentHasVat } from '@/lib/vat';
 import { DEFAULT_CONFIG, accentDark, accentTint, densityScale, normalizeConfig, paperBands, paymentQrTarget, pdfFont } from '@/lib/invoice-template';
 import { registerPdfFonts } from '@/lib/pdf-fonts';
 import { qrMatrix, qrRuns, type InvoiceCertification } from '@/lib/certification';
@@ -118,6 +119,8 @@ export interface InvoicePDFProps {
    */
   creditNote?: {
     nature: string; originalRef: string; originalIssued: string; reason: string;
+    /** The invoice whose balance it reduces, when the original reference is not that invoice (RRR) */
+    creditedRef?: string;
     /** The stored total: printed as is, the rounding left in the discount or the VAT */
     storedTotal?: number;
   };
@@ -346,8 +349,11 @@ export function InvoicePDFDocument({
   const discountPct   = invoice.discountPct ?? 0;
   // VAT as issued: the stored total says whether it was charged, so a later
   // change of tax regime doesn't rewrite old invoices
-  const showVat       = documentHasVat(invoice.amount, subtotal - Math.round(subtotal * (discountPct / 100)), chargesVat(biz.taxRegime));
-  const { discountAmt, discountedSub, tax, total } = documentAmounts(subtotal, discountPct, showVat, creditNote?.storedTotal);
+  const withVat       = taxSummary(lines, discountPct, true);
+  const showVat       = documentHasVat(invoice.amount, withVat.net, chargesVat(biz.taxRegime), withVat.total);
+  const { discountAmt, discountedSub, total, groups } = documentTaxes(lines, discountPct, showVat, creditNote?.storedTotal);
+  // Several tax groups: each line says its group, and the totals give the VAT of each (DGI spec, 3 n–q)
+  const groupOf = (li: LineItem) => showVat && groups.length > 1 ? ` (${li.taxGroup ?? 'B'})` : '';
   const isPaid = invoice.status === 'paid';
 
   // A credit note gives back what was invoiced: no withholding of its own
@@ -409,7 +415,7 @@ export function InvoicePDFDocument({
         ...(invoice.firstIssuedAt ? [['Émission', pdfFmtDateTime(invoice.firstIssuedAt)] as const] : []),
         ...(invoice.issuedByName ? [['Émis par', invoice.issuedByName] as const] : []),
         ['Nature', creditNote.nature],
-        ['Facture d’origine', `${creditNote.originalRef} du ${pdfFmtDate(creditNote.originalIssued)}`],
+        ['Facture d’origine', creditNote.originalRef === 'RRR' ? 'RRR' : `${creditNote.originalRef} du ${pdfFmtDate(creditNote.originalIssued)}`],
       ] as const : [
         ['Émis le', pdfFmtDate(invoice.issued)],
         // DGI mentions w and y: when the invoice was issued, and by whom
@@ -449,7 +455,7 @@ export function InvoicePDFDocument({
         : lines.map(li => (
           <View key={li.id} style={s.rcptItem} wrap={false}>
             <View style={s.rcptRow}>
-              <Text style={[s.tdDesc, { fontWeight: 700 }]}>{li.desc}</Text>
+              <Text style={[s.tdDesc, { fontWeight: 700 }]}>{li.desc}{groupOf(li)}</Text>
               <Text style={s.tdRight}>{pdfFmt(li.qty * li.price)}</Text>
             </View>
             <Text style={s.smallText}>Qté {li.qty} × P.U. {pdfFmt(li.price)} F CFA</Text>
@@ -470,7 +476,7 @@ export function InvoicePDFDocument({
         </View>
       ) : lines.map(li => (
         <View key={li.id} style={s.tableRow} wrap={false}>
-          <Text style={s.tdDesc}>{li.desc}</Text>
+          <Text style={s.tdDesc}>{li.desc}{groupOf(li)}</Text>
           <Text style={s.tdRight}>{li.qty}</Text>
           <Text style={s.tdRight}>{pdfFmt(li.price)}</Text>
           <Text style={s.tdRight}>{pdfFmt(li.qty * li.price)}</Text>
@@ -492,12 +498,12 @@ export function InvoicePDFDocument({
             <Text style={[s.totVal, { color: '#666' }]}>{'-'}{pdfFmt(discountAmt)} F CFA</Text>
           </View>
         )}
-        {showVat && (
-          <View style={s.totRow}>
-            <Text style={s.totLabel}>{VAT_LABEL}</Text>
-            <Text style={s.totVal}>{pdfFmt(tax)} F CFA</Text>
+        {showVat && vatRows(groups).map(r => (
+          <View key={r.key} style={s.totRow}>
+            <Text style={s.totLabel}>{r.label}</Text>
+            <Text style={s.totVal}>{pdfFmt(r.amount)} F CFA</Text>
           </View>
-        )}
+        ))}
         {showVat && (
           <View style={s.totRow}>
             <Text style={s.totLabel}>Total TTC</Text>
@@ -528,8 +534,13 @@ export function InvoicePDFDocument({
 
   const kind = documentKind ?? (creditNote ? 'avoir' : title === 'Devis' ? 'devis' : 'facture');
   // DGI mention t: the total in words, in every layout
+  // DGI mention s: the receipt stamp if paid in cash (Burkina Faso, CGI art. 519), on invoices
+  const stamp = kind === 'facture' && cadastralRequired(biz.country) ? cashStampMention(total) : null;
   const totalInWords = (
-    <Text style={s.totalWords}>{invoiceTotalMention(total, kind)}</Text>
+    <>
+      <Text style={stamp ? { ...s.totalWords, marginBottom: 2 } : s.totalWords}>{invoiceTotalMention(total, kind)}</Text>
+      {stamp && <Text style={s.totalWords}>{stamp}</Text>}
+    </>
   );
 
   // Compact, beside the payment methods: about as tall as three of their lines
@@ -546,7 +557,7 @@ export function InvoicePDFDocument({
     <View style={s.paySection} wrap={false}>
       <View style={s.payCol}>
         <Text style={s.blockLabel}>R{'è'}glement</Text>
-        <Text style={s.notesText}>Le montant de cet avoir est d{'é'}duit du reste d{'û'} sur la facture {creditNote.originalRef}.</Text>
+        <Text style={s.notesText}>Le montant de cet avoir est d{'é'}duit du reste d{'û'} sur la facture {creditNote.creditedRef ?? creditNote.originalRef}.</Text>
       </View>
     </View>
   ) : (
@@ -675,7 +686,7 @@ export function InvoicePDFDocument({
           <View style={s.strip}>
             <Text style={s.stripText}>Émis le : {pdfFmtDate(invoice.issued)}</Text>
             {creditNote ? <>
-              <Text style={s.stripText}>Sur la facture : {creditNote.originalRef}</Text>
+              <Text style={s.stripText}>Sur la facture : {creditNote.creditedRef ?? creditNote.originalRef}</Text>
               <Text style={s.stripText}>Nature : {creditNote.nature.split(' ·')[0]}</Text>
             </> : <>
               <Text style={s.stripText}>Échéance : {pdfFmtDate(invoice.due)}</Text>
@@ -699,7 +710,7 @@ export function InvoicePDFDocument({
               <View style={s.asideSep} />
               <Text style={s.asideLabel}>{creditNote ? 'Total de l’avoir' : netAPayer !== null && !isPaid ? 'Net à payer' : 'Total dû'}</Text>
               <Text style={s.asideTotal}>{pdfFmt(amountDue)} F CFA</Text>
-              <Text style={s.asideDue}>{creditNote ? `Sur ${creditNote.originalRef}` : `Éch. ${pdfFmtDate(invoice.due)}`}</Text>
+              <Text style={s.asideDue}>{creditNote ? `Sur ${creditNote.creditedRef ?? creditNote.originalRef}` : `Éch. ${pdfFmtDate(invoice.due)}`}</Text>
             </>
           )} />
         )}

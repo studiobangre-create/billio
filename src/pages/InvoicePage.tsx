@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { canWrite, canDelete } from '@/lib/permissions';
+import { canWrite, canDelete, canCredit } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import InvoiceClientSelect from '@/components/InvoiceClientSelect';
@@ -22,6 +22,7 @@ import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId, creditNoteIssueError } from '@/lib/api/credit-notes';
 import { CREDIT_NATURES, type CreditNature } from '@/lib/credit-note';
+import { renderCreditNotePdf, showPdf } from '@/lib/credit-note-pdf';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
@@ -33,7 +34,9 @@ import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Status } from '@/data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_RATE_LABEL, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
-import { VAT_LABEL, chargesVat, documentHasVat, splitTtc, vatOn } from '@/lib/vat';
+import TaxGroupSelect from '@/components/TaxGroupSelect';
+import { lineGroup, productTaxGroup, splitDocument, taxSummary, vatRows } from '@/lib/tax-groups';
+import { chargesVat, documentHasVat } from '@/lib/vat';
 import Page from '@/components/Page';
 import { OwnerLine } from '@/components/owner/OwnerControls';
 import InvoiceSide from '@/components/invoice/InvoiceSide';
@@ -91,6 +94,8 @@ export default function InvoicePage() {
   const navigate = useNavigate();
   const { invoices, quotes, setQuotes, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
+  // Credit notes: admins and accountants only (PRO-174)
+  const credits = canCredit(userRole);
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus, online } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
@@ -127,6 +132,7 @@ export default function InvoicePage() {
   const [avoirAmount,  setAvoirAmount]  = useState(0);
   const [avoirSaving,  setAvoirSaving]  = useState(false);
   const [avoirNature,  setAvoirNature]  = useState<CreditNature | ''>('');
+  const [creditPdfFor, setCreditPdfFor] = useState<string | null>(null);
   const [creditNotes,  setCreditNotes]  = useState<CreditNote[]>([]);
   // Goes up once a posting to the books has finished, so the side panel reads the entries again
   const [ledgerTick, setLedgerTick] = useState(0);
@@ -187,12 +193,12 @@ export default function InvoicePage() {
   const client        = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
   const clientWithholdingScenario = (client as { withholdingScenario?: ServiceWithholdingScenario }).withholdingScenario;
   const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
-  const subtotal      = lines.reduce((s, li) => s + li.qty * li.price, 0);
   const discountPct   = invoice.discountPct ?? 0;
-  const discountAmt   = Math.round(subtotal * (discountPct / 100));
-  const discountedSub = subtotal - discountAmt;
-  const tax           = vatOn(discountedSub, canInvoiceTVA);
-  const total         = discountedSub + tax;
+  // Totals per DGI tax group (PRO-138)
+  const sums          = taxSummary(lines, discountPct, canInvoiceTVA);
+  const { subtotal, discount: discountAmt, net: discountedSub, tax, total } = sums;
+  const withVat       = taxSummary(lines, discountPct, true);
+  const vatOnInvoice  = documentHasVat(invoice.amount, withVat.net, canInvoiceTVA, withVat.total);
   const isOverdue       = invoice.status === 'overdue';
   const { paid, credited, balance } = invoiceBalance(invoice, payments, creditNotes);
   // Invoices marked paid before payments were tracked per invoice have no payment rows
@@ -336,6 +342,22 @@ export default function InvoicePage() {
     navigate('/invoices');
   };
 
+  // The « FACTURE D'AVOIR » PDF of an issued credit note (PRO-143); the new look has it in InvoiceSide
+  const openCreditPdf = async (cn: CreditNote, chargedVat: boolean) => {
+    if (creditPdfFor) return;
+    const tab = window.open('', '_blank');
+    setCreditPdfFor(cn.id);
+    try {
+      showPdf(await renderCreditNotePdf({ creditNote: cn, invoice, chargedVat, client: clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' }, biz: orgSettings, template: invoiceTemplate }), tab);
+    } catch (err) {
+      tab?.close();
+      console.error('[creditNotePdf]', err);
+      showToast('Le PDF de l’avoir n’a pas pu être généré. Réessayez.', true);
+    } finally {
+      setCreditPdfFor(null);
+    }
+  };
+
   const openAvoir = () => {
     // The new look writes credit notes in the invoice editor (PRO-168)
     if (UI_V2) { navigate(`/invoices/${invoice.id}/credit-note`); return; }
@@ -370,7 +392,7 @@ export default function InvoicePage() {
         setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' as const } : i));
       }
       // Accounting: back-calculate HT/TVA from TTC amount
-      const { ht: htAmount, tva: tvaAmount } = splitTtc(avoirAmount, canInvoiceTVA);
+      const { ht: htAmount, tva: tvaAmount } = splitDocument(avoirAmount, lines, discountPct, canInvoiceTVA);
       recordCreditNoteEntry(orgId, {
         creditNoteId: avId,
         invoiceId:    invoice.id,
@@ -423,11 +445,8 @@ export default function InvoicePage() {
 
   const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
 
-  const eSubtotal      = eLines.reduce((s, l) => s + l.qty * l.price, 0);
-  const eDiscountAmt   = Math.round(eSubtotal * (eDiscount / 100));
-  const eDiscountedSub = eSubtotal - eDiscountAmt;
-  const eTax           = vatOn(eDiscountedSub, canInvoiceTVA);
-  const eTotal         = eDiscountedSub + eTax;
+  const eSums          = taxSummary(eLines, eDiscount, canInvoiceTVA);
+  const { subtotal: eSubtotal, discount: eDiscountAmt, net: eDiscountedSub, tax: eTax, total: eTotal } = eSums;
 
   const handleSaveEdit = async () => {
     if (!eClient) { showToast('Veuillez sélectionner un client.', true); return; }
@@ -541,7 +560,7 @@ export default function InvoicePage() {
             <Icon name="send" ariaHidden /> {isOverdue ? 'Relancer' : 'Envoyer'}
           </button>
         )}
-        {writable && invoice.status !== 'draft' && creditable > 0 && (
+        {credits && invoice.status !== 'draft' && creditable > 0 && (
           <button className="btn" onClick={openAvoir}>
             <Icon name="file-minus" ariaHidden /> Créer un avoir
           </button>
@@ -691,7 +710,7 @@ export default function InvoicePage() {
                 {discountPct > 0 && (
                   <div className="tot-row"><span>Remise ({discountPct}%)</span><span className="tv" style={{ color: 'var(--color-text-secondary)' }}>−{fmt(discountAmt)} F CFA</span></div>
                 )}
-                {canInvoiceTVA && <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(tax)} F CFA</span></div>}
+                {canInvoiceTVA && vatRows(sums.groups).map(r => <div key={r.key} className="tot-row"><span>{r.label}</span><span className="tv">{fmt(r.amount)} F CFA</span></div>)}
                 {paid > 0 && (
                   <div className="tot-row"><span>Montant payé</span><span className="tv paid-amt">−{fmt(paid)} F CFA</span></div>
                 )}
@@ -767,7 +786,8 @@ export default function InvoicePage() {
               amountDue={amountDue}
               creditNotes={creditNotes}
               client={{ code: invoice.client, name: client.name, contact: client.contact, email: client.email, phone: client.phone }}
-              vatOnInvoice={documentHasVat(invoice.amount, discountedSub, canInvoiceTVA)}
+              vatOnInvoice={vatOnInvoice}
+              salesSplit={lines.length ? splitDocument(invoice.amount, lines, discountPct, vatOnInvoice) : undefined}
             />
           ) : (<>
           {/* Rail */}
@@ -812,7 +832,7 @@ export default function InvoicePage() {
                   <button className="btn btn-block btn-ghost btn-danger" onClick={handleDelete}>
                     <Icon name="trash" ariaHidden /> Supprimer la facture
                   </button>
-                ) : (
+                ) : (credits &&
                   <button className="btn btn-block btn-ghost btn-danger" onClick={openAvoir}>
                     <Icon name="file-minus" ariaHidden /> Émettre un avoir
                   </button>
@@ -839,6 +859,13 @@ export default function InvoicePage() {
                   <div>
                     <div className="tl-text">Avoir {creditNoteRef(cn)} — {fmt(cn.amount)} F CFA</div>
                     <div className="tl-time">{fmtDateLong(cn.issued)} · {cn.reason}</div>
+                    {cn.status === 'issued' && (
+                      <button type="button" className="dt-linkcell" style={{ fontSize: 12 }} disabled={creditPdfFor !== null}
+                        onClick={() => openCreditPdf(cn, documentHasVat(invoice.amount, discountedSub, canInvoiceTVA))}
+                        aria-label={`PDF de l’avoir ${creditNoteRef(cn)}`}>
+                        {creditPdfFor === cn.id ? 'Génération…' : 'PDF de l’avoir'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1043,17 +1070,18 @@ export default function InvoicePage() {
           </div>
 
           <div className="subhead"><span>Lignes de facturation</span></div>
-          <div className="line-items-head">
+          <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
             <div className="li-col">Description</div>
             <div className="li-col">Unité</div>
             <div className="li-col right">Qté</div>
             <div className="li-col right">Prix</div>
+            {canInvoiceTVA && <div className="li-col">TVA</div>}
             <div />
           </div>
 
           {eLines.map((li, idx) => (
             <div key={li.id} className="line-item">
-              <div className="line-item-row">
+              <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
                 <input className="li-input" placeholder="Description du service" value={li.desc}
                   aria-label={`Description, ligne ${idx + 1}`}
                   onChange={e => updateELine(li.id, 'desc', e.target.value)} />
@@ -1070,6 +1098,8 @@ export default function InvoicePage() {
                 <input className="li-input num" type="number" min="0" value={li.price || ''}
                   placeholder="0" aria-label={`Prix unitaire, ligne ${idx + 1}`}
                   onChange={e => updateELine(li.id, 'price', e.target.value)} />
+                {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
+                  onChange={g => setELines(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
                 <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label={`Supprimer la ligne ${idx + 1}`}>
                   <Icon name="trash" size={15} ariaHidden />
                 </button>
@@ -1094,7 +1124,7 @@ export default function InvoicePage() {
                       ? <div className="picker-empty">Aucun produit trouvé</div>
                       : filteredProducts.map(p => (
                           <div key={p.id} className="picker-item" onClick={() => {
-                            setELines(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
+                            setELines(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
                             setShowPicker(false); setPickerQuery('');
                           }}>
                             <div>
@@ -1125,7 +1155,7 @@ export default function InvoicePage() {
               />
             </div>
             {eDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(eDiscountAmt)} F CFA</span></div>}
-            {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(eTax)} F CFA</span></div>}
+            {canInvoiceTVA && vatRows(eSums.groups).map(r => <div key={r.key} className="total-row"><span>{r.label}</span><span>{fmt(r.amount)} F CFA</span></div>)}
             <div className="total-row final"><span>Total à payer</span><span>{fmt(eTotal)} F CFA</span></div>
           </div>
         </div>

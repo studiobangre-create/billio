@@ -2,6 +2,7 @@
 // what the invoice editor computes in credit note mode. Kept free of React so
 // it can be tested.
 
+import { TAX_GROUPS, defaultTaxGroup, taxSummary } from '@/lib/tax-groups';
 import { filledLines } from '@/lib/line-validation';
 import { documentHasVat, splitTtc } from '@/lib/vat';
 import { editorTotals, type EditorTotals } from '@/lib/invoice-editor';
@@ -17,6 +18,11 @@ export const CREDIT_NATURES: readonly { code: CreditNature; label: string; hint:
   { code: 'RAM', label: 'Après paiement ou livraison', hint: 'Retour, prestation non rendue, après paiement ou livraison' },
   { code: 'RRR', label: 'Rabais, remise, ristourne', hint: 'Un geste commercial accordé après coup' },
 ];
+
+/** The mention the DGI's annex prints for each nature (PRO-143). */
+export const NATURE_MENTION: Record<CreditNature, string> = { COR: 'Correction', RAN: 'Annulation', RAM: 'Avoir suite reprise', RRR: 'RRR' };
+/** What the credit note PDF prints as its nature: the code and the DGI's mention. */
+export const printedNature = (code: CreditNature): string => code === 'RRR' ? 'RRR' : `${code} · ${NATURE_MENTION[code]}`;
 
 export const natureLabel = (code: CreditNature): string => {
   const n = CREDIT_NATURES.find(x => x.code === code);
@@ -42,14 +48,13 @@ export function creditableQty(invoiceLines: LineItem[], issued: Pick<CreditNote,
 export function creditLines(invoiceLines: LineItem[], qty: Record<string, number>): CreditLine[] {
   return filledLines(invoiceLines)
     .filter(l => (qty[l.id] ?? 0) > 0)
-    .map(l => ({ id: crypto.randomUUID(), desc: l.desc, unit: l.unit ?? 'unité', qty: qty[l.id], price: l.price, productId: l.productId, sourceId: l.id }));
+    .map(l => ({ id: crypto.randomUUID(), desc: l.desc, unit: l.unit ?? 'unité', qty: qty[l.id], price: l.price, productId: l.productId, taxGroup: l.taxGroup, sourceId: l.id }));
 }
 
 /** Whether the invoice charged VAT, read from its stored total (a later change of regime doesn't matter). */
 export function invoiceChargedVat(invoice: Pick<Invoice, 'amount' | 'discountPct'>, invoiceLines: LineItem[], regimeChargesVat: boolean): boolean {
-  const sub = filledLines(invoiceLines).reduce((s, l) => s + l.qty * l.price, 0);
-  const net = sub - Math.round(sub * ((invoice.discountPct ?? 0) / 100));
-  return documentHasVat(invoice.amount, net, regimeChargesVat);
+  const withVat = taxSummary(filledLines(invoiceLines), invoice.discountPct ?? 0, true);
+  return documentHasVat(invoice.amount, withVat.net, regimeChargesVat, withVat.total);
 }
 
 /**
@@ -127,15 +132,18 @@ export function creditTotals(lines: CreditLine[], invoice: { discountPct?: numbe
 export function reconcileFinalCredit(t: EditorTotals, opts: { emptiesInvoice: boolean; left: number; chargedVat: boolean; tolerance: number }): EditorTotals {
   const diff = opts.left - t.total;
   if (!opts.emptiesInvoice || diff === 0 || Math.abs(diff) > opts.tolerance) return t;
+  const taxed = t.groups.filter(g => g.rate > 0);
+  const onGroup = taxed.length ? taxed.reduce((a, b) => b.base > a.base ? b : a).code : null;
   return opts.chargedVat
-    ? { ...t, tax: t.tax + diff, total: opts.left, toPay: opts.left }
+    ? { ...t, tax: t.tax + diff, total: opts.left, toPay: opts.left, groups: t.groups.map(g => g.code === onGroup ? { ...g, tax: g.tax + diff } : g) }
     : { ...t, discount: t.discount - diff, net: t.net + diff, total: opts.left, toPay: opts.left };
 }
 
 /** A credit note on an invoice without stored lines: an amount TTC, split into HT and VAT. */
 export function amountTotals(amount: number, chargedVat: boolean): EditorTotals {
   const { ht, tva } = splitTtc(amount, chargedVat);
-  return { subtotal: ht, discount: 0, net: ht, tax: tva, total: amount, withholding: null, toPay: amount };
+  const g = TAX_GROUPS[defaultTaxGroup(chargedVat)];
+  return { subtotal: ht, discount: 0, net: ht, tax: tva, total: amount, withholding: null, toPay: amount, groups: [{ code: g.code, label: g.label, rate: g.rate, base: ht, tax: tva }] };
 }
 
 /**

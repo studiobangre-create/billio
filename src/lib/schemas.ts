@@ -1,5 +1,6 @@
 import type { RichDoc } from '@/lib/rich-text';
 import { z } from 'zod';
+import { TAX_GROUP_CODES } from '@/lib/tax-groups';
 
 // ---------------------------------------------------------------------------
 // Shared enums
@@ -25,6 +26,8 @@ export const lineItemSchema = z.object({
   qty:       z.number().min(0),
   price:     z.number().min(0),
   productId: z.string().optional(),
+  /** DGI tax group (PRO-138); none on older lines, which are taxed as B (or H without VAT) */
+  taxGroup:  z.enum(TAX_GROUP_CODES).optional(),
 });
 
 export const invoiceSchema = z.object({
@@ -109,6 +112,9 @@ export const paymentSchema = z.object({
   source: paySourceSchema.default('manual'),
   /** « Saisi par »: who recorded it (PRO-173), set by the database; none for online payments */
   createdByName: z.string().optional(),
+  /** Matched with the bank or Mobile Money statement (PRO-175): when, and by whom; set by the database */
+  reconciledAt:     z.string().optional(),
+  reconciledByName: z.string().optional(),
 });
 
 export const productSchema = z.object({
