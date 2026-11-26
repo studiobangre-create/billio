@@ -5,7 +5,8 @@ import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
-import { ACCOUNTING_ENABLED, UI_V2 } from '@/lib/features';
+import Toast from '@/components/Toast';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 import FeatureGuard from '@/components/FeatureGuard';
 import type { Feature } from '@/lib/plans';
 
@@ -22,7 +23,6 @@ const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
 const InvitePage             = lazy(() => import('./pages/InvitePage'));
 const PayPage                = lazy(() => import('./pages/PayPage'));
 const OnboardingPage         = lazy(() => import('./pages/OnboardingPage'));
-const DashboardPage          = lazy(() => import('./pages/DashboardPage'));
 const DashboardV2Page        = lazy(() => import('./pages/DashboardV2Page'));
 const SalesPage              = lazy(() => import('./pages/SalesPage'));
 const QuotesPage             = lazy(() => import('./pages/QuotesPage'));
@@ -75,21 +75,23 @@ export default function App() {
     <AppProvider>
       <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
-        {/* Root / login — default landing */}
+        {/* Root: the landing page for visitors, the app for signed-in users */}
         <Route
           path="/"
-          element={authed && !isRecovery
-            ? <Navigate to="/dashboard" replace />
-            : <AuthPage onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
-          }
+          element={resolving ? null : authed && !isRecovery ? <Navigate to="/dashboard" replace /> : <LandingPage />}
         />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-
-        {/* Legacy landing page */}
-        <Route
-          path="/landing"
-          element={authed ? <Navigate to="/dashboard" replace /> : <LandingPage />}
-        />
+        {/* Sign-in and sign-up are the same page, opened on one form or the other */}
+        {(['login', 'signup'] as const).map(mode => (
+          <Route
+            key={mode}
+            path={`/${mode}`}
+            element={authed && !isRecovery
+              ? <Navigate to="/dashboard" replace />
+              : <AuthPage mode={mode} onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
+            }
+          />
+        ))}
+        <Route path="/landing" element={<Navigate to="/" replace />} />
 
         {/* Public tools */}
         <Route path="/invoice-generator" element={<InvoiceGeneratorPage />} />
@@ -105,22 +107,25 @@ export default function App() {
         <Route path="/payer/:token" element={<PayPage />} />
 
         {/* Protected — wait for session to resolve before redirecting */}
+        {/* The setup wizard takes the whole screen: no app menu until the business is set up */}
         <Route
-          element={resolving ? null : authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/" replace />}
+          path="/onboarding"
+          element={resolving ? null : authed ? <><OnboardingPage onLogout={onLogout} /><Toast /></> : <Navigate to="/login" replace />}
+        />
+        <Route
+          element={resolving ? null : authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/login" replace />}
         >
-          {/* Onboarding renders inside AppShell (gets the sidebar), not guarded */}
-          <Route path="/onboarding" element={<OnboardingPage />} />
 
           {/* All other routes redirect to /onboarding when setup is missing */}
           <Route element={<OnboardingGuard />}>
-            <Route path="/dashboard" element={UI_V2 ? <DashboardV2Page /> : <DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardV2Page />} />
             <Route path="/invoices" element={<SalesPage />} />
-            {UI_V2 && <Route path="/invoices/new" element={<InvoiceEditorPage />} />}
-            {UI_V2 && <Route path="/invoices/:id/edit" element={<InvoiceEditorPage />} />}
-            {UI_V2 && <Route path="/invoices/:id/credit-note" element={<CreditNoteEditorPage />} />}
-            {UI_V2 && <Route path="/credit-notes/:cnId/edit" element={<CreditNoteEditorPage />} />}
-            {UI_V2 && <Route path="/quotes/new" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />}
-            {UI_V2 && <Route path="/quotes/:id/edit" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />}
+            <Route path="/invoices/new" element={<InvoiceEditorPage />} />
+            <Route path="/invoices/:id/edit" element={<InvoiceEditorPage />} />
+            <Route path="/invoices/:id/credit-note" element={<CreditNoteEditorPage />} />
+            <Route path="/credit-notes/:cnId/edit" element={<CreditNoteEditorPage />} />
+            <Route path="/quotes/new" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />
+            <Route path="/quotes/:id/edit" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />
             <Route path="/invoices/:id" element={<InvoicePage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/clients"  element={<Navigate to="/contacts" replace />} />
@@ -141,12 +146,12 @@ export default function App() {
             {/* Reports aren't built yet; old links land on the dashboard */}
             <Route path="/reports"  element={<Navigate to="/dashboard" replace />} />
             {/* In the ERP look Devis and Paiements are pages of their own (PRO-165) */}
-            <Route path="/payments" element={UI_V2 ? <Gated feature="payments_mobilemoney" title="Paiements"><PaymentsPage /></Gated> : <Navigate to="/invoices?tab=payments" replace />} />
-            <Route path="/quotes"     element={UI_V2 ? <Gated feature="quotes" title="Devis"><QuotesPage /></Gated> : <Navigate to="/invoices?tab=quotes" replace />} />
+            <Route path="/payments" element={<Gated feature="payments_mobilemoney" title="Paiements"><PaymentsPage /></Gated>} />
+            <Route path="/quotes"     element={<Gated feature="quotes" title="Devis"><QuotesPage /></Gated>} />
             <Route path="/quotes/:id" element={<Gated feature="quotes" title="Devis"><QuotePage /></Gated>} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/settings"  element={<SettingsPage />} />
-            {UI_V2 && <Route path="/profile" element={<ProfilePage />} />}
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
